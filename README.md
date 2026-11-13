@@ -1,6 +1,6 @@
 # tijdje
 
-A keyboard-driven terminal application for tracking working time at Consid, in the style of Norton Commander. Written in Rust.
+A keyboard-driven terminal application for tracking working time, in the style of Norton Commander. Written in Rust.
 
 ## License
 
