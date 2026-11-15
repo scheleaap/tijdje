@@ -14,6 +14,9 @@ _Avoid_: Entry, block, slot
 **Project**:
 The work a period is attributed to, e.g. a customer engagement or internal work.
 
+**Open period**:
+A period whose end time is not yet known, because it is still running.
+
 **Work period**:
 A period during which the consultant works on a project.
 

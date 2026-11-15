@@ -117,6 +117,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Total balance**: sum of the day balances from the first recorded day up to and including that day. Not shown for future days or days before the first recorded day.
 - **Period types**: work, break, vacation, sick, holiday. Exactly one per period. In the UI the four non-working checkboxes are mutually exclusive, and none checked means work.
 - **Times**: From and To are exactly four digits HHMM, 0000–2359. Periods never cross midnight.
+- **Left panel display**: day numbers are padded to two characters (`ma  2 nov`) so columns align. A day with only non-working periods shows `0h00m` worked time; a day without periods shows nothing.
 - **Consistency checks** (not exhaustive): From is not empty; no overlaps; From before To; at most one sick, one vacation and one holiday period per day; open period only on the current day; non-working periods have no project. Before checking a day, completely empty periods are removed and the rest are sorted by From, so ordering never fails a check.
 - **Check triggers**: leaving a day (B) checks that day. Ctrl+S and Ctrl+Q check all days. On Ctrl+Q the consistency popup comes before the "Save before quitting?" popup. Days that fail a check at load time are still loaded and marked ⚠️.
 - **Shortcut modifiers** used in the original design: (A) not available while a field is being edited; (B) runs a consistency check and cancels the action if it fails; (C) accepts the active input first.
@@ -145,6 +146,8 @@ days:
         type: work        # work | break | vacation | sick | holiday
 ```
 
+- A missing or empty file is an empty timesheet; the file is created on the first save.
+- Unknown keys and invalid `HH:MM` times are parse errors: the application exits without touching the file.
 - Empty To, project and notes are written as `null`. `""` is read as `null`.
 - `type` is always written.
 - Days without periods are not written. `regular_expected_working_time_in_minutes` is written when a day gets its first period, and existing values are kept.
