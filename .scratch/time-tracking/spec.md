@@ -4,7 +4,7 @@ Status: ready-for-agent
 
 ## Problem Statement
 
-As a consultant, I record my working time by hand in a free-form text file. Adding up worked time per day, keeping track of how far I am ahead or behind my expected working time, and spotting gaps or mistakes (overlaps, forgotten days, open periods) is manual, slow and error-prone. Later, the same data must be booked in Moco, which today means retyping it.
+As a consultant, I record my working time by hand in a free-form text file. Adding up worked time per day, keeping track of how far I am ahead or behind my actual expected working time, and spotting gaps or mistakes (overlaps, forgotten days, open periods) is manual, slow and error-prone. Later, the same data must be booked in Moco, which today means retyping it.
 
 ## Solution
 
@@ -39,7 +39,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 15. As a consultant, I want dates in the Dutch format "ma 12 nov", so that they match how I think about my week.
 16. As a consultant, I want worked time shown like `1h55m` and balances signed like `+0h45m` and `-1h12m`, so that values are unambiguous.
 17. As a consultant, I want the total balance to add up from the first recorded day, so that I know my overall surplus or deficit.
-18. As a consultant, I want an empty weekday after the first recorded day to count with its full expected working time, so that forgotten days lower my balance until I record them.
+18. As a consultant, I want an empty weekday after the first recorded day to count with its full regular expected working time, so that forgotten days lower my balance until I record them.
 19. As a consultant, I want days before the first recorded day to show no balances and no warnings, so that history before I started tracking is not noise.
 20. As a consultant, I want future days to show neither day balance nor total balance, so that planned absences do not distort my current balance.
 21. As a consultant, I want an absence indicator per day (🤒 sick, 🏖️ vacation, 🎄 holiday; at most one, in that priority), so that I see absences at a glance.
@@ -66,7 +66,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 39. As a consultant, I want Space to toggle the focused checkbox, so that checkboxes work like other fields.
 40. As a consultant, I want Alt+b/v/s/h to toggle Break/Vacation/Sick/Holiday, accepting any active input first, so that I can set the period type from anywhere in the period.
 41. As a consultant, I want the period-type checkboxes to be mutually exclusive, so that a period always has a single type.
-42. As a consultant, I want checking Vacation, Sick or Holiday on a day whose only period has empty From and To to fill in From 0900 and To 0900 + expected working time (e.g. 1612), and unchecking it to empty From and To again, so that whole-day absences take one keystroke.
+42. As a consultant, I want checking Vacation, Sick or Holiday on a day whose only period has empty From and To to fill in From 0900 and To 0900 + regular expected working time (e.g. 1612), and unchecking it to empty From and To again, so that whole-day absences take one keystroke.
 43. As a consultant, I want Alt+p and Alt+n to jump to the Project and Notes field, accepting any active input first, so that I can reach them quickly.
 44. As a consultant, I want project names to be free text with the best match from earlier projects shown as dimmed ghost text, accepted with → at the end of the input, so that I type project names consistently.
 45. As a consultant, I want Ctrl+C to copy the focused field's value to the system clipboard, so that I can reuse it elsewhere.
@@ -75,7 +75,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 48. As a consultant, I want Ctrl+Del to delete the focused period after confirming (Delete/Cancel), so that I can remove mistakes.
 49. As a consultant, I want a "→ ☕" indicator to the right of a period that is not directly followed by the next period, so that implied breaks are visible.
 50. As a consultant, I want a "⚠️" indicator to the right of a period that starts before 06:00 or ends after 20:00, so that unusual times stand out.
-51. As a consultant, I want the bottom of the right panel to show the expected working time, e.g. `Expected: 3h36m (7h12m − 3h36m vacation)` or just `Expected: 7h12m`, so that I understand my target for the day.
+51. As a consultant, I want the bottom of the right panel to show the actual expected working time, e.g. `Actual expected: 3h36m (regular 7h12m − 3h36m vacation)` or just `Actual expected: 7h12m`, so that I understand my target for the day.
 52. As a consultant, I want the right panel to scroll when periods do not fit, so that busy days remain usable.
 53. As a consultant, I want long notes cut off with `…` and scrolled horizontally while editing, so that the layout stays intact.
 
@@ -110,9 +110,10 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 
 ### Domain rules
 
-- **Expected working time**: a constant 432 minutes (7h12m) for now. For a day without a stored value (including empty days after the first recorded day) the constant applies. A day's expected working time is reduced by the duration of its vacation, sick and holiday periods.
+- **Regular expected working time**: a constant 432 minutes (7h12m) for now, stored per day. For a day without a stored value (including empty days after the first recorded day) the constant applies. Vacation, sick and holiday periods never change it.
+- **Actual expected working time**: computed, never stored: the regular expected working time minus the duration of the day's vacation, sick and holiday periods.
 - **Worked time**: the total duration of a day's work periods. Breaks never count. Open periods count once To is filled in.
-- **Day balance**: worked time minus expected working time. Shown for days from the first recorded day up to and including today.
+- **Day balance**: worked time minus actual expected working time. Shown for days from the first recorded day up to and including today.
 - **Total balance**: sum of the day balances from the first recorded day up to and including that day. Not shown for future days or days before the first recorded day.
 - **Period types**: work, break, vacation, sick, holiday. Exactly one per period. In the UI the four non-working checkboxes are mutually exclusive, and none checked means work.
 - **Times**: From and To are exactly four digits HHMM, 0000–2359. Periods never cross midnight.
@@ -135,7 +136,7 @@ YAML file, default `~/Documents/timesheet.yaml`, overridable with a single comma
 ```yaml
 days:
   "2026-11-12":
-    expected_working_time_minutes: 432
+    regular_expected_working_time_in_minutes: 432
     periods:
       - from: "12:35"
         to: null          # open period
@@ -146,13 +147,13 @@ days:
 
 - Empty To, project and notes are written as `null`. `""` is read as `null`.
 - `type` is always written.
-- Days without periods are not written. `expected_working_time_minutes` is written when a day gets its first period, and existing values are kept.
+- Days without periods are not written. `regular_expected_working_time_in_minutes` is written when a day gets its first period, and existing values are kept.
 - Writes are atomic (temp file + rename). The previous file is kept as `timesheet.yaml.bak`. Comments in the file are not preserved.
 - Before writing, the application detects whether the file changed on disk since it was loaded or last saved.
 
 ### Modules
 
-- **Timesheet domain** (pure, no I/O): days, periods, period types, HHMM parsing/formatting, derived figures (worked time, expected working time, day balance, total balance), consistency checks, day and period indicators. The deepest module; most rules live here.
+- **Timesheet domain** (pure, no I/O): days, periods, period types, HHMM parsing/formatting, derived figures (worked time, actual expected working time, day balance, total balance), consistency checks, day and period indicators. The deepest module; most rules live here.
 - **Timesheet store**: loads and saves the YAML file. Interface: load a path into a timesheet (or a parse error); save a timesheet, refusing when the file changed since a given fingerprint unless overwriting is forced.
 - **Application state**: the whole interactive state (screen, panel focus, selected day, focused period/field, active input, popups, undo/redo history, dirty flag, messages). Takes key events and produces state changes plus effects (save, quit, clipboard). Today/now, clipboard and file system reach it through small injected ports so tests can fake them.
 - **Rendering**: draws the application state with Norton Commander styling. After each frame, it paints the second cell of every wide symbol with a space in that cell's background, then redraws the symbol on top of it. Otherwise Ptyxis leaves half the background of 🏖️/⚠️ unpainted (ADR-0001). This approach was proven in the prototype:
@@ -172,10 +173,11 @@ ratatui + crossterm for the TUI, serde + serde_yaml_ng for YAML (serde_yaml is u
 ## Testing Decisions
 
 - Good tests check external behavior only: given input, they check what the user sees or what is persisted, never internal structure.
-- **Seam 1, Timesheet domain** (test-first, red-green-refactor): balances, expected working time reductions, consistency checks, HHMM parsing, sorting and indicators, tested through the domain module's public interface.
+- **Seam 1, Timesheet domain** (test-first, red-green-refactor): balances, actual expected working time, consistency checks, HHMM parsing, sorting and indicators, tested through the domain module's public interface.
 - **Seam 2, Application** (the highest seam; tests written alongside the code, not strictly test-first): feed key sequences into the application state with a fake clock, fake clipboard and in-memory file system, render to ratatui's TestBackend, and check the rendered buffer, the persisted YAML and clipboard contents. This covers navigation, editing, popups, undo/redo and saving end-to-end.
 - The store's YAML round-trip (null handling, type field, atomic write, `.bak`, change detection) is covered through seam 2's in-memory file system. A small set of tests uses a real temporary directory for the atomic write.
 - Emoji alignment in real terminals can't be checked with TestBackend. It is proven by the throwaway prototype (see Further Notes).
+- A sample timesheet file with realistic weeks (vacation, sick and holiday periods, an open period, an empty day) serves demos and tests, before periods can be created in the UI.
 - No prior art: the repository has no code yet.
 
 ## Out of Scope
@@ -183,7 +185,7 @@ ratatui + crossterm for the TUI, serde + serde_yaml_ng for YAML (serde_yaml is u
 - Moco synchronization (later milestone). Project names stay free text and will be mapped to Moco then.
 - A managed project list.
 - Screens other than Tracking and Help.
-- Weekend days, periods crossing midnight, configurable expected working time.
+- Weekend days, periods crossing midnight, configurable regular expected working time.
 - Auto-save, mouse support.
 - Verifying emoji rendering in terminals other than Ptyxis, and installing those terminals.
 

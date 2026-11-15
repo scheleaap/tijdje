@@ -21,7 +21,7 @@ A period during which the consultant works on a project.
 A period that is a break, vacation period, sick period or holiday period.
 
 **Break**:
-A non-working period that is not worked and does not reduce the expected working time.
+A non-working period that is not worked and does not reduce the actual expected working time.
 
 **Implied break**:
 A gap between two consecutive periods on the same day.
@@ -35,15 +35,20 @@ A period during which the consultant is sick.
 **Holiday period**:
 A period that falls on a public holiday.
 
-**Expected working time**:
-The time the consultant is expected to work on a day, reduced by that day's vacation, sick and holiday periods.
+**Regular expected working time**:
+The time the consultant is expected to work on a day without vacation, sick or holiday periods.
+_Avoid_: Expected working time (without "regular" or "actual")
+
+**Actual expected working time**:
+A day's regular expected working time minus the duration of its vacation, sick and holiday periods.
+_Avoid_: Expected working time (without "regular" or "actual")
 
 **Worked time**:
 The total duration of a day's work periods.
 _Avoid_: Worked hours
 
 **Day balance**:
-A day's worked time minus its expected working time.
+A day's worked time minus its actual expected working time.
 
 **Total balance**:
 The sum of all day balances from the first recorded day up to and including a given day.
