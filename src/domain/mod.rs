@@ -5,4 +5,4 @@ mod time;
 mod timesheet;
 
 pub use time::{Minutes, TimeOfDay};
-pub use timesheet::{Day, Period, PeriodType, Timesheet};
+pub use timesheet::{Absence, Day, Period, PeriodType, Timesheet};

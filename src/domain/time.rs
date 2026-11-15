@@ -22,9 +22,17 @@ impl TimeOfDay {
 pub struct Minutes(pub i32);
 
 impl Minutes {
-    /// Formats an unsigned duration like `1h55m`.
+    /// Formats a duration like `1h55m`.
     pub fn format_duration(self) -> String {
-        format!("{}h{:02}m", self.0 / 60, self.0 % 60)
+        let sign = if self.0 < 0 { "-" } else { "" };
+        let abs = self.0.unsigned_abs();
+        format!("{sign}{}h{:02}m", abs / 60, abs % 60)
+    }
+
+    /// Formats a balance like `+0h45m` or `-1h12m`; zero has no sign.
+    pub fn format_balance(self) -> String {
+        let sign = if self.0 > 0 { "+" } else { "" };
+        format!("{sign}{}", self.format_duration())
     }
 }
 
@@ -41,6 +49,14 @@ impl Add for Minutes {
 
     fn add(self, other: Self) -> Self {
         Self(self.0 + other.0)
+    }
+}
+
+impl Sub for Minutes {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self(self.0 - other.0)
     }
 }
 

@@ -11,13 +11,16 @@ use ratatui::{
 };
 
 use crate::domain::{
-    Timesheet,
+    Absence, Minutes, Timesheet,
     calendar::{self, Separator},
 };
 
 const MIN_WIDTH: u16 = 100;
 const MIN_HEIGHT: u16 = 24;
 const LEFT_PANEL_WIDTH: u16 = 46;
+const WORKED_WIDTH: usize = 6;
+const DAY_BALANCE_WIDTH: usize = 7;
+const TOTAL_BALANCE_WIDTH: usize = 8;
 
 const PANEL: Style = Style::new().fg(Color::Cyan).bg(Color::Blue);
 const SELECTED: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
@@ -38,6 +41,7 @@ pub enum Outcome {
 
 pub struct App {
     timesheet: Timesheet,
+    today: Date,
     screen: Screen,
     selected: Date,
     /// `None` until the first render.
@@ -48,6 +52,7 @@ impl App {
     pub fn new(timesheet: Timesheet, today: Date) -> Self {
         Self {
             timesheet,
+            today,
             screen: Screen::Tracking,
             selected: calendar::start_day(today),
             first_visible_day: None,
@@ -115,7 +120,11 @@ impl App {
         frame.render_widget(block, area);
         let [header, list] =
             Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(inner);
-        frame.render_widget(Paragraph::new(" Date       Worked").style(PANEL), header);
+        let header_text = format!(
+            " {:<9}  {:>WORKED_WIDTH$} {:>DAY_BALANCE_WIDTH$} {:>TOTAL_BALANCE_WIDTH$}",
+            "Date", "Worked", "Day", "Total"
+        );
+        frame.render_widget(Paragraph::new(header_text).style(PANEL), header);
 
         let height = usize::from(list.height);
         let first = self.scroll_to_selected(height);
@@ -124,24 +133,51 @@ impl App {
             .take(height)
             .map(|row| match row {
                 ListRow::Day(date) => {
-                    let worked = self
-                        .timesheet
-                        .worked_time_on(date)
-                        .map(|worked| worked.format_duration())
-                        .unwrap_or_default();
-                    let text = format!(" {}  {worked:>6}", calendar::format_dutch(date));
+                    let text = self.day_row_text(date);
                     let style = if date == self.selected {
                         SELECTED
                     } else {
                         PANEL
                     };
-                    Line::from(Span::styled(format!("{text:<width$}"), style))
+                    let padding = " ".repeat(width.saturating_sub(Span::raw(&text).width()));
+                    Line::from(Span::styled(text + &padding, style))
                 }
                 ListRow::Separator(Separator::Year) => Line::raw("═".repeat(width)),
                 ListRow::Separator(_) => Line::raw("─".repeat(width)),
             })
             .collect();
         frame.render_widget(Paragraph::new(lines).style(PANEL), list);
+    }
+
+    fn day_row_text(&self, date: Date) -> String {
+        let timesheet = &self.timesheet;
+        let worked = timesheet
+            .worked_time_on(date)
+            .map(Minutes::format_duration)
+            .unwrap_or_default();
+        let day_balance = timesheet
+            .day_balance_on(date, self.today)
+            .map(Minutes::format_balance)
+            .unwrap_or_default();
+        let total_balance = timesheet
+            .total_balance_on(date, self.today)
+            .map(Minutes::format_balance)
+            .unwrap_or_default();
+        let absence = match timesheet.absence_on(date) {
+            Some(Absence::Sick) => "🤒",
+            Some(Absence::Vacation) => "🏖️",
+            Some(Absence::Holiday) => "🎄",
+            None => "  ",
+        };
+        let warning = if timesheet.has_day_warning_on(date, self.today) {
+            "⚠️"
+        } else {
+            "  "
+        };
+        format!(
+            " {}  {worked:>WORKED_WIDTH$} {day_balance:>DAY_BALANCE_WIDTH$} {total_balance:>TOTAL_BALANCE_WIDTH$}  {absence} {warning}",
+            calendar::format_dutch(date)
+        )
     }
 
     /// Adjusts the first visible day so the selected day is visible, and returns it.

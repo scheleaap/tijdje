@@ -15,6 +15,7 @@ use ratatui::{
 };
 use tijdje::{
     app::App,
+    domain::{Period, PeriodType, TimeOfDay},
     store::{self, FileSystem},
 };
 
@@ -79,4 +80,16 @@ pub fn press(app: &mut App, code: KeyCode) -> tijdje::app::Outcome {
 
 pub fn ctrl(app: &mut App, c: char) -> tijdje::app::Outcome {
     app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL))
+}
+
+/// A period from `from` to `to`, both written as HHMM numbers (e.g. `1235`).
+pub fn period(from: u16, to: Option<u16>, period_type: PeriodType) -> Period {
+    let time = |hhmm: u16| TimeOfDay::new(hhmm / 100, hhmm % 100);
+    Period {
+        from: time(from),
+        to: to.and_then(time),
+        project: None,
+        notes: None,
+        period_type,
+    }
 }

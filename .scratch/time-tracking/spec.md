@@ -115,6 +115,8 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Worked time**: the total duration of a day's work periods. Breaks never count. Open periods count once To is filled in.
 - **Day balance**: worked time minus actual expected working time. Shown for days from the first recorded day up to and including today.
 - **Total balance**: sum of the day balances from the first recorded day up to and including that day. Not shown for future days or days before the first recorded day.
+- **Balance format**: signed (`+0h45m`, `-1h12m`); zero has no sign (`0h00m`).
+- **Day warning**: for days from the first recorded day (inclusive) up to but excluding today that are empty or have an open period.
 - **Period types**: work, break, vacation, sick, holiday. Exactly one per period. In the UI the four non-working checkboxes are mutually exclusive, and none checked means work.
 - **Times**: From and To are exactly four digits HHMM, 0000–2359. Periods never cross midnight.
 - **Left panel display**: day numbers are padded to two characters (`ma  2 nov`) so columns align. A day with only non-working periods shows `0h00m` worked time; a day without periods shows nothing.

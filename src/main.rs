@@ -4,6 +4,7 @@ use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use tijdje::{
     app::{App, Outcome},
     store::{self, RealFileSystem},
+    wide_symbols,
 };
 
 fn timesheet_path() -> PathBuf {
@@ -26,7 +27,8 @@ fn main() -> ExitCode {
     let mut terminal = ratatui::init();
     let result = (|| -> std::io::Result<()> {
         loop {
-            terminal.draw(|frame| app.render(frame))?;
+            let frame = terminal.draw(|frame| app.render(frame))?;
+            wide_symbols::paint_backgrounds(frame.buffer, &mut std::io::stdout())?;
             if let Event::Key(key) = event::read()?
                 && key.kind == KeyEventKind::Press
                 && app.handle_key(key) == Outcome::Quit

@@ -38,6 +38,9 @@ A period during which the consultant is sick.
 **Holiday period**:
 A period that falls on a public holiday.
 
+**Absence**:
+A vacation, sick or holiday period: a non-working period that reduces the actual expected working time.
+
 **Regular expected working time**:
 The time the consultant is expected to work on a day without vacation, sick or holiday periods.
 _Avoid_: Expected working time (without "regular" or "actual")
@@ -55,6 +58,9 @@ A day's worked time minus its actual expected working time.
 
 **Total balance**:
 The sum of all day balances from the first recorded day up to and including a given day.
+
+**Day warning**:
+The ⚠️ indicator for a day that needs attention, e.g. an empty day or one with an open period.
 
 **Active input**:
 Text typed into a field that has not yet been accepted or rejected.

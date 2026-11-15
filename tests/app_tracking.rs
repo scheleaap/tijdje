@@ -25,9 +25,12 @@ fn left_panel_shows_worked_time_per_day_from_the_file() {
             "{day} should show {worked}"
         );
     }
+    let header = row_containing(&screen, "Worked");
+    let worked_end = header.find("Worked").unwrap() + "Worked".len();
+    let empty_row = row_containing(&screen, "wo 11 nov");
     assert!(
-        !row_containing(&screen, "wo 11 nov").contains('h'),
-        "empty day shows no worked time"
+        empty_row[..worked_end].trim_end().ends_with("nov"),
+        "empty day shows no worked time: {empty_row:?}"
     );
 }
 
@@ -118,13 +121,13 @@ fn list_scrolls_endlessly_and_keeps_the_selection_visible() {
 #[test]
 fn right_panel_is_an_empty_frame() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 100, 24));
-    row_containing(&screen, "Periods");
-    for row in &screen[1..22] {
-        let right = row.chars().skip(47).collect::<String>();
+    let buffer = render(&mut app, 100, 24);
+    row_containing(&rows(&buffer), "Periods");
+    for y in 1..22 {
+        let right: String = (47..99).map(|x| buffer[(x, y)].symbol()).collect();
         assert!(
-            right.trim_end_matches('║').trim().is_empty(),
-            "right panel not empty: {right:?}"
+            right.trim().is_empty(),
+            "right panel not empty on row {y}: {right:?}"
         );
     }
 }

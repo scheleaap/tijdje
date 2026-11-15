@@ -1,18 +1,7 @@
-use tijdje::domain::{Day, Minutes, Period, PeriodType, TimeOfDay};
+mod common;
 
-fn time(hhmm: u16) -> Option<TimeOfDay> {
-    TimeOfDay::new(hhmm / 100, hhmm % 100)
-}
-
-fn period(from: u16, to: Option<u16>, period_type: PeriodType) -> Period {
-    Period {
-        from: time(from),
-        to: to.and_then(time),
-        project: None,
-        notes: None,
-        period_type,
-    }
-}
+use common::period;
+use tijdje::domain::{Day, Minutes, PeriodType};
 
 #[test]
 fn worked_time_sums_work_periods() {
