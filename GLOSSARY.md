@@ -38,6 +38,9 @@ A period during which the consultant is sick.
 **Holiday period**:
 A period that falls on a public holiday.
 
+**Unusual time**:
+A period that starts before 06:00 or ends after 20:00.
+
 **Absence**:
 A vacation, sick or holiday period: a non-working period that reduces the actual expected working time.
 

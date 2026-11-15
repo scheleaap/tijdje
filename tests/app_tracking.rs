@@ -8,7 +8,7 @@ use tijdje::app::{Outcome, Screen};
 #[test]
 fn left_panel_shows_worked_time_per_day_from_the_file() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 100, 40));
+    let screen = rows(&render(&mut app, 120, 40));
     // Worked examples from the sample file (work periods only, open periods excluded).
     for (day, worked) in [
         ("ma  2 nov", "8h42m"),
@@ -37,16 +37,16 @@ fn left_panel_shows_worked_time_per_day_from_the_file() {
 #[test]
 fn only_weekdays_are_listed() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 100, 24)).join("\n");
+    let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(!screen.contains("za ") && !screen.contains("zo "));
 }
 
 #[test]
 fn today_is_selected_on_startup() {
     let mut app = app_with(SAMPLE, date(2026, 11, 12));
-    let buffer = render(&mut app, 100, 24);
+    let buffer = render(&mut app, 120, 24);
     let screen = rows(&buffer);
-    let y = screen.iter().position(|r| r.contains("do 12 nov")).unwrap();
+    let y = row_index(&screen, "do 12 nov");
     let x = screen[y].find("do 12 nov").unwrap();
     assert_eq!(
         buffer[(u16::try_from(x).unwrap() + 1, u16::try_from(y).unwrap())].bg,
@@ -64,8 +64,8 @@ fn previous_friday_is_selected_on_a_weekend() {
 #[test]
 fn single_line_separates_weeks() {
     let mut app = app_with(SAMPLE, date(2026, 11, 12));
-    let screen = rows(&render(&mut app, 100, 24));
-    let friday = screen.iter().position(|r| r.contains("vr  6 nov")).unwrap();
+    let screen = rows(&render(&mut app, 120, 24));
+    let friday = row_index(&screen, "vr  6 nov");
     assert!(screen[friday + 1].contains("────"));
     assert!(screen[friday + 2].contains("ma  9 nov"));
 }
@@ -73,8 +73,8 @@ fn single_line_separates_weeks() {
 #[test]
 fn double_line_separates_years() {
     let mut app = app_with(SAMPLE, date(2026, 12, 31));
-    let screen = rows(&render(&mut app, 100, 24));
-    let last = screen.iter().position(|r| r.contains("do 31 dec")).unwrap();
+    let screen = rows(&render(&mut app, 120, 24));
+    let last = row_index(&screen, "do 31 dec");
     assert!(screen[last + 1].contains("════"));
     assert!(screen[last + 2].contains("vr  1 jan"));
     assert!(row_containing(&screen, "vr  1 jan").contains("0h00m"));
@@ -103,39 +103,25 @@ fn page_keys_select_previous_and_next_week() {
 #[test]
 fn list_scrolls_endlessly_and_keeps_the_selection_visible() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    render(&mut app, 100, 24);
+    render(&mut app, 120, 24);
     for _ in 0..60 {
         press(&mut app, KeyCode::PageUp);
     }
-    let screen = rows(&render(&mut app, 100, 24));
+    let screen = rows(&render(&mut app, 120, 24));
     assert_eq!(app.selected_day(), date(2025, 9, 19));
     row_containing(&screen, "vr 19 sep");
     for _ in 0..120 {
         press(&mut app, KeyCode::PageDown);
     }
     assert_eq!(app.selected_day(), date(2028, 1, 7));
-    let screen = rows(&render(&mut app, 100, 24));
+    let screen = rows(&render(&mut app, 120, 24));
     row_containing(&screen, "vr  7 jan");
-}
-
-#[test]
-fn right_panel_is_an_empty_frame() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let buffer = render(&mut app, 100, 24);
-    row_containing(&rows(&buffer), "Periods");
-    for y in 1..22 {
-        let right: String = (47..99).map(|x| buffer[(x, y)].symbol()).collect();
-        assert!(
-            right.trim().is_empty(),
-            "right panel not empty on row {y}: {right:?}"
-        );
-    }
 }
 
 #[test]
 fn function_key_bar_is_on_the_bottom_line() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 100, 24));
+    let screen = rows(&render(&mut app, 120, 24));
     assert!(screen[23].starts_with(" 1Help"));
     assert!(screen[23].contains(" 2Track"));
     assert!(screen[23].contains("10"));
@@ -146,7 +132,7 @@ fn f1_shows_help_and_esc_or_f2_returns_to_tracking() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
     press(&mut app, KeyCode::F(1));
     assert_eq!(app.screen(), Screen::Help);
-    let screen = rows(&render(&mut app, 100, 24));
+    let screen = rows(&render(&mut app, 120, 24));
     row_containing(&screen, "Ctrl+Q");
     press(&mut app, KeyCode::Esc);
     assert_eq!(app.screen(), Screen::Tracking);
@@ -165,16 +151,16 @@ fn ctrl_q_quits() {
 #[test]
 fn small_terminal_shows_a_message_instead_of_the_ui() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 99, 24)).join("\n");
+    let screen = rows(&render(&mut app, 119, 24)).join("\n");
     assert!(screen.contains("Terminal too small"));
     assert!(!screen.contains("Periods"));
-    let screen = rows(&render(&mut app, 100, 23)).join("\n");
+    let screen = rows(&render(&mut app, 120, 23)).join("\n");
     assert!(screen.contains("Terminal too small"));
 }
 
 #[test]
 fn panels_use_the_norton_commander_palette() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let buffer = render(&mut app, 100, 24);
+    let buffer = render(&mut app, 120, 24);
     assert_eq!(buffer[(60, 10)].bg, Color::Blue);
 }

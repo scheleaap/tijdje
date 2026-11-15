@@ -25,7 +25,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 4. As a consultant, I want the bottom line to show the function-key functions, so that I can discover them without a manual.
 5. As a consultant, I want F1 to show a help screen listing all shortcuts, and Esc or F2 to return to Tracking, so that I can look up keys quickly.
 6. As a consultant, I want Alt+←/→ to move focus between the left and right panel, so that I can navigate without a mouse.
-7. As a consultant, I want a "terminal too small" message when my terminal is smaller than 100×24, so that the layout never breaks silently.
+7. As a consultant, I want a "terminal too small" message when my terminal is smaller than 120×24, so that the layout never breaks silently.
 
 ### Left panel (days)
 
@@ -53,8 +53,8 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 26. As a consultant, I want input fields to have a different background color instead of borders, so that the panel looks clean.
 27. As a consultant, I want the duration of each period computed automatically, so that I do not have to calculate it.
 28. As a consultant, I want no period and no field to have focus when I enter a day, so that I do not accidentally edit something.
-29. As a consultant, I want ↑/↓ to move focus to the same field in the previous/next period, or to the first field of the first/last period if none has focus, so that I can move vertically.
-30. As a consultant, I want Tab/Shift-Tab to move focus to the next/previous field of a period (including checkboxes), so that I can move horizontally.
+29. As a consultant, I want ↑/↓ to move focus to the same field in the previous/next period, or, if none has focus, to the first field of the first period (↓) or the last period (↑), so that I can move vertically.
+30. As a consultant, I want Tab/Shift-Tab to move focus to the next/previous field of a period (including checkboxes), continuing in the next/previous period and stopping at the very first and last field, so that I can move horizontally.
 31. As a consultant, I want Ctrl+↑/↓ to select the previous/next day from the right panel, so that I can record several days in a row.
 32. As a consultant, I want typing in a focused field to replace its value, as in a spreadsheet, so that overwriting is fast.
 33. As a consultant, I want to accept active input with Enter and reject it with Esc (restoring the previously accepted value), so that I stay in control of every change.
@@ -75,7 +75,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 48. As a consultant, I want Ctrl+Del to delete the focused period after confirming (Delete/Cancel), so that I can remove mistakes.
 49. As a consultant, I want a "→ ☕" indicator to the right of a period that is not directly followed by the next period, so that implied breaks are visible.
 50. As a consultant, I want a "⚠️" indicator to the right of a period that starts before 06:00 or ends after 20:00, so that unusual times stand out.
-51. As a consultant, I want the bottom of the right panel to show the actual expected working time, e.g. `Actual expected: 3h36m (regular 7h12m − 3h36m vacation)` or just `Actual expected: 7h12m`, so that I understand my target for the day.
+51. As a consultant, I want the bottom of the right panel to show the actual expected working time, e.g. `Actual expected: 3h36m (regular 7h12m − 3h36m absence)`, with all absences grouped into one term, or just `Actual expected: 7h12m`, so that I understand my target for the day.
 52. As a consultant, I want the right panel to scroll when periods do not fit, so that busy days remain usable.
 53. As a consultant, I want long notes cut off with `…` and scrolled horizontally while editing, so that the layout stays intact.
 
@@ -124,7 +124,10 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Check triggers**: leaving a day (B) checks that day. Ctrl+S and Ctrl+Q check all days. On Ctrl+Q the consistency popup comes before the "Save before quitting?" popup. Days that fail a check at load time are still loaded and marked ⚠️.
 - **Shortcut modifiers** used in the original design: (A) not available while a field is being edited; (B) runs a consistency check and cancels the action if it fails; (C) accepts the active input first.
   - Ctrl+↑/↓: A, B, C. ↑/↓ in the right panel: A. Alt+b/v/s/h/p/n: C. Alt+←/→: A. Ctrl+Q: A, B. Ctrl+S: A, B (all days). Ctrl+Z/Y: A. Ctrl+Del: A.
-- **Tab order** within a period: From, To, Project, Notes, Break, Vacation, Sick, Holiday. Duration is not focusable.
+- **Tab order** within a period: From, To, Project, Notes, Break, Vacation, Sick, Holiday. Duration is not focusable. Tab with nothing focused focuses From of the first period.
+- **Right panel layout**: checkbox columns have emoji headers (☕ break, 🏖️ vacation, 🤒 sick, 🎄 holiday). Project is 10 cells wide; Notes takes the remaining width. A period with both indicators shows `→ ☕ ⚠️`.
+- **Panel focus**: the active panel's title is highlighted; in an inactive left panel the selected day has a gray bar. Leaving and re-entering the right panel on the same day keeps the focused field; selecting another day clears it. Shift-Tab with nothing focused focuses Holiday of the last period.
+- **Right panel title**: shows the selected day, e.g. `Periods: ma  2 nov`.
 
 ### Undo
 

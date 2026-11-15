@@ -8,12 +8,21 @@ use std::{
 pub struct TimeOfDay(u16);
 
 impl TimeOfDay {
-    pub fn new(hour: u16, minute: u16) -> Option<Self> {
-        (hour < 24 && minute < 60).then_some(Self(hour * 60 + minute))
+    pub const fn new(hour: u16, minute: u16) -> Option<Self> {
+        if hour < 24 && minute < 60 {
+            Some(Self(hour * 60 + minute))
+        } else {
+            None
+        }
     }
 
     pub fn minutes_since_midnight(self) -> u16 {
         self.0
+    }
+
+    /// Formats the time like `1235`, as typed in the From and To fields.
+    pub fn format_hhmm(self) -> String {
+        format!("{:02}{:02}", self.0 / 60, self.0 % 60)
     }
 }
 

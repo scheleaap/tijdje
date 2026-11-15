@@ -1,4 +1,4 @@
-use tijdje::domain::Minutes;
+use tijdje::domain::{Minutes, TimeOfDay};
 
 #[test]
 fn durations_are_formatted_as_hours_and_two_digit_minutes() {
@@ -23,4 +23,11 @@ fn a_zero_balance_has_no_sign() {
 #[test]
 fn negative_durations_keep_minutes_positive() {
     assert_eq!(Minutes(-75).format_duration(), "-1h15m");
+}
+
+#[test]
+fn times_are_displayed_as_four_digits_without_colon() {
+    assert_eq!(TimeOfDay::new(12, 35).unwrap().format_hhmm(), "1235");
+    assert_eq!(TimeOfDay::new(9, 5).unwrap().format_hhmm(), "0905");
+    assert_eq!(TimeOfDay::new(0, 0).unwrap().format_hhmm(), "0000");
 }

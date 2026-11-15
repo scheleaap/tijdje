@@ -15,7 +15,7 @@ use ratatui::{
 };
 use tijdje::{
     app::App,
-    domain::{Period, PeriodType, TimeOfDay},
+    domain::{Day, Minutes, Period, PeriodType, TimeOfDay},
     store::{self, FileSystem},
 };
 
@@ -68,10 +68,9 @@ pub fn rows(buffer: &Buffer) -> Vec<String> {
         .collect()
 }
 
+/// The first row containing `text`, skipping the top border row with the panel titles.
 pub fn row_containing<'a>(rows: &'a [String], text: &str) -> &'a str {
-    rows.iter()
-        .find(|r| r.contains(text))
-        .unwrap_or_else(|| panic!("no row contains {text:?}"))
+    &rows[row_index(rows, text)]
 }
 
 pub fn press(app: &mut App, code: KeyCode) -> tijdje::app::Outcome {
@@ -91,5 +90,30 @@ pub fn period(from: u16, to: Option<u16>, period_type: PeriodType) -> Period {
         project: None,
         notes: None,
         period_type,
+    }
+}
+
+pub fn alt_key(app: &mut App, code: KeyCode) -> tijdje::app::Outcome {
+    app.handle_key(KeyEvent::new(code, KeyModifiers::ALT))
+}
+
+pub fn ctrl_key(app: &mut App, code: KeyCode) -> tijdje::app::Outcome {
+    app.handle_key(KeyEvent::new(code, KeyModifiers::CONTROL))
+}
+
+/// The index of the first row containing `text`, skipping the top border row.
+pub fn row_index(rows: &[String], text: &str) -> usize {
+    rows.iter()
+        .skip(1)
+        .position(|r| r.contains(text))
+        .map(|i| i + 1)
+        .unwrap_or_else(|| panic!("no row contains {text:?}"))
+}
+
+/// A day with the default regular expected working time of 7h12m.
+pub fn day(periods: Vec<Period>) -> Day {
+    Day {
+        regular_expected_working_time: Some(Minutes(432)),
+        periods,
     }
 }

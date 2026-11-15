@@ -4,6 +4,11 @@ use jiff::civil::Date;
 
 use super::{Minutes, TimeOfDay, calendar};
 
+/// Periods starting before this time have an unusual time.
+const EARLIEST_USUAL_START: TimeOfDay = TimeOfDay::new(6, 0).expect("valid time");
+/// Periods ending after this time have an unusual time.
+const LATEST_USUAL_END: TimeOfDay = TimeOfDay::new(20, 0).expect("valid time");
+
 /// 7h12m.
 pub const DEFAULT_REGULAR_EXPECTED_WORKING_TIME: Minutes = Minutes(432);
 
@@ -22,6 +27,16 @@ pub enum Absence {
     Sick,
     Vacation,
     Holiday,
+}
+
+impl From<Absence> for PeriodType {
+    fn from(absence: Absence) -> Self {
+        match absence {
+            Absence::Sick => Self::Sick,
+            Absence::Vacation => Self::Vacation,
+            Absence::Holiday => Self::Holiday,
+        }
+    }
 }
 
 impl PeriodType {
@@ -80,14 +95,17 @@ impl Day {
             .unwrap_or(DEFAULT_REGULAR_EXPECTED_WORKING_TIME)
     }
 
-    pub fn actual_expected_working_time(&self) -> Minutes {
-        let absent: Minutes = self
-            .periods
+    /// The total duration of the day's absences.
+    pub fn absence_time(&self) -> Minutes {
+        self.periods
             .iter()
             .filter(|p| p.period_type.absence().is_some())
             .filter_map(Period::duration)
-            .sum();
-        self.regular_expected_working_time() - absent
+            .sum()
+    }
+
+    pub fn actual_expected_working_time(&self) -> Minutes {
+        self.regular_expected_working_time() - self.absence_time()
     }
 
     /// The absence shown for the day: sick, then vacation, then holiday.
@@ -96,6 +114,15 @@ impl Day {
             .iter()
             .filter_map(|p| p.period_type.absence())
             .min()
+    }
+
+    /// Whether there is a gap between the period at `index` and the next one.
+    pub fn has_implied_break_after(&self, index: usize) -> bool {
+        let (Some(period), Some(next)) = (self.periods.get(index), self.periods.get(index + 1))
+        else {
+            return false;
+        };
+        matches!((period.to, next.from), (Some(to), Some(from)) if from > to)
     }
 
     pub fn day_balance(&self) -> Minutes {
@@ -107,6 +134,12 @@ impl Period {
     /// An open period has no To yet, because it is still running.
     pub fn is_open(&self) -> bool {
         self.to.is_none()
+    }
+
+    /// Whether the period starts before 06:00 or ends after 20:00.
+    pub fn has_unusual_time(&self) -> bool {
+        self.from.is_some_and(|from| from < EARLIEST_USUAL_START)
+            || self.to.is_some_and(|to| to > LATEST_USUAL_END)
     }
 
     /// The period's duration, or `None` while From or To is empty.

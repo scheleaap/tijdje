@@ -1,14 +1,7 @@
 mod common;
 
-use common::period;
-use tijdje::domain::{Absence, Day, Minutes, Period, PeriodType};
-
-fn day(periods: Vec<Period>) -> Day {
-    Day {
-        regular_expected_working_time: Some(Minutes(432)),
-        periods,
-    }
-}
+use common::{day, period};
+use tijdje::domain::{Absence, Day, Minutes, PeriodType};
 
 #[test]
 fn actual_expected_equals_regular_without_absences() {
@@ -84,4 +77,15 @@ fn vacation_wins_over_holiday() {
 fn holiday_alone_is_shown() {
     let d = day(vec![period(900, Some(1612), PeriodType::Holiday)]);
     assert_eq!(d.absence(), Some(Absence::Holiday));
+}
+
+#[test]
+fn absence_time_sums_vacation_sick_and_holiday() {
+    let d = day(vec![
+        period(800, Some(1000), PeriodType::Work),
+        period(1000, Some(1030), PeriodType::Break),
+        period(1030, Some(1230), PeriodType::Sick),
+        period(1230, Some(1330), PeriodType::Vacation),
+    ]);
+    assert_eq!(d.absence_time(), Minutes(180));
 }

@@ -8,7 +8,7 @@ use jiff::civil::date;
 #[test]
 fn left_panel_shows_day_and_total_balances() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 100, 40));
+    let screen = rows(&render(&mut app, 120, 40));
     for (day, day_balance, total_balance) in [
         ("ma  2 nov", "+1h30m", "+1h30m"),  // 8h42m worked
         ("di  3 nov", "+1h26m", "+2h56m"),  // 8h38m
@@ -33,7 +33,7 @@ fn left_panel_shows_day_and_total_balances() {
 #[test]
 fn future_days_and_days_before_the_first_recorded_day_show_no_balances() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 100, 40));
+    let screen = rows(&render(&mut app, 120, 40));
     for day in ["vr 30 okt", "ma 16 nov", "di 17 nov"] {
         let row = row_containing(&screen, day);
         assert!(!row.contains('h'), "{day} should show no figures: {row:?}");
@@ -43,20 +43,20 @@ fn future_days_and_days_before_the_first_recorded_day_show_no_balances() {
 #[test]
 fn absence_indicators_show_per_day() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 100, 40));
+    let screen = rows(&render(&mut app, 120, 40));
     assert!(row_containing(&screen, "vr  6 nov").contains("🏖️"));
     assert!(row_containing(&screen, "do 12 nov").contains("🤒"));
     assert!(!row_containing(&screen, "ma  9 nov").contains("🏖️"));
 
     let mut app = app_with(SAMPLE, date(2026, 12, 31));
-    let screen = rows(&render(&mut app, 100, 40));
+    let screen = rows(&render(&mut app, 120, 40));
     assert!(row_containing(&screen, "vr  1 jan").contains("🎄"));
 }
 
 #[test]
 fn warnings_show_for_past_empty_days_and_open_periods_only() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 100, 40));
+    let screen = rows(&render(&mut app, 120, 40));
     assert!(
         row_containing(&screen, "di 10 nov").contains("⚠️"),
         "open period"
@@ -76,10 +76,10 @@ fn warnings_show_for_past_empty_days_and_open_periods_only() {
 #[test]
 fn emoji_columns_line_up() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let buffer = render(&mut app, 100, 40);
+    let buffer = render(&mut app, 120, 40);
     let screen = rows(&buffer);
     let column_of = |day: &str, emoji: &str| {
-        let y = screen.iter().position(|r| r.contains(day)).unwrap();
+        let y = row_index(&screen, day);
         (0..buffer.area.width)
             .find(|&x| buffer[(x, u16::try_from(y).unwrap())].symbol() == emoji)
             .unwrap()
