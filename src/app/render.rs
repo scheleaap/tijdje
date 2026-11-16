@@ -498,6 +498,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ("Ctrl+Del", "Delete the focused period"),
         ("F1", "Help"),
         ("F2, Esc", "Back to Tracking"),
+        ("Ctrl+S", "Save"),
         ("Ctrl+Q", "Quit"),
     ];
     let lines: Vec<Line> = shortcuts

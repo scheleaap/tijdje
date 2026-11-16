@@ -161,9 +161,13 @@ days:
 - Unknown keys and invalid `HH:MM` times are parse errors: the application exits without touching the file.
 - Empty To, project and notes are written as `null`. `""` is read as `null`.
 - `type` is always written.
-- Days without periods are not written. `regular_expected_working_time_in_minutes` is written when a day gets its first period, and existing values are kept.
-- Writes are atomic (temp file + rename). The previous file is kept as `timesheet.yaml.bak`. Comments in the file are not preserved.
+- Days without periods are not written. `regular_expected_working_time_in_minutes` is written when a day gets its first period, and existing values are kept. A day in the file without it is a parse error.
+- Writes are atomic: temp file, flushed to disk, renamed over the old file, keeping its permissions. A failed save removes the temp file. Comments in the file are not preserved.
+- The first save of a session keeps the file as it was when the application started as `timesheet.yaml.bak`; later saves in the same session leave it alone.
+- If the file path is a symlink, it is followed: the file it points to is replaced, the symlink stays, and the temp file and backup go next to the target.
 - Before writing, the application detects whether the file changed on disk since it was loaded or last saved.
+- Dates, times, project and notes are always written double-quoted, so YAML 1.1 readers don't take `08:45` for a number or `2026-11-02` for a timestamp. The application writes the YAML itself for this; reading still uses the YAML library.
+- Ctrl+Q with unsaved changes asks "Save before quitting?"; choosing Save may lead to "File changed on disk", after which Overwrite quits and Cancel stays in the application. A failed save shows a message in the right panel.
 
 ### Modules
 

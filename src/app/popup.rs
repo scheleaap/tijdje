@@ -5,6 +5,9 @@ use ratatui::crossterm::event::KeyCode;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PopupAction {
     DeletePeriod,
+    Save,
+    DontSave,
+    Overwrite,
     Cancel,
 }
 
@@ -21,6 +24,29 @@ impl Popup {
             question: "Delete period?",
             buttons: vec![
                 ("Delete", PopupAction::DeletePeriod),
+                ("Cancel", PopupAction::Cancel),
+            ],
+            selected: 0,
+        }
+    }
+
+    pub fn save_before_quitting() -> Self {
+        Self {
+            question: "Save before quitting?",
+            buttons: vec![
+                ("Save", PopupAction::Save),
+                ("Don't save", PopupAction::DontSave),
+                ("Cancel", PopupAction::Cancel),
+            ],
+            selected: 0,
+        }
+    }
+
+    pub fn file_changed_on_disk() -> Self {
+        Self {
+            question: "File changed on disk",
+            buttons: vec![
+                ("Overwrite", PopupAction::Overwrite),
                 ("Cancel", PopupAction::Cancel),
             ],
             selected: 0,

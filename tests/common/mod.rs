@@ -1,9 +1,11 @@
 #![allow(dead_code)]
 
 use std::{
+    cell::RefCell,
     collections::HashMap,
     io,
     path::{Path, PathBuf},
+    rc::Rc,
 };
 
 use jiff::civil::Date;
@@ -16,39 +18,87 @@ use ratatui::{
 use tijdje::{
     app::App,
     domain::{Day, Minutes, Period, PeriodType, TimeOfDay},
-    store::{self, FileSystem},
+    store::FileSystem,
 };
 
 pub const SAMPLE: &str = include_str!("../../sample/timesheet.yaml");
 
-#[derive(Default)]
+/// An in-memory file system; clones share the same files.
+#[derive(Default, Clone)]
 pub struct InMemoryFileSystem {
-    pub files: HashMap<PathBuf, String>,
+    files: Rc<RefCell<HashMap<PathBuf, String>>>,
 }
 
 impl InMemoryFileSystem {
     pub fn with(path: &str, content: &str) -> Self {
-        Self {
-            files: HashMap::from([(PathBuf::from(path), content.to_owned())]),
-        }
+        let fs = Self::default();
+        fs.set(path, content);
+        fs
+    }
+
+    pub fn get(&self, path: &str) -> Option<String> {
+        self.files.borrow().get(Path::new(path)).cloned()
+    }
+
+    pub fn set(&self, path: &str, content: &str) {
+        self.files
+            .borrow_mut()
+            .insert(PathBuf::from(path), content.to_owned());
     }
 }
 
 impl FileSystem for InMemoryFileSystem {
     fn read_to_string(&self, path: &Path) -> io::Result<String> {
         self.files
+            .borrow()
             .get(path)
             .cloned()
             .ok_or_else(|| io::ErrorKind::NotFound.into())
     }
+
+    fn write(&self, path: &Path, contents: &str) -> io::Result<()> {
+        self.files
+            .borrow_mut()
+            .insert(path.to_owned(), contents.to_owned());
+        Ok(())
+    }
+
+    fn copy(&self, from: &Path, to: &Path) -> io::Result<()> {
+        let contents = self.read_to_string(from)?;
+        self.write(to, &contents)
+    }
+
+    fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
+        let contents = self
+            .files
+            .borrow_mut()
+            .remove(from)
+            .ok_or(io::ErrorKind::NotFound)?;
+        self.write(to, &contents)
+    }
+
+    fn remove(&self, path: &Path) -> io::Result<()> {
+        self.files.borrow_mut().remove(path);
+        Ok(())
+    }
+
+    fn resolve(&self, path: &Path) -> PathBuf {
+        path.to_owned()
+    }
 }
 
+pub const TIMESHEET: &str = "timesheet.yaml";
+
 pub fn app_with(content: &str, today: Date) -> App {
-    let fs = InMemoryFileSystem::with("timesheet.yaml", content);
-    App::new(
-        store::load(&fs, Path::new("timesheet.yaml")).expect("valid timesheet"),
-        today,
-    )
+    app_with_fs(content, today).0
+}
+
+/// An app on an in-memory timesheet file, and that file system.
+pub fn app_with_fs(content: &str, today: Date) -> (App, InMemoryFileSystem) {
+    let fs = InMemoryFileSystem::with(TIMESHEET, content);
+    let app =
+        App::open(Box::new(fs.clone()), PathBuf::from(TIMESHEET), today).expect("valid timesheet");
+    (app, fs)
 }
 
 pub fn render(app: &mut App, width: u16, height: u16) -> Buffer {

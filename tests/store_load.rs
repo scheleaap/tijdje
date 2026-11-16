@@ -14,6 +14,7 @@ fn load(content: &str) -> Result<tijdje::domain::Timesheet, LoadError> {
         &InMemoryFileSystem::with("t.yaml", content),
         Path::new("t.yaml"),
     )
+    .map(|(timesheet, _)| timesheet)
 }
 
 #[test]
@@ -53,7 +54,8 @@ days:
 
 #[test]
 fn missing_file_is_an_empty_timesheet() {
-    let timesheet = store::load(&InMemoryFileSystem::default(), Path::new("nope.yaml")).unwrap();
+    let (timesheet, _) =
+        store::load(&InMemoryFileSystem::default(), Path::new("nope.yaml")).unwrap();
     assert!(timesheet.days.is_empty());
 }
 
@@ -68,12 +70,40 @@ fn invalid_time_is_an_error_naming_the_day() {
         r#"
 days:
   "2026-11-12":
+    regular_expected_working_time_in_minutes: 432
     periods:
       - { from: "1235", to: null, project: null, notes: null, type: work }
 "#,
     )
     .unwrap_err();
     assert!(err.to_string().contains("2026-11-12"), "{err}");
+}
+
+#[test]
+fn a_day_without_regular_expected_working_time_is_an_error() {
+    let result = load(
+        r#"
+days:
+  "2026-11-12":
+    periods:
+      - { from: "12:35", to: null, project: null, notes: null, type: work }
+"#,
+    );
+    assert!(matches!(result, Err(LoadError::Parse(_))));
+}
+
+#[test]
+fn an_unknown_period_type_is_an_error() {
+    let result = load(
+        r#"
+days:
+  "2026-11-12":
+    regular_expected_working_time_in_minutes: 432
+    periods:
+      - { from: "12:35", to: null, project: null, notes: null, type: lunch }
+"#,
+    );
+    assert!(matches!(result, Err(LoadError::Parse(_))));
 }
 
 #[test]

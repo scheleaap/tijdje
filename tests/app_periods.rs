@@ -210,7 +210,9 @@ fn right_panel_scrolls_to_keep_the_focused_period_visible() {
             )
         })
         .collect();
-    let yaml = format!("days:\n  \"2026-11-02\":\n    periods:\n{periods}");
+    let yaml = format!(
+        "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n{periods}"
+    );
     let mut app = app_with(&yaml, date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Up);

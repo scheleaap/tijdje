@@ -4,13 +4,28 @@ mod active_input;
 mod popup;
 mod render;
 
+use std::path::PathBuf;
+
 use jiff::civil::Date;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use active_input::ActiveInput;
 use popup::{Popup, PopupAction};
 
-use crate::domain::{Period, TimeOfDay, Timesheet, calendar};
+use crate::{
+    domain::{Day, Period, TimeOfDay, Timesheet, calendar},
+    store::{self, Backup, FileSystem, Fingerprint, LoadError, Overwrite, SaveError},
+};
+
+/// Where the timesheet is loaded from and saved to.
+struct Storage {
+    fs: Box<dyn FileSystem>,
+    path: PathBuf,
+    /// The file as last loaded or saved, to detect changes made outside the app.
+    fingerprint: Fingerprint,
+    /// Whether this session already kept the original file as a backup.
+    backup_made: bool,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
@@ -104,6 +119,11 @@ pub struct FieldFocus {
 
 pub struct App {
     timesheet: Timesheet,
+    storage: Storage,
+    /// Whether the timesheet has changes that aren't saved yet.
+    has_unsaved_changes: bool,
+    /// Set when "Save" was chosen in the "Save before quitting?" popup.
+    quit_after_saving: bool,
     today: Date,
     screen: Screen,
     panel: Panel,
@@ -120,9 +140,27 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(timesheet: Timesheet, today: Date) -> Self {
+    /// Loads the timesheet at `path` and starts on `today`.
+    pub fn open(fs: Box<dyn FileSystem>, path: PathBuf, today: Date) -> Result<Self, LoadError> {
+        let (timesheet, fingerprint) = store::load(fs.as_ref(), &path)?;
+        Ok(Self::new(
+            timesheet,
+            Storage {
+                fs,
+                path,
+                fingerprint,
+                backup_made: false,
+            },
+            today,
+        ))
+    }
+
+    fn new(timesheet: Timesheet, storage: Storage, today: Date) -> Self {
         Self {
             timesheet,
+            storage,
+            has_unsaved_changes: false,
+            quit_after_saving: false,
             today,
             screen: Screen::Tracking,
             panel: Panel::Days,
@@ -160,6 +198,10 @@ impl App {
         &self.timesheet
     }
 
+    pub fn has_unsaved_changes(&self) -> bool {
+        self.has_unsaved_changes
+    }
+
     pub fn handle_key(&mut self, key: KeyEvent) -> Outcome {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let alt = key.modifiers.contains(KeyModifiers::ALT);
@@ -167,7 +209,7 @@ impl App {
         if let Some(popup) = &mut self.popup {
             if let Some(action) = popup.handle_key(key.code) {
                 self.popup = None;
-                self.run_popup_action(action);
+                return self.run_popup_action(action);
             }
             return Outcome::Continue;
         }
@@ -176,7 +218,14 @@ impl App {
             return Outcome::Continue;
         }
         if ctrl && key.code == KeyCode::Char('q') {
-            return Outcome::Quit;
+            if !self.has_unsaved_changes {
+                return Outcome::Quit;
+            }
+            self.popup = Some(Popup::save_before_quitting());
+            return Outcome::Continue;
+        }
+        if ctrl && key.code == KeyCode::Char('s') {
+            return self.save(Overwrite::IfUnchanged);
         }
         match (self.screen, key.code) {
             (_, KeyCode::F(1)) => self.screen = Screen::Help,
@@ -285,25 +334,31 @@ impl App {
             None
         };
         let value = (!text.is_empty()).then_some(text);
-        if let Some(period) = self.focused_period_mut() {
-            match focus.field {
-                Field::From => period.from = time,
-                Field::To => period.to = time,
-                Field::Project => period.project = value,
-                Field::Notes => period.notes = value,
-                _ => {}
+        self.edit_selected_day(|day| {
+            if let Some(period) = day.periods.get_mut(focus.period) {
+                match focus.field {
+                    Field::From => period.from = time,
+                    Field::To => period.to = time,
+                    Field::Project => period.project = value,
+                    Field::Notes => period.notes = value,
+                    _ => {}
+                }
             }
-        }
+        });
         self.active_input = None;
         true
     }
 
-    fn focused_period_mut(&mut self) -> Option<&mut Period> {
-        let focus = self.focus?;
-        self.timesheet
-            .day_mut(self.selected)
-            .periods
-            .get_mut(focus.period)
+    /// Changes the selected day. This is the only way the timesheet changes, so
+    /// unsaved changes are tracked here, and only when something did change.
+    fn edit_selected_day<R>(&mut self, edit: impl FnOnce(&mut Day) -> R) -> R {
+        let day = self.timesheet.day_mut(self.selected);
+        let before = day.clone();
+        let result = edit(day);
+        if *day != before {
+            self.has_unsaved_changes = true;
+        }
+        result
     }
 
     /// Enter on a day without periods, without focus, or in the last period adds
@@ -324,18 +379,61 @@ impl App {
         if last_is_open {
             return;
         }
-        let period = self.timesheet.day_mut(self.selected).add_period();
+        let period = self.edit_selected_day(Day::add_period);
         self.focus = Some(FieldFocus {
             period,
             field: Field::From,
         });
     }
 
-    fn run_popup_action(&mut self, action: PopupAction) {
+    fn run_popup_action(&mut self, action: PopupAction) -> Outcome {
         match action {
             PopupAction::DeletePeriod => self.delete_focused_period(),
-            PopupAction::Cancel => {}
+            PopupAction::Save => {
+                self.quit_after_saving = true;
+                return self.save(Overwrite::IfUnchanged);
+            }
+            PopupAction::DontSave => return Outcome::Quit,
+            PopupAction::Overwrite => return self.save(Overwrite::Always),
+            PopupAction::Cancel => self.quit_after_saving = false,
         }
+        Outcome::Continue
+    }
+
+    /// Saves the timesheet. If the file changed on disk, asks whether to
+    /// overwrite it, unless `overwrite` is `Always`. The first save of a
+    /// session keeps the file as it was when the application started as a
+    /// backup.
+    fn save(&mut self, overwrite: Overwrite) -> Outcome {
+        let storage = &mut self.storage;
+        let backup = if storage.backup_made {
+            Backup::Skip
+        } else {
+            Backup::Create
+        };
+        match store::save(
+            storage.fs.as_ref(),
+            &storage.path,
+            &self.timesheet,
+            &storage.fingerprint,
+            overwrite,
+            backup,
+        ) {
+            Ok(fingerprint) => {
+                storage.fingerprint = fingerprint;
+                storage.backup_made = true;
+                self.has_unsaved_changes = false;
+                if self.quit_after_saving {
+                    return Outcome::Quit;
+                }
+            }
+            Err(SaveError::ChangedOnDisk) => self.popup = Some(Popup::file_changed_on_disk()),
+            Err(e @ SaveError::Io(_)) => {
+                self.message = Some(e.to_string());
+                self.quit_after_saving = false;
+            }
+        }
+        Outcome::Continue
     }
 
     /// Deletes the focused period; focus moves to the period taking its place.
@@ -343,9 +441,10 @@ impl App {
         let Some(focus) = self.focus else {
             return;
         };
-        let day = self.timesheet.day_mut(self.selected);
-        day.remove_period(focus.period);
-        let count = day.periods.len();
+        let count = self.edit_selected_day(|day| {
+            day.remove_period(focus.period);
+            day.periods.len()
+        });
         self.focus = (count > 0).then(|| FieldFocus {
             period: focus.period.min(count - 1),
             ..focus

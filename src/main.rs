@@ -3,7 +3,7 @@ use std::{env, path::PathBuf, process::ExitCode};
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use tijdje::{
     app::{App, Outcome},
-    store::{self, RealFileSystem},
+    store::RealFileSystem,
     wide_symbols,
 };
 
@@ -16,14 +16,14 @@ fn timesheet_path() -> PathBuf {
 
 fn main() -> ExitCode {
     let path = timesheet_path();
-    let timesheet = match store::load(&RealFileSystem, &path) {
-        Ok(timesheet) => timesheet,
+    let today = jiff::Zoned::now().date();
+    let mut app = match App::open(Box::new(RealFileSystem), path.clone(), today) {
+        Ok(app) => app,
         Err(e) => {
             eprintln!("tijdje: {}: {e}", path.display());
             return ExitCode::FAILURE;
         }
     };
-    let mut app = App::new(timesheet, jiff::Zoned::now().date());
     let mut terminal = ratatui::init();
     let result = (|| -> std::io::Result<()> {
         loop {
