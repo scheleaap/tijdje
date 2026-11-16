@@ -1,6 +1,7 @@
 //! Interactive application state and key handling. Drawing lives in `render`.
 
 mod active_input;
+mod history;
 mod popup;
 mod render;
 
@@ -10,6 +11,7 @@ use jiff::civil::Date;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use active_input::ActiveInput;
+use history::{Change, History};
 use popup::{Popup, PopupAction};
 
 use crate::{
@@ -174,6 +176,8 @@ pub struct App {
     /// Periods of the selected day that failed the consistency check; cleared
     /// at the next key press, like the message.
     inconsistent_periods: Vec<usize>,
+    /// Undo/redo history of accepted changes.
+    history: History,
     /// Days changed in this session; only these are checked when leaving them.
     changed_days: HashSet<Date>,
     /// The day named in a consistency-check popup, for "Go to day".
@@ -214,6 +218,7 @@ impl App {
             active_input: None,
             message: None,
             inconsistent_periods: Vec::new(),
+            history: History::default(),
             changed_days: HashSet::new(),
             inconsistent_day: None,
             popup: None,
@@ -281,6 +286,14 @@ impl App {
             if self.check_all_days(("Quit anyway", PopupAction::QuitAnyway)) {
                 return self.quit();
             }
+            return Outcome::Continue;
+        }
+        if ctrl && key.code == KeyCode::Char('z') && self.screen == Screen::Tracking {
+            self.undo();
+            return Outcome::Continue;
+        }
+        if ctrl && key.code == KeyCode::Char('y') && self.screen == Screen::Tracking {
+            self.redo();
             return Outcome::Continue;
         }
         if ctrl && key.code == KeyCode::Char('s') {
@@ -472,17 +485,61 @@ impl App {
         true
     }
 
-    /// Changes the selected day. This is the only way the timesheet changes, so
-    /// unsaved changes are tracked here, and only when something did change.
+    /// Changes the selected day as an accepted change: recorded for undo and
+    /// tracked as unsaved, but only when something did change. Undo/redo and
+    /// sorting change days without going through here.
     fn edit_selected_day<R>(&mut self, edit: impl FnOnce(&mut Day) -> R) -> R {
         let day = self.timesheet.day_mut(self.selected);
         let before = day.clone();
         let result = edit(day);
         if *day != before {
-            self.has_unsaved_changes = true;
-            self.changed_days.insert(self.selected);
+            let after = day.clone();
+            self.history.record(Change {
+                date: self.selected,
+                before,
+                after,
+            });
+            self.mark_changed(self.selected);
         }
         result
+    }
+
+    fn mark_changed(&mut self, date: Date) {
+        self.has_unsaved_changes = true;
+        self.changed_days.insert(date);
+    }
+
+    /// Ctrl+Z: undoes the last change, selecting its day.
+    fn undo(&mut self) {
+        let restored = self.history.undo().map(|c| (c.date, c.before.clone()));
+        self.restore_or_say(restored, "Nothing to undo");
+    }
+
+    /// Ctrl+Y: redoes the last undone change, selecting its day.
+    fn redo(&mut self) {
+        let restored = self.history.redo().map(|c| (c.date, c.after.clone()));
+        self.restore_or_say(restored, "Nothing to redo");
+    }
+
+    fn restore_or_say(&mut self, restored: Option<(Date, Day)>, nothing: &str) {
+        match restored {
+            Some((date, day)) => self.restore_day(date, day),
+            None => self.message = Some(nothing.to_owned()),
+        }
+    }
+
+    /// Puts `day` back on `date` and selects it. On the same day, focus stays
+    /// at the same position if that period exists; another day starts
+    /// without focus.
+    fn restore_day(&mut self, date: Date, day: Day) {
+        let period_count = day.periods.len();
+        self.timesheet.set_day(date, day);
+        self.mark_changed(date);
+        if date == self.selected {
+            self.focus = self.focus.filter(|focus| focus.period < period_count);
+        } else {
+            self.select_day(date);
+        }
     }
 
     /// Selects `date`, unless the selected day was changed in this session
@@ -504,8 +561,9 @@ impl App {
         self.select_day(date);
     }
 
+    /// Sorts the selected day and removes its empty periods. Not an undo step.
     fn normalize_selected_day(&mut self) {
-        let moved = self.edit_selected_day(Day::normalize);
+        let moved = self.timesheet.day_mut(self.selected).normalize();
         self.follow_moved_periods(&moved);
     }
 

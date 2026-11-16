@@ -142,7 +142,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 
 - One session-wide history covering all days. One step is one accepted change: an accepted field value, a paste, a checkbox toggle (including any From/To auto-fill it triggers), adding a period, or deleting a period.
 - The automatic sort when leaving a day is not an undo step.
-- Undoing a change on another day selects that day.
+- Undoing a change on another day selects that day. Undoing on the same day keeps the focus at the same position if that period exists (after undoing a delete, that's the restored period). Undo may bring back an unsorted order, which is sorted again when leaving the day or saving; undoing back to the saved state still counts as unsaved. Undo/redo work from both panels of the Tracking screen (not on Help, while editing or with a popup open) and say "Nothing to undo/redo" when there's nothing. Undoing to another day doesn't run the consistency check on the day being left.
 
 ### Storage
 

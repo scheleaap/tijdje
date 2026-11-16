@@ -668,6 +668,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ("Alt+p/n", "Go to Project/Notes"),
         ("F1", "Help"),
         ("F2, Esc", "Back to Tracking"),
+        ("Ctrl+Z/Ctrl+Y", "Undo/redo"),
         ("Ctrl+S", "Save"),
         ("Ctrl+Q", "Quit"),
     ];

@@ -418,6 +418,11 @@ impl Timesheet {
         self.days.entry(date).or_default()
     }
 
+    /// Replaces the day on `date`.
+    pub fn set_day(&mut self, date: Date, day: Day) {
+        self.days.insert(date, day);
+    }
+
     /// The worked time on `date`, or `None` when nothing is recorded that day.
     pub fn worked_time_on(&self, date: Date) -> Option<Minutes> {
         let day = self.day(date);
