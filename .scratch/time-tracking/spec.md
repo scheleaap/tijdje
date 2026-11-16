@@ -55,7 +55,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 28. As a consultant, I want no period and no field to have focus when I enter a day, so that I do not accidentally edit something.
 29. As a consultant, I want ↑/↓ to move focus to the same field in the previous/next period, or, if none has focus, to the first field of the first period (↓) or the last period (↑), so that I can move vertically.
 30. As a consultant, I want Tab/Shift-Tab to move focus to the next/previous field of a period (including checkboxes), continuing in the next/previous period and stopping at the very first and last field, so that I can move horizontally.
-31. As a consultant, I want Ctrl+↑/↓ to select the previous/next day from the right panel, so that I can record several days in a row.
+31. As a consultant, I want Alt+↑/↓ and Alt+PgUp/PgDn to select the previous/next day and week from the right panel, so that I can record several days in a row.
 32. As a consultant, I want typing in a focused field to replace its value, as in a spreadsheet, so that overwriting is fast.
 33. As a consultant, I want to accept active input with Enter and reject it with Esc (restoring the previously accepted value), so that I stay in control of every change.
 34. As a consultant, I want ←/→/Home/End to move the cursor while editing, so that I can correct typos.
@@ -81,7 +81,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 
 ### Consistency checks
 
-54. As a consultant, I want the day to be checked when I leave it (Ctrl+↑/↓, or ↑/↓/PgUp/PgDn in the left panel), and to stay on the day if the check fails, so that I never leave an inconsistent day behind.
+54. As a consultant, I want the day to be checked when I leave it (Alt+↑/↓/PgUp/PgDn in the right panel, or ↑/↓/PgUp/PgDn in the left panel), and to stay on the day if the check fails, so that I never leave an inconsistent day behind.
 55. As a consultant, I want periods sorted by From and completely empty periods removed automatically when I leave the day, so that I can add periods in any order and stray empty periods disappear.
 56. As a consultant, I want the check to reject an empty From, overlapping periods, a From that is not before To, more than one sick, vacation or holiday period per day, an open period on a day other than today, and a project on a non-working period, so that my data stays valid.
 57. As a consultant, I want non-consecutive periods to be allowed, so that implied breaks need no explicit break period.
@@ -124,7 +124,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Check triggers**: leaving a day (B) checks that day, but only if it was changed in this session, so you can always browse past broken days. Ctrl+S and Ctrl+Q first sort all days and remove empty periods (which alone isn't an unsaved change), then check all days; the popup names the earliest failing day, and "Go to day" selects it, focuses the right panel and shows the problem there. On Ctrl+Q the consistency popup comes before the "Save before quitting?" popup.
 - **Check results**: messages name periods by their times (e.g. `0900–1200 overlaps 1130–1300`, `Open period 1230– on a past day`, `More than one sick period`); only the first problem is shown. The offending periods get a red background until the next key press. Every day that currently fails a check gets a day warning.
 - **Shortcut modifiers** used in the original design: (A) not available while a field is being edited; (B) runs a consistency check and cancels the action if it fails; (C) accepts the active input first.
-  - Ctrl+↑/↓: A, B (ignored while editing; it doesn't accept active input). ↑/↓ in the right panel: A. Alt+b/v/s/h/p/n: C. Alt+←/→: A. Ctrl+Q: A, B. Ctrl+S: A, B (all days). Ctrl+Z/Y: A. Ctrl+Del: A.
+  - Alt+↑/↓/PgUp/PgDn in the right panel: A, B (ignored while editing; they don't accept active input). ←/→ in the right panel: previous/next field of the period, stopping at its edges; while editing they move the cursor. ↑/↓ in the right panel: A. Alt+b/v/s/h/p/n: C. Alt+←/→: A. Ctrl+Q: A, B. Ctrl+S: A, B (all days). Ctrl+Z/Y: A. Ctrl+Del: A.
 - **Editing**: From/To take only digits, at most 4; an empty value may be accepted. Enter with an invalid time keeps the field in edit mode and shows a message. Tab/Shift-Tab accept and move on (staying put if accepting fails). All other non-editing shortcuts are ignored while editing. Typing on a checkbox does nothing.
 - **Messages**: one-line notices in the right panel (invalid time, failed consistency check, rejected paste); a message disappears at the next key press. The right panel always reserves a row for them.
 - **Active input display**: while editing, the field shows the text around the cursor; `…` only appears outside edit mode.

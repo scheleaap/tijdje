@@ -246,11 +246,11 @@ fn ctrl_arrows_select_another_day_and_clear_focus() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Down);
-    ctrl_key(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 16));
     assert_eq!(app.focus(), None);
-    ctrl_key(&mut app, KeyCode::Up);
-    ctrl_key(&mut app, KeyCode::Up);
+    alt_key(&mut app, KeyCode::Up);
+    alt_key(&mut app, KeyCode::Up);
     assert_eq!(app.selected_day(), date(2026, 11, 12));
     assert_eq!(app.panel(), Panel::Periods);
 }
@@ -288,4 +288,50 @@ fn right_panel_scrolls_to_keep_the_focused_period_visible() {
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(screen.contains("P29"));
     assert!(!screen.contains("P0 "));
+}
+
+#[test]
+fn left_and_right_move_between_fields_and_stop_at_the_period_edges() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 2));
+    alt_key(&mut app, KeyCode::Right);
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Right);
+    assert_eq!(app.focus(), focus(0, Field::To));
+    press(&mut app, KeyCode::Left);
+    press(&mut app, KeyCode::Left);
+    assert_eq!(
+        app.focus(),
+        focus(0, Field::From),
+        "stops at the first field"
+    );
+    for _ in 0..10 {
+        press(&mut app, KeyCode::Right);
+    }
+    assert_eq!(
+        app.focus(),
+        focus(0, Field::Notes),
+        "stops at the last field"
+    );
+}
+
+#[test]
+fn alt_page_keys_select_the_previous_and_next_week() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 11));
+    alt_key(&mut app, KeyCode::Right);
+    alt_key(&mut app, KeyCode::PageDown);
+    assert_eq!(app.selected_day(), date(2026, 11, 18));
+    alt_key(&mut app, KeyCode::PageUp);
+    alt_key(&mut app, KeyCode::PageUp);
+    assert_eq!(app.selected_day(), date(2026, 11, 4));
+    assert_eq!(app.panel(), Panel::Periods);
+}
+
+#[test]
+fn ctrl_arrows_no_longer_change_the_day() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 11));
+    alt_key(&mut app, KeyCode::Right);
+    ctrl_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Up);
+    ctrl_key(&mut app, KeyCode::Up);
+    assert_eq!(app.selected_day(), date(2026, 11, 11));
 }

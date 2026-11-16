@@ -315,8 +315,12 @@ impl App {
 
     fn handle_periods_key(&mut self, code: KeyCode, ctrl: bool, alt: bool) {
         match code {
-            KeyCode::Up if ctrl => self.leave_day_for(calendar::previous_weekday(self.selected)),
-            KeyCode::Down if ctrl => self.leave_day_for(calendar::next_weekday(self.selected)),
+            KeyCode::Up if alt => self.leave_day_for(calendar::previous_weekday(self.selected)),
+            KeyCode::Down if alt => self.leave_day_for(calendar::next_weekday(self.selected)),
+            KeyCode::PageUp if alt => self.leave_day_for(calendar::previous_week(self.selected)),
+            KeyCode::PageDown if alt => self.leave_day_for(calendar::next_week(self.selected)),
+            KeyCode::Left => self.move_focus_within_period(Direction::Backward),
+            KeyCode::Right => self.move_focus_within_period(Direction::Forward),
             KeyCode::Up => self.move_focus_vertically(Direction::Backward),
             KeyCode::Down => self.move_focus_vertically(Direction::Forward),
             KeyCode::Tab => self.move_focus_horizontally(Direction::Forward),
@@ -666,6 +670,20 @@ impl App {
                 ..focus
             },
         });
+    }
+
+    /// ←/→: the previous/next field of the focused period, stopping at its
+    /// first and last field.
+    fn move_focus_within_period(&mut self, direction: Direction) {
+        if let Some(focus) = self.focus {
+            let field = match direction {
+                Direction::Forward => focus.field.next(),
+                Direction::Backward => focus.field.previous(),
+            };
+            if let Some(field) = field {
+                self.focus = Some(FieldFocus { field, ..focus });
+            }
+        }
     }
 
     /// Tab/Shift-Tab: the next/previous field, continuing in the next/previous

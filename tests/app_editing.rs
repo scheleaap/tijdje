@@ -180,7 +180,7 @@ fn other_shortcuts_are_ignored_while_editing() {
     press(&mut app, KeyCode::Up);
     press(&mut app, KeyCode::Down);
     alt_key(&mut app, KeyCode::Left);
-    ctrl_key(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Down);
     ctrl_key(&mut app, KeyCode::Delete);
     press(&mut app, KeyCode::F(1));
     assert_eq!(ctrl(&mut app, 'q'), Outcome::Continue);
@@ -408,4 +408,19 @@ fn the_consistency_popup_has_a_short_title() {
         screen.contains("ma 2 nov: 0845–1245 overlaps 1230–1300"),
         "{screen}"
     );
+}
+
+#[test]
+fn left_and_right_move_the_cursor_while_editing() {
+    let mut app = app_on_monday();
+    press(&mut app, KeyCode::Down);
+    tab_to(&mut app, Field::Notes);
+    type_text(&mut app, "ac");
+    press(&mut app, KeyCode::Left);
+    type_text(&mut app, "b");
+    press(&mut app, KeyCode::Right);
+    type_text(&mut app, "d");
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(period(&app, 0).notes.as_deref(), Some("abcd"));
+    assert_eq!(app.focus(), focus(0, Field::Notes));
 }

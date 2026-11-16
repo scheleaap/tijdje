@@ -4,11 +4,9 @@ Running list of user feedback and known open points that aren't covered by a tic
 
 ## Open
 
-- **←/→ between fields** (user feedback, 2026-11-15, after ticket 03): ←/→ should also move between fields in the right panel. Idea to think about later: that would free up Tab for switching panels.
+- **Tab for switching panels** (user idea, 2026-11-15, after ticket 03): with ←/→ moving between fields, Tab could switch panels instead.
 - **Drop panel focus** (user idea, 2026-11-16, after ticket 04): drop the concept of panel focus.
-- **Shift+arrows change the day** (user idea, 2026-11-16, after ticket 04): Shift+↑/↓ and Shift+PgUp/PgDn change the selected day.
 - **Notes keeps its text when typing** (user feedback, 2026-11-16, during ticket 11): typing in the Notes field shouldn't replace the existing text; the user wants to modify it.
-- **Cursor shows up in the left panel while editing** (user feedback, 2026-11-16, during ticket 11): while typing in a field, a blinking cursor appears on a ⚠️ in the left panel instead of in the edited field. Likely cause: the wide-symbol background fix (ADR-0001) moves the cursor after each frame to repaint emoji and doesn't put it back. Likely fix: save the cursor position before repainting and restore it afterwards.
 - **Clock port** (review of ticket 01): today is fixed at startup, so "today" doesn't change while the app runs past midnight. (The file-system port was added in ticket 05.)
 - **Other terminals unverified** (ADR-0001): emoji rendering is only checked in Ptyxis. Konsole, kitty, foot and ghostty are still to be checked.
 - **Total balance performance** (review of ticket 02): the total balance is recalculated from the first recorded day for every visible row. Fine for now; may need caching after years of data.
@@ -16,6 +14,9 @@ Running list of user feedback and known open points that aren't covered by a tic
 
 ## Done
 
+- **←/→ between fields**: done after ticket 11 (stops at the period's edges).
+- **Shift+arrows change the day**: done after ticket 11, with Alt instead of Shift (Ptyxis uses Shift+PgUp/PgDn for scrollback); Alt+↑/↓/PgUp/PgDn replace Ctrl+↑/↓.
+- **Cursor shows up in the left panel while editing**: fixed after ticket 11 (the wide-symbol repaint saves and restores the cursor).
 - **Text hard to read**: done in ticket 11 (Midnight Commander palette).
 - **Year in the year separator**: done in ticket 11.
 - **Input field background**: done in ticket 11 (light gray fields, cyan when focused).

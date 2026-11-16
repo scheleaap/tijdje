@@ -32,7 +32,7 @@ fn screen(app: &mut App) -> String {
 #[test]
 fn leaving_a_changed_inconsistent_day_is_refused_with_a_message() {
     let (mut app, _fs) = monday_with_an_overlap();
-    ctrl_key(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 2));
     assert!(screen(&mut app).contains("0845–1245 overlaps 1230–1300"));
 }
@@ -40,7 +40,7 @@ fn leaving_a_changed_inconsistent_day_is_refused_with_a_message() {
 #[test]
 fn the_offending_periods_are_highlighted_until_the_next_key() {
     let (mut app, _fs) = monday_with_an_overlap();
-    ctrl_key(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Down);
     let buffer = render(&mut app, 120, 24);
     let rows = rows(&buffer);
     for text in ["0845 1245", "1230 1300"] {
@@ -85,10 +85,10 @@ fn unchanged_inconsistent_days_can_be_browsed() {
 #[test]
 fn a_fixed_day_can_be_left() {
     let (mut app, _fs) = monday_with_an_overlap();
-    ctrl_key(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Down);
     type_text(&mut app, "1230");
     press(&mut app, KeyCode::Enter);
-    ctrl_key(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 3));
 }
 
@@ -101,7 +101,7 @@ fn leaving_a_day_sorts_its_periods() {
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "0800");
     press(&mut app, KeyCode::Enter);
-    ctrl_key(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 3));
     let monday = &app.timesheet().days[&date(2026, 11, 2)];
     assert_eq!(monday.periods[0].from, TimeOfDay::new(7, 0));
@@ -113,7 +113,7 @@ fn leaving_a_day_removes_empty_periods() {
     let (mut app, _fs) = sample_on(date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Enter);
-    ctrl_key(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 12));
     assert!(app.timesheet().day(date(2026, 11, 11)).periods.is_empty());
 }

@@ -650,7 +650,9 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ("PgUp/PgDn", "Left panel: previous/next week"),
         ("↑/↓", "Right panel: same field in the previous/next period"),
         ("Tab/Shift-Tab", "Right panel: next/previous field"),
-        ("Ctrl+↑/↓", "Right panel: previous/next day"),
+        ("←/→", "Right panel: previous/next field of the period"),
+        ("Alt+↑/↓", "Right panel: previous/next day"),
+        ("Alt+PgUp/PgDn", "Right panel: previous/next week"),
         ("Type", "Right panel: replace the focused field's value"),
         (
             "Enter",

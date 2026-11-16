@@ -11,14 +11,17 @@ use ratatui::{
     backend::IntoCrossterm,
     buffer::Buffer,
     crossterm::{
-        cursor::MoveTo,
+        cursor::{MoveTo, RestorePosition, SavePosition},
         queue,
         style::{Print, ResetColor, SetBackgroundColor, SetForegroundColor},
     },
     text::Span,
 };
 
+/// The cursor position is saved first and restored afterwards, so the cursor
+/// stays where the frame put it (e.g. in the field being edited).
 pub fn paint_backgrounds(buffer: &Buffer, out: &mut impl Write) -> io::Result<()> {
+    queue!(out, SavePosition)?;
     let area = buffer.area;
     for y in area.top()..area.bottom() {
         for x in area.left()..area.right().saturating_sub(1) {
@@ -36,6 +39,6 @@ pub fn paint_backgrounds(buffer: &Buffer, out: &mut impl Write) -> io::Result<()
             }
         }
     }
-    queue!(out, ResetColor)?;
+    queue!(out, ResetColor, RestorePosition)?;
     out.flush()
 }
