@@ -129,6 +129,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Active input display**: while editing, the field shows the text around the cursor; `…` only appears outside edit mode.
 - **Adding periods**: Enter doesn't add a period while the last period is open (no To yet), which includes an empty last period.
 - **Delete popup**: Delete is the default button.
+- **Period types**: unchecking an absence empties From and To only if the period is still the day's only one and they still hold the auto-filled full day (0900 and 0900 + regular expected working time); the values decide, so hand-typed times equal to a full day are emptied too (accepted; undo covers it). Switching from one absence (or to Break) keeps From and To, without emptying or auto-fill. Alt+b/v/s/h/p/n need a focused period in the right panel; they accept active input first and do nothing if that fails.
 - **Deleting**: after deleting a period, focus moves to the same field of the period taking its place (the previous one if the last was deleted); no focus if the day becomes empty.
 - **Tab order** within a period: From, To, Project, Notes, Break, Vacation, Sick, Holiday. Duration is not focusable. Tab with nothing focused focuses From of the first period.
 - **Right panel layout**: checkbox columns have emoji headers (☕ break, 🏖️ vacation, 🤒 sick, 🎄 holiday). Project is 10 cells wide; Notes takes the remaining width. A period with both indicators shows `→ ☕ ⚠️`.

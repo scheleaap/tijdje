@@ -40,17 +40,9 @@ const PERIOD_ROW_FIXED_WIDTH: usize = GAP
     + GAP
     + PROJECT_WIDTH
     + GAP
-    + CHECKBOXES.len() * (GAP + CHECKBOX_WIDTH)
+    + Field::CHECKBOXES.len() * (GAP + CHECKBOX_WIDTH)
     + GAP
     + INDICATORS_WIDTH;
-
-/// The period-type checkboxes, in Tab order.
-const CHECKBOXES: [(Field, PeriodType); 4] = [
-    (Field::Break, PeriodType::Break),
-    (Field::Vacation, PeriodType::Vacation),
-    (Field::Sick, PeriodType::Sick),
-    (Field::Holiday, PeriodType::Holiday),
-];
 
 /// The emoji for a non-working period type: checkbox headers and absence indicators.
 fn period_type_emoji(period_type: PeriodType) -> &'static str {
@@ -198,9 +190,10 @@ impl App {
         .areas(inner);
         let notes_width = usize::from(inner.width).saturating_sub(PERIOD_ROW_FIXED_WIDTH);
 
-        let checkbox_headers: String = CHECKBOXES
+        let checkbox_headers: String = Field::CHECKBOXES
             .iter()
-            .map(|&(_, period_type)| format!(" {} ", period_type_emoji(period_type)))
+            .filter_map(|field| field.period_type())
+            .map(|period_type| format!(" {} ", period_type_emoji(period_type)))
             .collect();
         let header_text = format!(
             " {:<TIME_WIDTH$} {:<TIME_WIDTH$} {:<DURATION_WIDTH$} {:<PROJECT_WIDTH$} {:<notes_width$}{checkbox_headers}",
@@ -304,8 +297,8 @@ impl App {
                 notes_width,
             ),
         ];
-        for (field, period_type) in CHECKBOXES {
-            let mark = if period.period_type == period_type {
+        for field in Field::CHECKBOXES {
+            let mark = if field.period_type() == Some(period.period_type) {
                 "[x]"
             } else {
                 "[ ]"
@@ -496,6 +489,9 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ),
         ("Esc", "Reject input"),
         ("Ctrl+Del", "Delete the focused period"),
+        ("Space", "Toggle the focused checkbox"),
+        ("Alt+b/v/s/h", "Toggle break/vacation/sick/holiday"),
+        ("Alt+p/n", "Go to Project/Notes"),
         ("F1", "Help"),
         ("F2, Esc", "Back to Tracking"),
         ("Ctrl+S", "Save"),

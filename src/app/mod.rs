@@ -13,7 +13,7 @@ use active_input::ActiveInput;
 use popup::{Popup, PopupAction};
 
 use crate::{
-    domain::{Day, Period, TimeOfDay, Timesheet, calendar},
+    domain::{Day, Period, PeriodType, TimeOfDay, Timesheet, calendar},
     store::{self, Backup, FileSystem, Fingerprint, LoadError, Overwrite, SaveError},
 };
 
@@ -88,18 +88,50 @@ impl Field {
         matches!(self, Field::From | Field::To)
     }
 
-    /// Fields that take typed text (as opposed to checkboxes).
+    /// The period-type checkboxes, in Tab order.
+    pub const CHECKBOXES: [Field; 4] = [Field::Break, Field::Vacation, Field::Sick, Field::Holiday];
+
+    /// The period type a checkbox field stands for.
+    pub fn period_type(self) -> Option<PeriodType> {
+        match self {
+            Field::Break => Some(PeriodType::Break),
+            Field::Vacation => Some(PeriodType::Vacation),
+            Field::Sick => Some(PeriodType::Sick),
+            Field::Holiday => Some(PeriodType::Holiday),
+            Field::From | Field::To | Field::Project | Field::Notes => None,
+        }
+    }
+
+    /// Fields that take typed text: every field that isn't a checkbox.
     fn takes_text(self) -> bool {
-        matches!(
-            self,
-            Field::From | Field::To | Field::Project | Field::Notes
-        )
+        self.period_type().is_none()
     }
 
     /// Whether typing `c` adds it to an active input of `len` characters:
     /// time fields take at most four digits, other text fields anything.
     fn accepts(self, c: char, len: usize) -> bool {
         self.takes_text() && (!self.is_time() || (c.is_ascii_digit() && len < 4))
+    }
+}
+
+/// Alt shortcuts that act on the focused period (Alt+b/v/s/h/p/n).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PeriodShortcut {
+    Toggle(PeriodType),
+    Focus(Field),
+}
+
+impl PeriodShortcut {
+    fn for_key(code: KeyCode) -> Option<Self> {
+        Some(match code {
+            KeyCode::Char('b') => Self::Toggle(PeriodType::Break),
+            KeyCode::Char('v') => Self::Toggle(PeriodType::Vacation),
+            KeyCode::Char('s') => Self::Toggle(PeriodType::Sick),
+            KeyCode::Char('h') => Self::Toggle(PeriodType::Holiday),
+            KeyCode::Char('p') => Self::Focus(Field::Project),
+            KeyCode::Char('n') => Self::Focus(Field::Notes),
+            _ => return None,
+        })
     }
 }
 
@@ -213,6 +245,17 @@ impl App {
             }
             return Outcome::Continue;
         }
+        if alt
+            && self.screen == Screen::Tracking
+            && self.panel == Panel::Periods
+            && let Some(shortcut) = PeriodShortcut::for_key(key.code)
+        {
+            // Accept active input first; if that fails, the shortcut does nothing.
+            if self.active_input.is_none() || self.accept() {
+                self.run_period_shortcut(shortcut);
+            }
+            return Outcome::Continue;
+        }
         if self.active_input.is_some() {
             self.handle_editing_key(key);
             return Outcome::Continue;
@@ -263,7 +306,7 @@ impl App {
             KeyCode::Delete if ctrl && self.focus.is_some() => {
                 self.popup = Some(Popup::delete_period());
             }
-            KeyCode::Char(c) if !ctrl && !alt => self.start_editing(c),
+            KeyCode::Char(c) if !ctrl && !alt => self.type_char(c),
             _ => {}
         }
     }
@@ -302,6 +345,30 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    /// Space toggles a focused checkbox; otherwise typing starts editing.
+    fn type_char(&mut self, c: char) {
+        match self.focus.and_then(|focus| focus.field.period_type()) {
+            Some(period_type) if c == ' ' => self.toggle_period_type(period_type),
+            _ => self.start_editing(c),
+        }
+    }
+
+    fn toggle_period_type(&mut self, period_type: PeriodType) {
+        if let Some(focus) = self.focus {
+            self.edit_selected_day(|day| day.toggle_period_type(focus.period, period_type));
+        }
+    }
+
+    fn run_period_shortcut(&mut self, shortcut: PeriodShortcut) {
+        let Some(focus) = self.focus else {
+            return;
+        };
+        match shortcut {
+            PeriodShortcut::Toggle(period_type) => self.toggle_period_type(period_type),
+            PeriodShortcut::Focus(field) => self.focus = Some(FieldFocus { field, ..focus }),
         }
     }
 

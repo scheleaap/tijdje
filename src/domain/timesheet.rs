@@ -9,6 +9,16 @@ const EARLIEST_USUAL_START: TimeOfDay = TimeOfDay::new(6, 0).expect("valid time"
 /// Periods ending after this time have an unusual time.
 const LATEST_USUAL_END: TimeOfDay = TimeOfDay::new(20, 0).expect("valid time");
 
+/// A From–To pair with both times set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct TimeSpan {
+    from: TimeOfDay,
+    to: TimeOfDay,
+}
+
+/// Where an auto-filled full day of absence starts.
+const FULL_DAY_START: TimeOfDay = TimeOfDay::new(9, 0).expect("valid time");
+
 /// 7h12m.
 pub const DEFAULT_REGULAR_EXPECTED_WORKING_TIME: Minutes = Minutes(432);
 
@@ -128,6 +138,42 @@ impl Day {
         self.periods.len() - 1
     }
 
+    /// Checks `period_type` on the period at `index`, or unchecks it (back to
+    /// work) if it was already checked. Checking an absence on the day's only
+    /// period, while its From and To are empty, fills a full day from 09:00.
+    /// Unchecking an absence empties those times again, if they're unchanged.
+    pub fn toggle_period_type(&mut self, index: usize, period_type: PeriodType) {
+        let full_day = self.full_day();
+        let is_only_period = self.periods.len() == 1;
+        let Some(period) = self.periods.get_mut(index) else {
+            return;
+        };
+        let previous = period.period_type;
+        if previous == period_type {
+            period.period_type = PeriodType::Work;
+            if is_only_period && period_type.absence().is_some() {
+                period.empty_times_if(full_day);
+            }
+        } else {
+            period.period_type = period_type;
+            let checking_an_absence =
+                period_type.absence().is_some() && previous.absence().is_none();
+            if is_only_period && checking_an_absence {
+                period.fill_times_if_empty(full_day);
+            }
+        }
+    }
+
+    /// A full day of absence: from 09:00 for the regular expected working time.
+    fn full_day(&self) -> Option<TimeSpan> {
+        let end = FULL_DAY_START.minutes_since_midnight()
+            + u16::try_from(self.regular_expected_working_time().0).ok()?;
+        Some(TimeSpan {
+            from: FULL_DAY_START,
+            to: TimeOfDay::new(end / 60, end % 60)?,
+        })
+    }
+
     /// Removes the period at `index`, if there is one.
     pub fn remove_period(&mut self, index: usize) {
         if index < self.periods.len() {
@@ -153,6 +199,22 @@ impl Period {
     /// An empty period has no values: no times, project or notes, and type work.
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
+    }
+
+    /// Sets From and To to `span` if both are empty.
+    fn fill_times_if_empty(&mut self, span: Option<TimeSpan>) {
+        if let (None, None, Some(span)) = (self.from, self.to, span) {
+            self.from = Some(span.from);
+            self.to = Some(span.to);
+        }
+    }
+
+    /// Empties From and To if they hold exactly `span`.
+    fn empty_times_if(&mut self, span: Option<TimeSpan>) {
+        if span.is_some_and(|span| self.from == Some(span.from) && self.to == Some(span.to)) {
+            self.from = None;
+            self.to = None;
+        }
     }
 
     /// An open period has no To yet, because it is still running.
