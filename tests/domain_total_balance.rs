@@ -112,9 +112,12 @@ fn empty_timesheet_has_no_balances() {
 }
 
 fn with_open_period(mut t: Timesheet, on: Date) -> Timesheet {
-    let mut open = period(1300, Some(1400), PeriodType::Work);
-    open.to = None;
-    t.days.get_mut(&on).unwrap().periods.push(open);
+    // After the day's last period, so it doesn't overlap.
+    t.days
+        .get_mut(&on)
+        .unwrap()
+        .periods
+        .push(period(1700, None, PeriodType::Work));
     t
 }
 

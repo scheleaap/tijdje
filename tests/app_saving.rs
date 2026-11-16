@@ -13,7 +13,7 @@ use tijdje::{
 
 /// Changes Mon 2 Nov's first From to 0815 on the in-memory sample file.
 fn app_with_a_change() -> (App, InMemoryFileSystem) {
-    let (mut app, fs) = app_with_fs(SAMPLE, date(2026, 11, 2));
+    let (mut app, fs) = sample_on(date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Down);
     type_text(&mut app, "0815");
@@ -72,7 +72,7 @@ fn saved_yaml_follows_the_documented_schema() {
 
 #[test]
 fn text_with_quotes_and_special_characters_survives_saving() {
-    let (mut app, fs) = app_with_fs(SAMPLE, date(2026, 11, 2));
+    let (mut app, fs) = sample_on(date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Down);
     for _ in 0..3 {
@@ -91,7 +91,7 @@ fn text_with_quotes_and_special_characters_survives_saving() {
 
 #[test]
 fn days_without_periods_are_not_written() {
-    let (mut app, fs) = app_with_fs(SAMPLE, date(2026, 11, 6));
+    let (mut app, fs) = sample_on(date(2026, 11, 6));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Down);
     ctrl_key(&mut app, KeyCode::Delete);
@@ -102,10 +102,12 @@ fn days_without_periods_are_not_written() {
 
 #[test]
 fn a_new_day_stores_the_regular_expected_working_time() {
-    let (mut app, fs) = app_with_fs(SAMPLE, date(2026, 11, 11));
+    let (mut app, fs) = sample_on(date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Enter);
     type_text(&mut app, "0900");
+    press(&mut app, KeyCode::Tab);
+    type_text(&mut app, "1200");
     press(&mut app, KeyCode::Enter);
     ctrl(&mut app, 's');
     assert!(
@@ -152,7 +154,7 @@ fn the_backup_keeps_the_file_from_before_the_session() {
 
 #[test]
 fn accepting_an_unchanged_value_is_not_an_unsaved_change() {
-    let (mut app, _fs) = app_with_fs(SAMPLE, date(2026, 11, 2));
+    let (mut app, _fs) = sample_on(date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Down);
     type_text(&mut app, "0845");
@@ -209,7 +211,7 @@ fn a_file_changed_on_disk_asks_before_overwriting() {
 
 #[test]
 fn ctrl_q_without_unsaved_changes_quits() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 2));
+    let (mut app, _fs) = sample_on(date(2026, 11, 2));
     assert_eq!(ctrl(&mut app, 'q'), Outcome::Quit);
 }
 
@@ -276,7 +278,7 @@ fn canceling_the_overwrite_while_quitting_stays_in_the_application() {
 
 #[test]
 fn ctrl_s_and_ctrl_q_are_ignored_while_editing() {
-    let (mut app, fs) = app_with_fs(SAMPLE, date(2026, 11, 2));
+    let (mut app, fs) = sample_on(date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Down);
     type_text(&mut app, "07");

@@ -30,7 +30,7 @@ fn right_panel_shows_the_periods_of_the_selected_day() {
         lunch.contains("0h30m") && lunch.contains("[x]"),
         "{lunch:?}"
     );
-    assert!(screen[0].contains("Periods: ma  2 nov"));
+    assert!(screen[0].contains("Periods: ma 2 nov"));
 }
 
 #[test]

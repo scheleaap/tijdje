@@ -174,3 +174,19 @@ pub fn type_text(app: &mut App, text: &str) {
         press(app, KeyCode::Char(c));
     }
 }
+
+/// The day on which the sample is consistent: its open period (10 Nov) is today.
+pub const SAMPLE_TODAY: Date = jiff::civil::date(2026, 11, 10);
+
+/// The sample on an in-memory file, with "today" set so the sample passes the
+/// consistency check, and `day` selected.
+pub fn sample_on(day: Date) -> (App, InMemoryFileSystem) {
+    let (mut app, fs) = app_with_fs(SAMPLE, SAMPLE_TODAY);
+    while app.selected_day() < day {
+        press(&mut app, KeyCode::Down);
+    }
+    while app.selected_day() > day {
+        press(&mut app, KeyCode::Up);
+    }
+    (app, fs)
+}

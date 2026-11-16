@@ -61,6 +61,8 @@ const INACTIVE_SELECTED: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const INPUT: Style = Style::new().fg(Color::White).bg(Color::Indexed(17));
 const EDITING: Style = Style::new().fg(Color::Black).bg(Color::White);
 const MESSAGE: Style = Style::new().fg(Color::Yellow).bg(Color::Blue);
+/// Periods that failed the consistency check.
+const HIGHLIGHTED: Style = Style::new().fg(Color::White).bg(Color::Red);
 const KEY_NUMBER: Style = Style::new().fg(Color::White).bg(Color::Black);
 const KEY_LABEL: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 
@@ -177,7 +179,7 @@ impl App {
     }
 
     fn render_periods(&mut self, frame: &mut Frame, area: Rect) {
-        let title = format!(" Periods: {} ", calendar::format_dutch(self.selected));
+        let title = format!(" Periods: {} ", calendar::format_dutch_short(self.selected));
         let block = panel_block(&title, self.panel == Panel::Periods);
         let inner = block.inner(area);
         frame.render_widget(block, area);
@@ -224,13 +226,19 @@ impl App {
             .skip(first)
             .take(height)
             .map(|(index, period)| {
-                self.period_line(
+                let mut line = self.period_line(
                     day,
                     index,
                     period,
                     notes_width,
                     active_input_text.as_deref(),
-                )
+                );
+                if self.inconsistent_periods.contains(&index) {
+                    for span in &mut line.spans {
+                        span.style = HIGHLIGHTED;
+                    }
+                }
+                line
             })
             .collect();
         frame.render_widget(Paragraph::new(lines).style(PANEL), list);
@@ -319,13 +327,20 @@ impl App {
             .is_some_and(|f| f.period == period && f.field == field)
     }
 
-    /// Adjusts the first visible period so the focused period is visible, and returns it.
+    /// Adjusts the first visible period so the first period that failed the
+    /// consistency check, or else the focused period, is visible.
     fn scroll_to_focused_period(&mut self, height: usize) -> usize {
-        if let Some(focus) = self.focus {
-            if focus.period < self.first_visible_period {
-                self.first_visible_period = focus.period;
-            } else if height > 0 && focus.period >= self.first_visible_period + height {
-                self.first_visible_period = focus.period + 1 - height;
+        let target = self
+            .inconsistent_periods
+            .iter()
+            .min()
+            .copied()
+            .or(self.focus.map(|focus| focus.period));
+        if let Some(period) = target {
+            if period < self.first_visible_period {
+                self.first_visible_period = period;
+            } else if height > 0 && period >= self.first_visible_period + height {
+                self.first_visible_period = period + 1 - height;
             }
         }
         self.first_visible_period
@@ -358,7 +373,16 @@ fn to_u16(n: usize) -> u16 {
 }
 
 fn render_popup(frame: &mut Frame, popup: &Popup) {
-    let width = 40.min(frame.area().width);
+    let buttons_width: usize = popup
+        .buttons
+        .iter()
+        .map(|(label, _)| Span::raw(*label).width() + 4)
+        .sum();
+    let content_width = Span::raw(popup.question.as_str())
+        .width()
+        .max(buttons_width)
+        + 4;
+    let width = to_u16(content_width.max(40)).min(frame.area().width);
     let area = Rect {
         x: frame.area().width.saturating_sub(width) / 2,
         y: frame.area().height.saturating_sub(5) / 2,

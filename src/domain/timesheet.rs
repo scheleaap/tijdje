@@ -9,6 +9,21 @@ const EARLIEST_USUAL_START: TimeOfDay = TimeOfDay::new(6, 0).expect("valid time"
 /// Periods ending after this time have an unusual time.
 const LATEST_USUAL_END: TimeOfDay = TimeOfDay::new(20, 0).expect("valid time");
 
+/// Why a day fails the consistency check, and which periods are involved.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConsistencyProblem {
+    pub message: String,
+    /// Indices of the periods involved.
+    pub periods: Vec<usize>,
+}
+
+/// A day that fails the consistency check, with its problem.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InconsistentDay {
+    pub date: Date,
+    pub problem: ConsistencyProblem,
+}
+
 /// A From–To pair with both times set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct TimeSpan {
@@ -50,7 +65,23 @@ impl From<Absence> for PeriodType {
     }
 }
 
+impl Absence {
+    /// The absence's name in messages, e.g. "More than one sick period".
+    pub fn name(self) -> &'static str {
+        match self {
+            Absence::Sick => "sick",
+            Absence::Vacation => "vacation",
+            Absence::Holiday => "holiday",
+        }
+    }
+}
+
 impl PeriodType {
+    /// Whether this is a work period (as opposed to a non-working period).
+    pub fn is_working(self) -> bool {
+        self == PeriodType::Work
+    }
+
     /// The absence this period type stands for, if any.
     pub fn absence(self) -> Option<Absence> {
         match self {
@@ -174,6 +205,120 @@ impl Day {
         })
     }
 
+    /// The first consistency problem of the day on `date`, if any.
+    pub fn check(&self, date: Date, today: Date) -> Option<ConsistencyProblem> {
+        self.check_from_is_set()
+            .or_else(|| self.check_from_before_to())
+            .or_else(|| self.check_no_overlaps())
+            .or_else(|| self.check_open_period(date, today))
+            .or_else(|| self.check_one_period_per_absence())
+            .or_else(|| self.check_no_project_on_non_working_periods())
+    }
+
+    fn check_from_is_set(&self) -> Option<ConsistencyProblem> {
+        self.first_period_where(
+            |p| p.from.is_none(),
+            |p| format!("Period {} has no From", p.label()),
+        )
+    }
+
+    fn check_from_before_to(&self) -> Option<ConsistencyProblem> {
+        self.first_period_where(
+            |p| matches!((p.from, p.to), (Some(from), Some(to)) if from >= to),
+            |p| format!("Period {}: From is not before To", p.label()),
+        )
+    }
+
+    fn check_no_overlaps(&self) -> Option<ConsistencyProblem> {
+        self.indices_by_from().windows(2).find_map(|pair| {
+            let (earlier, later) = (&self.periods[pair[0]], &self.periods[pair[1]]);
+            let message = match (earlier.to, later.from) {
+                (Some(to), Some(from)) if from < to => {
+                    format!("{} overlaps {}", earlier.label(), later.label())
+                }
+                (None, Some(_)) => format!(
+                    "Open period {} is followed by {}",
+                    earlier.label(),
+                    later.label()
+                ),
+                _ => return None,
+            };
+            Some(ConsistencyProblem {
+                message,
+                periods: pair.to_vec(),
+            })
+        })
+    }
+
+    fn check_open_period(&self, date: Date, today: Date) -> Option<ConsistencyProblem> {
+        if date == today {
+            return None;
+        }
+        let when = if date < today { "past" } else { "future" };
+        self.first_period_where(Period::is_open, |p| {
+            format!("Open period {} on a {when} day", p.label())
+        })
+    }
+
+    fn check_one_period_per_absence(&self) -> Option<ConsistencyProblem> {
+        [Absence::Sick, Absence::Vacation, Absence::Holiday]
+            .into_iter()
+            .find_map(|absence| {
+                let periods: Vec<usize> = (0..self.periods.len())
+                    .filter(|&i| self.periods[i].period_type.absence() == Some(absence))
+                    .collect();
+                (periods.len() > 1).then(|| ConsistencyProblem {
+                    message: format!("More than one {} period", absence.name()),
+                    periods,
+                })
+            })
+    }
+
+    fn check_no_project_on_non_working_periods(&self) -> Option<ConsistencyProblem> {
+        self.first_period_where(
+            |p| !p.period_type.is_working() && p.project.is_some(),
+            |p| format!("Non-working period {} has a project", p.label()),
+        )
+    }
+
+    /// A problem for the first period matching `fails`, described by `message`.
+    fn first_period_where(
+        &self,
+        fails: impl Fn(&Period) -> bool,
+        message: impl Fn(&Period) -> String,
+    ) -> Option<ConsistencyProblem> {
+        let index = self.periods.iter().position(fails)?;
+        Some(ConsistencyProblem {
+            message: message(&self.periods[index]),
+            periods: vec![index],
+        })
+    }
+
+    /// Period indices ordered by From; periods with the same From keep their order.
+    fn indices_by_from(&self) -> Vec<usize> {
+        let mut indices: Vec<usize> = (0..self.periods.len()).collect();
+        indices.sort_by_key(|&i| self.periods[i].from);
+        indices
+    }
+
+    /// Removes empty periods and sorts the rest by From. Returns, for each old
+    /// period index, its new index (`None` if it was removed).
+    pub fn normalize(&mut self) -> Vec<Option<usize>> {
+        let kept: Vec<usize> = self
+            .indices_by_from()
+            .into_iter()
+            .filter(|&i| !self.periods[i].is_empty())
+            .collect();
+        let mut moved = vec![None; self.periods.len()];
+        for (new, &old) in kept.iter().enumerate() {
+            moved[old] = Some(new);
+        }
+        let old = std::mem::take(&mut self.periods);
+        let mut old: Vec<Option<Period>> = old.into_iter().map(Some).collect();
+        self.periods = kept.iter().filter_map(|&i| old[i].take()).collect();
+        moved
+    }
+
     /// Removes the period at `index`, if there is one.
     pub fn remove_period(&mut self, index: usize) {
         if index < self.periods.len() {
@@ -199,6 +344,12 @@ impl Period {
     /// An empty period has no values: no times, project or notes, and type work.
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
+    }
+
+    /// The period's times as a label, e.g. `0900–1200`, `1230–` or `–1200`.
+    pub fn label(&self) -> String {
+        let time = |t: Option<TimeOfDay>| t.map(TimeOfDay::format_hhmm).unwrap_or_default();
+        format!("{}–{}", time(self.from), time(self.to))
     }
 
     /// Sets From and To to `span` if both are empty.
@@ -281,10 +432,22 @@ impl Timesheet {
         )
     }
 
-    /// Whether a day before today (from the first recorded day on) is empty or has an open period.
+    /// Whether a day fails the consistency check, or is a day before today
+    /// (from the first recorded day on) that is empty or has an open period.
     pub fn has_day_warning_on(&self, date: Date, today: Date) -> bool {
         let day = self.day(date);
-        self.is_tracked(date) && date < today && (day.is_empty() || day.has_open_period())
+        let inconsistent = !day.is_empty() && day.check(date, today).is_some();
+        let unfinished =
+            self.is_tracked(date) && date < today && (day.is_empty() || day.has_open_period());
+        inconsistent || unfinished
+    }
+
+    /// The earliest day that fails the consistency check, with its problem.
+    pub fn first_inconsistent_day(&self, today: Date) -> Option<InconsistentDay> {
+        self.days.iter().find_map(|(&date, day)| {
+            day.check(date, today)
+                .map(|problem| InconsistentDay { date, problem })
+        })
     }
 
     /// The earliest day with at least one period.

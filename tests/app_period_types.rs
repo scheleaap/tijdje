@@ -161,14 +161,18 @@ fn space_on_a_text_field_types_a_space() {
 
 #[test]
 fn period_types_are_saved() {
-    let (mut app, fs) = app_with_fs(SAMPLE, date(2026, 11, 2));
+    // The break (1230–1300) has no project, so it may become a sick period.
+    let (mut app, fs) = sample_on(date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
+    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Down);
     alt_key(&mut app, KeyCode::Char('s'));
     ctrl(&mut app, 's');
     let yaml = fs.get(TIMESHEET).unwrap();
     assert!(
-        yaml.contains("        notes: \"Onboarding\"\n        type: sick\n"),
+        yaml.contains(
+            "      - from: \"12:30\"\n        to: \"13:00\"\n        project: null\n        notes: null\n        type: sick\n"
+        ),
         "{yaml}"
     );
 }

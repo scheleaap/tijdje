@@ -87,3 +87,12 @@ fn double_line_wins_when_the_year_changes_over_a_weekend() {
         Separator::Year
     );
 }
+
+#[test]
+fn short_dates_are_not_padded() {
+    assert_eq!(calendar::format_dutch_short(date(2026, 11, 2)), "ma 2 nov");
+    assert_eq!(
+        calendar::format_dutch_short(date(2026, 11, 12)),
+        "do 12 nov"
+    );
+}

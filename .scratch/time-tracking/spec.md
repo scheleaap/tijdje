@@ -120,8 +120,9 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Period types**: work, break, vacation, sick, holiday. Exactly one per period. In the UI the four non-working checkboxes are mutually exclusive, and none checked means work.
 - **Times**: From and To are exactly four digits HHMM, 0000–2359. Periods never cross midnight.
 - **Left panel display**: day numbers are padded to two characters (`ma  2 nov`) so columns align. A day with only non-working periods shows `0h00m` worked time; a day without periods shows nothing.
-- **Consistency checks** (not exhaustive): From is not empty; no overlaps; From before To; at most one sick, one vacation and one holiday period per day; open period only on the current day; non-working periods have no project. Before checking a day, completely empty periods are removed and the rest are sorted by From, so ordering never fails a check.
-- **Check triggers**: leaving a day (B) checks that day. Ctrl+S and Ctrl+Q check all days. On Ctrl+Q the consistency popup comes before the "Save before quitting?" popup. Days that fail a check at load time are still loaded and marked ⚠️.
+- **Consistency checks** (not exhaustive): From is not empty; no overlaps, and nothing after an open period; From before To; at most one sick, one vacation and one holiday period per day; open period only on the current day; non-working periods have no project. Before checking a day, completely empty periods are removed and the rest are sorted by From, so ordering never fails a check.
+- **Check triggers**: leaving a day (B) checks that day, but only if it was changed in this session, so you can always browse past broken days. Ctrl+S and Ctrl+Q first sort all days and remove empty periods (which alone isn't an unsaved change), then check all days; the popup names the earliest failing day, and "Go to day" selects it, focuses the right panel and shows the problem there. On Ctrl+Q the consistency popup comes before the "Save before quitting?" popup.
+- **Check results**: messages name periods by their times (e.g. `0900–1200 overlaps 1130–1300`, `Open period 1230– on a past day`, `More than one sick period`); only the first problem is shown. The offending periods get a red background until the next key press. Every day that currently fails a check gets a day warning.
 - **Shortcut modifiers** used in the original design: (A) not available while a field is being edited; (B) runs a consistency check and cancels the action if it fails; (C) accepts the active input first.
   - Ctrl+↑/↓: A, B (ignored while editing; it doesn't accept active input). ↑/↓ in the right panel: A. Alt+b/v/s/h/p/n: C. Alt+←/→: A. Ctrl+Q: A, B. Ctrl+S: A, B (all days). Ctrl+Z/Y: A. Ctrl+Del: A.
 - **Editing**: From/To take only digits, at most 4; an empty value may be accepted. Enter with an invalid time keeps the field in edit mode and shows a message. Tab/Shift-Tab accept and move on (staying put if accepting fails). All other non-editing shortcuts are ignored while editing. Typing on a checkbox does nothing.
@@ -134,7 +135,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Tab order** within a period: From, To, Project, Notes, Break, Vacation, Sick, Holiday. Duration is not focusable. Tab with nothing focused focuses From of the first period.
 - **Right panel layout**: checkbox columns have emoji headers (☕ break, 🏖️ vacation, 🤒 sick, 🎄 holiday). Project is 10 cells wide; Notes takes the remaining width. A period with both indicators shows `→ ☕ ⚠️`.
 - **Panel focus**: the active panel's title is highlighted; in an inactive left panel the selected day has a gray bar. Leaving and re-entering the right panel on the same day keeps the focused field; selecting another day clears it. Shift-Tab with nothing focused focuses Holiday of the last period.
-- **Right panel title**: shows the selected day, e.g. `Periods: ma  2 nov`.
+- **Right panel title**: shows the selected day without padding, e.g. `Periods: ma 2 nov`; popups use the same unpadded date.
 
 ### Undo
 

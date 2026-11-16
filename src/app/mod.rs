@@ -4,7 +4,7 @@ mod active_input;
 mod popup;
 mod render;
 
-use std::path::PathBuf;
+use std::{collections::HashSet, path::PathBuf};
 
 use jiff::civil::Date;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
@@ -13,7 +13,10 @@ use active_input::ActiveInput;
 use popup::{Popup, PopupAction};
 
 use crate::{
-    domain::{Day, Period, PeriodType, TimeOfDay, Timesheet, calendar},
+    domain::{
+        ConsistencyProblem, Day, InconsistentDay, Period, PeriodType, TimeOfDay, Timesheet,
+        calendar,
+    },
     store::{self, Backup, FileSystem, Fingerprint, LoadError, Overwrite, SaveError},
 };
 
@@ -165,6 +168,13 @@ pub struct App {
     active_input: Option<ActiveInput>,
     /// A one-line notice in the right panel; cleared at the next key press.
     message: Option<String>,
+    /// Periods of the selected day that failed the consistency check; cleared
+    /// at the next key press, like the message.
+    inconsistent_periods: Vec<usize>,
+    /// Days changed in this session; only these are checked when leaving them.
+    changed_days: HashSet<Date>,
+    /// The day named in a consistency-check popup, for "Go to day".
+    inconsistent_day: Option<InconsistentDay>,
     popup: Option<Popup>,
     /// `None` until the first render.
     first_visible_day: Option<Date>,
@@ -200,6 +210,9 @@ impl App {
             focus: None,
             active_input: None,
             message: None,
+            inconsistent_periods: Vec::new(),
+            changed_days: HashSet::new(),
+            inconsistent_day: None,
             popup: None,
             first_visible_day: None,
             first_visible_period: 0,
@@ -238,6 +251,7 @@ impl App {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let alt = key.modifiers.contains(KeyModifiers::ALT);
         self.message = None;
+        self.inconsistent_periods.clear();
         if let Some(popup) = &mut self.popup {
             if let Some(action) = popup.handle_key(key.code) {
                 self.popup = None;
@@ -261,14 +275,16 @@ impl App {
             return Outcome::Continue;
         }
         if ctrl && key.code == KeyCode::Char('q') {
-            if !self.has_unsaved_changes {
-                return Outcome::Quit;
+            if self.check_all_days(("Quit anyway", PopupAction::QuitAnyway)) {
+                return self.quit();
             }
-            self.popup = Some(Popup::save_before_quitting());
             return Outcome::Continue;
         }
         if ctrl && key.code == KeyCode::Char('s') {
-            return self.save(Overwrite::IfUnchanged);
+            if self.check_all_days(("Save anyway", PopupAction::SaveAnyway)) {
+                return self.save(Overwrite::IfUnchanged);
+            }
+            return Outcome::Continue;
         }
         match (self.screen, key.code) {
             (_, KeyCode::F(1)) => self.screen = Screen::Help,
@@ -286,18 +302,18 @@ impl App {
 
     fn handle_days_key(&mut self, code: KeyCode) {
         match code {
-            KeyCode::Up => self.select_day(calendar::previous_weekday(self.selected)),
-            KeyCode::Down => self.select_day(calendar::next_weekday(self.selected)),
-            KeyCode::PageUp => self.select_day(calendar::previous_week(self.selected)),
-            KeyCode::PageDown => self.select_day(calendar::next_week(self.selected)),
+            KeyCode::Up => self.leave_day_for(calendar::previous_weekday(self.selected)),
+            KeyCode::Down => self.leave_day_for(calendar::next_weekday(self.selected)),
+            KeyCode::PageUp => self.leave_day_for(calendar::previous_week(self.selected)),
+            KeyCode::PageDown => self.leave_day_for(calendar::next_week(self.selected)),
             _ => {}
         }
     }
 
     fn handle_periods_key(&mut self, code: KeyCode, ctrl: bool, alt: bool) {
         match code {
-            KeyCode::Up if ctrl => self.select_day(calendar::previous_weekday(self.selected)),
-            KeyCode::Down if ctrl => self.select_day(calendar::next_weekday(self.selected)),
+            KeyCode::Up if ctrl => self.leave_day_for(calendar::previous_weekday(self.selected)),
+            KeyCode::Down if ctrl => self.leave_day_for(calendar::next_weekday(self.selected)),
             KeyCode::Up => self.move_focus_vertically(Direction::Backward),
             KeyCode::Down => self.move_focus_vertically(Direction::Forward),
             KeyCode::Tab => self.move_focus_horizontally(Direction::Forward),
@@ -424,8 +440,95 @@ impl App {
         let result = edit(day);
         if *day != before {
             self.has_unsaved_changes = true;
+            self.changed_days.insert(self.selected);
         }
         result
+    }
+
+    /// Selects `date`, unless the selected day was changed in this session
+    /// and fails the consistency check: then it stays selected, with a
+    /// message and its offending periods highlighted. Either way, the
+    /// selected day is sorted and its empty periods removed first.
+    fn leave_day_for(&mut self, date: Date) {
+        if self.changed_days.contains(&self.selected) {
+            self.normalize_selected_day();
+            if let Some(problem) = self
+                .timesheet
+                .day(self.selected)
+                .check(self.selected, self.today)
+            {
+                self.show_problem(problem);
+                return;
+            }
+        }
+        self.select_day(date);
+    }
+
+    fn normalize_selected_day(&mut self) {
+        let moved = self.edit_selected_day(Day::normalize);
+        self.follow_moved_periods(&moved);
+    }
+
+    /// Keeps focus on the same period after the selected day was sorted.
+    fn follow_moved_periods(&mut self, moved: &[Option<usize>]) {
+        self.focus = self.focus.and_then(|focus| {
+            moved
+                .get(focus.period)
+                .copied()
+                .flatten()
+                .map(|period| FieldFocus { period, ..focus })
+        });
+    }
+
+    fn show_problem(&mut self, problem: ConsistencyProblem) {
+        self.message = Some(problem.message);
+        self.inconsistent_periods = problem.periods;
+    }
+
+    /// Sorts every day and removes empty periods, then checks all days. For
+    /// the earliest failing day, shows a popup with `anyway` as the button
+    /// that continues regardless; returns whether all days passed. Sorting
+    /// alone isn't an unsaved change.
+    fn check_all_days(&mut self, anyway: (&'static str, PopupAction)) -> bool {
+        let mut moved_on_selected_day = Vec::new();
+        for (&date, day) in &mut self.timesheet.days {
+            let moved = day.normalize();
+            if date == self.selected {
+                moved_on_selected_day = moved;
+            }
+        }
+        self.follow_moved_periods(&moved_on_selected_day);
+        match self.timesheet.first_inconsistent_day(self.today) {
+            None => true,
+            Some(inconsistent) => {
+                let question = format!(
+                    "{}: {}",
+                    calendar::format_dutch_short(inconsistent.date),
+                    inconsistent.problem.message
+                );
+                self.popup = Some(Popup::inconsistent_day(question, anyway));
+                self.inconsistent_day = Some(inconsistent);
+                false
+            }
+        }
+    }
+
+    /// Quits, asking first whether to save unsaved changes.
+    fn quit(&mut self) -> Outcome {
+        if !self.has_unsaved_changes {
+            return Outcome::Quit;
+        }
+        self.popup = Some(Popup::save_before_quitting());
+        Outcome::Continue
+    }
+
+    /// Selects the day from a consistency-check popup and shows its problem.
+    fn go_to_inconsistent_day(&mut self) {
+        if let Some(inconsistent) = self.inconsistent_day.take() {
+            self.select_day(inconsistent.date);
+            self.panel = Panel::Periods;
+            self.show_problem(inconsistent.problem);
+        }
     }
 
     /// Enter on a day without periods, without focus, or in the last period adds
@@ -456,6 +559,9 @@ impl App {
     fn run_popup_action(&mut self, action: PopupAction) -> Outcome {
         match action {
             PopupAction::DeletePeriod => self.delete_focused_period(),
+            PopupAction::GoToDay => self.go_to_inconsistent_day(),
+            PopupAction::SaveAnyway => return self.save(Overwrite::IfUnchanged),
+            PopupAction::QuitAnyway => return self.quit(),
             PopupAction::Save => {
                 self.quit_after_saving = true;
                 return self.save(Overwrite::IfUnchanged);

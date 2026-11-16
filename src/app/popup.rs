@@ -5,6 +5,9 @@ use ratatui::crossterm::event::KeyCode;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PopupAction {
     DeletePeriod,
+    GoToDay,
+    SaveAnyway,
+    QuitAnyway,
     Save,
     DontSave,
     Overwrite,
@@ -13,7 +16,7 @@ pub enum PopupAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Popup {
-    pub question: &'static str,
+    pub question: String,
     pub buttons: Vec<(&'static str, PopupAction)>,
     pub selected: usize,
 }
@@ -21,7 +24,7 @@ pub struct Popup {
 impl Popup {
     pub fn delete_period() -> Self {
         Self {
-            question: "Delete period?",
+            question: "Delete period?".to_owned(),
             buttons: vec![
                 ("Delete", PopupAction::DeletePeriod),
                 ("Cancel", PopupAction::Cancel),
@@ -32,7 +35,7 @@ impl Popup {
 
     pub fn save_before_quitting() -> Self {
         Self {
-            question: "Save before quitting?",
+            question: "Save before quitting?".to_owned(),
             buttons: vec![
                 ("Save", PopupAction::Save),
                 ("Don't save", PopupAction::DontSave),
@@ -44,9 +47,23 @@ impl Popup {
 
     pub fn file_changed_on_disk() -> Self {
         Self {
-            question: "File changed on disk",
+            question: "File changed on disk".to_owned(),
             buttons: vec![
                 ("Overwrite", PopupAction::Overwrite),
+                ("Cancel", PopupAction::Cancel),
+            ],
+            selected: 0,
+        }
+    }
+
+    /// A day fails the consistency check; `anyway` is the button that
+    /// continues regardless ("Save anyway" or "Quit anyway").
+    pub fn inconsistent_day(problem: String, anyway: (&'static str, PopupAction)) -> Self {
+        Self {
+            question: problem,
+            buttons: vec![
+                ("Go to day", PopupAction::GoToDay),
+                anyway,
                 ("Cancel", PopupAction::Cancel),
             ],
             selected: 0,

@@ -65,6 +65,9 @@ A day's worked time minus its actual expected working time.
 **Total balance**:
 The sum of all day balances from the first recorded day up to and including a given day.
 
+**Consistency check**:
+The rules a day's periods must follow, e.g. no overlaps and From before To.
+
 **Day warning**:
 The ⚠️ indicator for a day that needs attention, e.g. an empty day or one with an open period.
 

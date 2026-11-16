@@ -27,8 +27,12 @@ pub fn format_dutch(date: Date) -> String {
         "{} {:>2} {}",
         dutch_weekday(date.weekday()),
         date.day(),
-        MONTHS[usize::try_from(date.month() - 1).expect("month is 1-12")]
+        dutch_month(date)
     )
+}
+
+fn dutch_month(date: Date) -> &'static str {
+    MONTHS[usize::try_from(date.month() - 1).expect("month is 1-12")]
 }
 
 fn is_weekend(date: Date) -> bool {
@@ -38,6 +42,16 @@ fn is_weekend(date: Date) -> bool {
 fn add_days(date: Date, days: i32) -> Date {
     date.checked_add(days.days())
         .expect("date stays within jiff's supported range")
+}
+
+/// Formats a date like `ma 2 nov`, without padding the day.
+pub fn format_dutch_short(date: Date) -> String {
+    format!(
+        "{} {} {}",
+        dutch_weekday(date.weekday()),
+        date.day(),
+        dutch_month(date)
+    )
 }
 
 /// The day selected on startup: today, or the previous Friday on a weekend.

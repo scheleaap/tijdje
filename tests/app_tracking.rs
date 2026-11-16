@@ -143,7 +143,7 @@ fn f1_shows_help_and_esc_or_f2_returns_to_tracking() {
 
 #[test]
 fn ctrl_q_quits() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 13));
+    let mut app = app_with(SAMPLE, SAMPLE_TODAY);
     assert_eq!(press(&mut app, KeyCode::Down), Outcome::Continue);
     assert_eq!(ctrl(&mut app, 'q'), Outcome::Quit);
 }
