@@ -20,7 +20,6 @@ Running list of user feedback and known open points that aren't covered by a tic
 - **Checkboxes right of Project** (user feedback, 2026-11-16, after ticket 04): position the checkboxes directly to the right of the Project field.
 - **Yellow selection color** (user idea, 2026-11-16, after ticket 04): consider yellow as the selection color.
 - **Year in the left panel title** (user feedback, 2026-11-16, after ticket 04): the left panel title should also show the year.
-- **No new period after an open last period** (user feedback, 2026-11-16, after ticket 04): Enter should not add a period when the last period of the day is open (no To yet), just as for an empty last period.
 - **Clock and file-system ports** (review of ticket 01): today is fixed at startup, and the app has no file-system port yet. Needed for ticket 05 (saving), and for "today" changing while the app runs past midnight.
 - **Other terminals unverified** (ADR-0001): emoji rendering is only checked in Ptyxis. Konsole, kitty, foot and ghostty are still to be checked.
 - **Total balance performance** (review of ticket 02): the total balance is recalculated from the first recorded day for every visible row. Fine for now; may need caching after years of data.
@@ -28,6 +27,7 @@ Running list of user feedback and known open points that aren't covered by a tic
 
 ## Done
 
+- **No new period after an open last period**: done after ticket 04.
 - **No new period after an empty last period**: done in ticket 04.
 - **Ctrl+Del** reaches the application in Ptyxis (checked by the user after ticket 04).
 

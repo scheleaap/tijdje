@@ -368,3 +368,15 @@ fn enter_does_not_add_a_period_after_an_empty_last_period() {
     assert_eq!(app.timesheet().days[&date(2026, 11, 11)].periods.len(), 1);
     assert_eq!(app.focus(), focus(0, Field::From));
 }
+
+#[test]
+fn enter_does_not_add_a_period_after_an_open_last_period() {
+    // Tue 10 Nov from the sample: 0810–1200, then 1230– (open).
+    let mut app = app_with(SAMPLE, date(2026, 11, 10));
+    alt_key(&mut app, KeyCode::Right);
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(app.timesheet().days[&date(2026, 11, 10)].periods.len(), 2);
+    press(&mut app, KeyCode::Up);
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(app.timesheet().days[&date(2026, 11, 10)].periods.len(), 2);
+}

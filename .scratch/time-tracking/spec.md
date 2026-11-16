@@ -127,7 +127,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Editing**: From/To take only digits, at most 4; an empty value may be accepted. Enter with an invalid time keeps the field in edit mode and shows a message. Tab/Shift-Tab accept and move on (staying put if accepting fails). All other non-editing shortcuts are ignored while editing. Typing on a checkbox does nothing.
 - **Messages**: one-line notices in the right panel (invalid time, failed consistency check, rejected paste); a message disappears at the next key press. The right panel always reserves a row for them.
 - **Active input display**: while editing, the field shows the text around the cursor; `…` only appears outside edit mode.
-- **Adding periods**: Enter doesn't add a period while the last period is empty.
+- **Adding periods**: Enter doesn't add a period while the last period is open (no To yet), which includes an empty last period.
 - **Delete popup**: Delete is the default button.
 - **Deleting**: after deleting a period, focus moves to the same field of the period taking its place (the previous one if the last was deleted); no focus if the day becomes empty.
 - **Tab order** within a period: From, To, Project, Notes, Break, Vacation, Sick, Holiday. Duration is not focusable. Tab with nothing focused focuses From of the first period.

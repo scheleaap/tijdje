@@ -307,20 +307,21 @@ impl App {
     }
 
     /// Enter on a day without periods, without focus, or in the last period adds
-    /// a period and focuses its From, unless the last period is still empty.
+    /// a period and focuses its From, unless the last period is still open
+    /// (which includes an empty period).
     fn add_period_on_enter(&mut self) {
         let count = self.period_count();
         let in_last_period = self.focus.is_some_and(|f| f.period + 1 == count);
         if count > 0 && self.focus.is_some() && !in_last_period {
             return;
         }
-        let last_is_empty = self
+        let last_is_open = self
             .timesheet
             .day(self.selected)
             .periods
             .last()
-            .is_some_and(Period::is_empty);
-        if last_is_empty {
+            .is_some_and(Period::is_open);
+        if last_is_open {
             return;
         }
         let period = self.timesheet.day_mut(self.selected).add_period();
