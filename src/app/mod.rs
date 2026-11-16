@@ -15,12 +15,19 @@ use history::{Change, History};
 use popup::{Popup, PopupAction};
 
 use crate::{
+    clipboard::{Clipboard, NoClipboard},
     domain::{
         ConsistencyProblem, Day, InconsistentDay, Period, PeriodType, TimeOfDay, Timesheet,
         calendar,
     },
     store::{self, Backup, FileSystem, Fingerprint, LoadError, Overwrite, SaveError},
 };
+
+const NO_CLIPBOARD: &str = "The clipboard is not available";
+
+fn invalid_time_message(text: &str) -> String {
+    format!("{text} is not a valid time (HHMM, 0000–2359)")
+}
 
 /// Where the timesheet is loaded from and saved to.
 struct Storage {
@@ -115,6 +122,16 @@ impl Field {
         self.period_type().is_none()
     }
 
+    /// The value a pasted text gives this text field: a time becomes `HHMM`,
+    /// other fields get the text on one line. `None` for an invalid time.
+    fn pasted_value(self, text: &str) -> Option<String> {
+        if self.is_time() {
+            TimeOfDay::parse_pasted(text).map(TimeOfDay::format_hhmm)
+        } else {
+            Some(text.lines().map(str::trim).collect::<Vec<_>>().join(" "))
+        }
+    }
+
     /// Whether typing `c` adds it to an active input of `len` characters:
     /// time fields take at most four digits, other text fields anything.
     fn accepts(self, c: char, len: usize) -> bool {
@@ -160,6 +177,7 @@ pub struct FieldFocus {
 pub struct App {
     timesheet: Timesheet,
     storage: Storage,
+    clipboard: Box<dyn Clipboard>,
     /// Whether the timesheet has changes that aren't saved yet.
     has_unsaved_changes: bool,
     /// Set when "Save" was chosen in the "Save before quitting?" popup.
@@ -208,6 +226,7 @@ impl App {
         Self {
             timesheet,
             storage,
+            clipboard: Box::new(NoClipboard),
             has_unsaved_changes: false,
             quit_after_saving: false,
             today,
@@ -251,6 +270,15 @@ impl App {
         &self.timesheet
     }
 
+    fn periods_panel_is_active(&self) -> bool {
+        self.screen == Screen::Tracking && self.panel == Panel::Periods
+    }
+
+    /// Uses `clipboard` for Ctrl+C/Ctrl+V; without one, they do nothing.
+    pub fn set_clipboard(&mut self, clipboard: Box<dyn Clipboard>) {
+        self.clipboard = clipboard;
+    }
+
     pub fn has_unsaved_changes(&self) -> bool {
         self.has_unsaved_changes
     }
@@ -268,8 +296,7 @@ impl App {
             return Outcome::Continue;
         }
         if alt
-            && self.screen == Screen::Tracking
-            && self.panel == Panel::Periods
+            && self.periods_panel_is_active()
             && let Some(shortcut) = PeriodShortcut::for_key(key.code)
         {
             // Accept active input first; if that fails, the shortcut does nothing.
@@ -277,6 +304,19 @@ impl App {
                 self.run_period_shortcut(shortcut);
             }
             return Outcome::Continue;
+        }
+        if ctrl && self.periods_panel_is_active() {
+            match key.code {
+                KeyCode::Char('c') => {
+                    self.copy();
+                    return Outcome::Continue;
+                }
+                KeyCode::Char('v') => {
+                    self.paste();
+                    return Outcome::Continue;
+                }
+                _ => {}
+            }
         }
         if self.active_input.is_some() {
             self.handle_editing_key(key);
@@ -402,6 +442,47 @@ impl App {
         }
     }
 
+    /// Ctrl+C: copies the focused field's value, or the active input while
+    /// editing. Checkboxes can't be copied.
+    fn copy(&mut self) {
+        if !self.focus.is_some_and(|focus| focus.field.takes_text()) {
+            return;
+        }
+        let text = match &self.active_input {
+            Some(input) => input.text(),
+            None => self.focused_text(),
+        };
+        if !self.clipboard.set_text(&text) {
+            self.message = Some(NO_CLIPBOARD.to_owned());
+        }
+    }
+
+    /// Ctrl+V: puts the clipboard text into the focused field as accepted
+    /// input, replacing any active input. A time may be pasted as `HHMM`,
+    /// `HH:MM` or `H:MM`; anything else is rejected with a message.
+    fn paste(&mut self) {
+        let Some(focus) = self.focus.filter(|focus| focus.field.takes_text()) else {
+            return;
+        };
+        let Some(text) = self.clipboard.get_text() else {
+            self.message = Some(NO_CLIPBOARD.to_owned());
+            return;
+        };
+        let text = text.trim();
+        if text.is_empty() {
+            self.message = Some("The clipboard is empty".to_owned());
+            return;
+        }
+        let Some(value) = focus.field.pasted_value(text) else {
+            self.message = Some(invalid_time_message(text));
+            return;
+        };
+        let previous = self.active_input.replace(ActiveInput::with_text(&value));
+        if !self.accept() {
+            self.active_input = previous;
+        }
+    }
+
     /// The focused text field's current value, as it is shown.
     fn focused_text(&self) -> String {
         let (Some(focus), Some(period)) = (self.focus, self.focused_period()) else {
@@ -462,7 +543,7 @@ impl App {
             match TimeOfDay::parse_hhmm(&text) {
                 Some(time) => Some(time),
                 None => {
-                    self.message = Some(format!("{text} is not a valid time (HHMM, 0000–2359)"));
+                    self.message = Some(invalid_time_message(&text));
                     return false;
                 }
             }

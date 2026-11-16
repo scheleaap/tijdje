@@ -190,3 +190,28 @@ pub fn sample_on(day: Date) -> (App, InMemoryFileSystem) {
     }
     (app, fs)
 }
+
+/// An in-memory clipboard; clones share the same contents.
+#[derive(Default, Clone)]
+pub struct FakeClipboard(pub Rc<RefCell<Option<String>>>);
+
+impl FakeClipboard {
+    pub fn with(text: &str) -> Self {
+        Self(Rc::new(RefCell::new(Some(text.to_owned()))))
+    }
+
+    pub fn text(&self) -> Option<String> {
+        self.0.borrow().clone()
+    }
+}
+
+impl tijdje::clipboard::Clipboard for FakeClipboard {
+    fn get_text(&mut self) -> Option<String> {
+        self.text()
+    }
+
+    fn set_text(&mut self, text: &str) -> bool {
+        *self.0.borrow_mut() = Some(text.to_owned());
+        true
+    }
+}

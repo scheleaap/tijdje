@@ -3,6 +3,7 @@ use std::{env, path::PathBuf, process::ExitCode};
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use tijdje::{
     app::{App, Outcome},
+    clipboard::SystemClipboard,
     store::RealFileSystem,
     wide_symbols,
 };
@@ -24,6 +25,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
+    app.set_clipboard(Box::new(SystemClipboard::new()));
     let mut terminal = ratatui::init();
     let result = (|| -> std::io::Result<()> {
         loop {

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+arboard = { version = "3.7.0", default-features = false, features = ["wayland-data-control"] }
 jiff = { version = "0.2.45", features = ["serde"] }
 ratatui = "0.30.2"
 serde = { version = "1.0.229", features = ["derive"] }

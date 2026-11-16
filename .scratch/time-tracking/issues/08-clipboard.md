@@ -4,12 +4,12 @@
 
 **Blocked by:** 04
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Ctrl+C copies the focused field's value to the system clipboard (arboard)
-- [ ] Ctrl+V puts the clipboard text into the focused field as accepted input, replacing any active input
-- [ ] Pasting `12:35` into From/To gives `1235`; invalid times are rejected with a message in the right panel
-- [ ] Ctrl+V on a checkbox does nothing
-- [ ] Tests use a fake clipboard
+- [x] Ctrl+C copies the focused field's value to the system clipboard (arboard)
+- [x] Ctrl+V puts the clipboard text into the focused field as accepted input, replacing any active input
+- [x] Pasting `12:35` into From/To gives `1235`; invalid times are rejected with a message in the right panel
+- [x] Ctrl+V on a checkbox does nothing
+- [x] Tests use a fake clipboard
 
 Spec: `.scratch/time-tracking/spec.md`

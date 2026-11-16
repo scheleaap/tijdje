@@ -20,3 +20,25 @@ fn anything_but_exactly_four_digits_is_rejected() {
         assert_eq!(TimeOfDay::parse_hhmm(input), None, "{input:?}");
     }
 }
+
+#[test]
+fn pasted_times_may_use_a_colon_and_a_one_digit_hour() {
+    assert_eq!(TimeOfDay::parse_pasted("12:35"), TimeOfDay::new(12, 35));
+    assert_eq!(TimeOfDay::parse_pasted("9:35"), TimeOfDay::new(9, 35));
+    assert_eq!(TimeOfDay::parse_pasted("1235"), TimeOfDay::new(12, 35));
+}
+
+#[test]
+fn other_pasted_text_is_not_a_time() {
+    for input in [
+        "1:2:3:5",
+        ":1235",
+        "12:3",
+        "123:45",
+        "99:99",
+        "half past nine",
+        "",
+    ] {
+        assert_eq!(TimeOfDay::parse_pasted(input), None, "{input:?}");
+    }
+}

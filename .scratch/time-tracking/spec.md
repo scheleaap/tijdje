@@ -130,6 +130,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Active input display**: while editing, the field shows the text around the cursor; `…` only appears outside edit mode.
 - **Adding periods**: Alt+Enter adds a period from any field or without focus, but not while the last period is open (no To yet), which includes an empty last period. Enter no longer adds periods; Space no longer toggles checkboxes.
 - **Delete popup**: Delete is the default button.
+- **Clipboard**: Ctrl+C copies the focused field's value, or the active input while editing; Ctrl+V replaces the field (also Notes) with the clipboard text as accepted input. Pasted times are accepted as `HHMM`, `HH:MM` or `H:MM` (the hour padded); anything else is rejected with a message showing the text as pasted, leaving any active input as it was. Pasted line breaks become spaces, and surrounding spaces are trimmed. Checkboxes can't be copied or pasted. An empty clipboard and a missing clipboard each give a message.
 - **Period types**: unchecking an absence empties From and To only if the period is still the day's only one and they still hold the auto-filled full day (0900 and 0900 + regular expected working time); the values decide, so hand-typed times equal to a full day are emptied too (accepted; undo covers it). Switching from one absence (or to Break) keeps From and To, without emptying or auto-fill. Alt+b/v/s/h/p/n need a focused period in the right panel; they accept active input first and do nothing if that fails.
 - **Deleting**: after deleting a period, focus moves to the same field of the period taking its place (the previous one if the last was deleted); no focus if the day becomes empty.
 - **Tab order** within a period follows the fields on screen: From, To, Project, Break, Vacation, Sick, Holiday, Notes. Duration is not focusable. Tab with nothing focused focuses From of the first period.
@@ -189,7 +190,7 @@ days:
 
 ### Technology (implementer's choice, not a decision by the user)
 
-ratatui + crossterm for the TUI, serde + serde_yaml_ng for YAML (serde_yaml is unmaintained), arboard for the clipboard, jiff for dates and times. The Rust toolchain is added to the existing mise configuration as `rust = "latest"`.
+ratatui + crossterm for the TUI, serde + serde_yaml_ng for YAML (serde_yaml is unmaintained), arboard for the clipboard (without its image support, with Wayland support via `wayland-data-control`), jiff for dates and times. The Rust toolchain is added to the existing mise configuration as `rust = "latest"`.
 
 ## Testing Decisions
 

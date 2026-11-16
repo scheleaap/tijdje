@@ -6,6 +6,7 @@ Running list of user feedback and known open points that aren't covered by a tic
 
 - **Tab for switching panels** (user idea, 2026-11-15, after ticket 03): with ←/→ moving between fields, Tab could switch panels instead.
 - **Drop panel focus** (user idea, 2026-11-16, after ticket 04): drop the concept of panel focus.
+- **No "0h" for durations under an hour** (user feedback, 2026-11-16, before ticket 08): show `42m` instead of `0h42m`; where columns are aligned, pad it (`  42m`).
 - **Clock port** (review of ticket 01): today is fixed at startup, so "today" doesn't change while the app runs past midnight. (The file-system port was added in ticket 05.)
 - **Other terminals unverified** (ADR-0001): emoji rendering is only checked in Ptyxis. Konsole, kitty, foot and ghostty are still to be checked.
 - **Total balance performance** (review of ticket 02): the total balance is recalculated from the first recorded day for every visible row. Fine for now; may need caching after years of data.

@@ -28,6 +28,22 @@ impl TimeOfDay {
         Self::new(input[..2].parse().ok()?, input[2..].parse().ok()?)
     }
 
+    /// Parses a pasted time: `HHMM`, `HH:MM` or `H:MM`.
+    pub fn parse_pasted(input: &str) -> Option<Self> {
+        let Some((hours, minutes)) = input.split_once(':') else {
+            return Self::parse_hhmm(input);
+        };
+        let digits = |s: &str| s.bytes().all(|b| b.is_ascii_digit());
+        if !(1..=2).contains(&hours.len())
+            || minutes.len() != 2
+            || !digits(hours)
+            || !digits(minutes)
+        {
+            return None;
+        }
+        Self::new(hours.parse().ok()?, minutes.parse().ok()?)
+    }
+
     /// Formats the time like `1235`, as typed in the From and To fields.
     pub fn format_hhmm(self) -> String {
         format!("{:02}{:02}", self.0 / 60, self.0 % 60)
