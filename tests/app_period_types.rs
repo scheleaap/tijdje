@@ -75,7 +75,7 @@ fn checking_an_absence_updates_the_figures_and_indicator() {
             .contains("Actual expected: 3h27m (regular 7h12m − 3h45m absence)")
     );
     let row = row_containing(&rows, "0845 1230");
-    assert!(row.contains("[ ] [x] [ ] [ ]"), "{row:?}");
+    assert_eq!(row.matches('✓').count(), 1, "{row:?}");
 }
 
 #[test]

@@ -154,11 +154,12 @@ fn tab_accepts_and_moves_on() {
     press(&mut app, KeyCode::Tab);
     assert!(!app.is_editing());
     assert_eq!(period(&app, 0).project.as_deref(), Some("acme"));
-    assert_eq!(app.focus(), focus(0, Field::Notes));
+    assert_eq!(app.focus(), focus(0, Field::Break));
+    tab_to(&mut app, Field::Notes);
     type_text(&mut app, "n");
     press(&mut app, KeyCode::BackTab);
     assert_eq!(period(&app, 0).notes.as_deref(), Some("n"));
-    assert_eq!(app.focus(), focus(0, Field::Project));
+    assert_eq!(app.focus(), focus(0, Field::Holiday));
 }
 
 #[test]
@@ -189,7 +190,7 @@ fn other_shortcuts_are_ignored_while_editing() {
     assert_eq!(app.panel(), tijdje::app::Panel::Periods);
     assert_eq!(app.screen(), tijdje::app::Screen::Tracking);
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
-    assert!(!screen.contains("Delete period?"));
+    assert!(!screen.contains("─ Delete period ─"));
 }
 
 #[test]
@@ -240,7 +241,7 @@ fn ctrl_del_deletes_the_focused_period_after_confirming() {
     ctrl_key(&mut app, KeyCode::Delete);
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(
-        screen.contains("Delete period?")
+        screen.contains("Delete period 0845–1230?")
             && screen.contains(" Delete ")
             && screen.contains(" Cancel ")
     );
@@ -270,7 +271,7 @@ fn delete_popup_can_be_canceled() {
         }
         assert_eq!(app.timesheet().days[&date(2026, 11, 2)].periods.len(), 3);
         let screen = rows(&render(&mut app, 120, 24)).join("\n");
-        assert!(!screen.contains("Delete period?"));
+        assert!(!screen.contains("─ Delete period ─"));
     }
 }
 
@@ -310,7 +311,7 @@ fn ctrl_del_without_focus_does_nothing() {
     let mut app = app_on_monday();
     ctrl_key(&mut app, KeyCode::Delete);
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
-    assert!(!screen.contains("Delete period?"));
+    assert!(!screen.contains("─ Delete period ─"));
 }
 
 #[test]
@@ -379,4 +380,32 @@ fn enter_does_not_add_a_period_after_an_open_last_period() {
     press(&mut app, KeyCode::Up);
     press(&mut app, KeyCode::Enter);
     assert_eq!(app.timesheet().days[&date(2026, 11, 10)].periods.len(), 2);
+}
+
+#[test]
+fn popups_have_a_short_title_and_a_message() {
+    let mut app = app_on_monday();
+    press(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Delete);
+    let screen = rows(&render(&mut app, 120, 24));
+    let title = row_index(&screen, "─ Delete period ─");
+    let message = row_index(&screen, "Delete period 0845–1230?");
+    assert!(message > title, "the message is inside, below the title");
+}
+
+#[test]
+fn the_consistency_popup_has_a_short_title() {
+    let (mut app, _fs) = sample_on(date(2026, 11, 2));
+    alt_key(&mut app, KeyCode::Right);
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Tab);
+    type_text(&mut app, "1245");
+    press(&mut app, KeyCode::Enter);
+    ctrl(&mut app, 's');
+    let screen = rows(&render(&mut app, 120, 24)).join("\n");
+    assert!(screen.contains("─ Consistency ─"), "{screen}");
+    assert!(
+        screen.contains("ma 2 nov: 0845–1245 overlaps 1230–1300"),
+        "{screen}"
+    );
 }

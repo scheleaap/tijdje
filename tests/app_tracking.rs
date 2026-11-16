@@ -25,11 +25,10 @@ fn left_panel_shows_worked_time_per_day_from_the_file() {
             "{day} should show {worked}"
         );
     }
-    let header = row_containing(&screen, "Worked");
-    let worked_end = header.find("Worked").unwrap() + "Worked".len();
     let empty_row = row_containing(&screen, "wo 11 nov");
+    let worked_column = empty_row.split('│').nth(2).unwrap();
     assert!(
-        empty_row[..worked_end].trim_end().ends_with("nov"),
+        worked_column.trim().is_empty(),
         "empty day shows no worked time: {empty_row:?}"
     );
 }
@@ -163,4 +162,28 @@ fn panels_use_the_norton_commander_palette() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
     let buffer = render(&mut app, 120, 24);
     assert_eq!(buffer[(60, 10)].bg, Color::Blue);
+}
+
+#[test]
+fn the_left_panel_title_shows_the_year() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 13));
+    let screen = rows(&render(&mut app, 120, 24));
+    assert!(screen[0].contains("Days: 2026"), "{:?}", screen[0]);
+}
+
+#[test]
+fn the_year_separator_shows_the_new_year() {
+    let mut app = app_with(SAMPLE, date(2026, 12, 31));
+    let screen = rows(&render(&mut app, 120, 24));
+    let separator = &screen[row_index(&screen, "do 31 dec") + 1];
+    assert!(separator.contains("═ 2027 ═"), "{separator:?}");
+}
+
+#[test]
+fn the_left_panel_has_no_column_lines() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 13));
+    let screen = rows(&render(&mut app, 120, 24));
+    let row = row_containing(&screen, "ma  9 nov");
+    let inside: String = row.chars().skip(1).take(44).collect();
+    assert!(!inside.contains('│'), "{row:?}");
 }

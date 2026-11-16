@@ -63,16 +63,19 @@ pub enum Field {
 }
 
 impl Field {
+    /// All fields in Tab order, which is their order on screen.
     const ALL: [Field; 8] = [
         Field::From,
         Field::To,
         Field::Project,
-        Field::Notes,
         Field::Break,
         Field::Vacation,
         Field::Sick,
         Field::Holiday,
+        Field::Notes,
     ];
+    const FIRST: Field = Field::ALL[0];
+    const LAST: Field = Field::ALL[Field::ALL.len() - 1];
 
     fn index(self) -> usize {
         Self::ALL.iter().position(|&f| f == self).expect("listed")
@@ -178,7 +181,7 @@ pub struct App {
     popup: Option<Popup>,
     /// `None` until the first render.
     first_visible_day: Option<Date>,
-    first_visible_period: usize,
+    first_visible_period_row: usize,
 }
 
 impl App {
@@ -215,7 +218,7 @@ impl App {
             inconsistent_day: None,
             popup: None,
             first_visible_day: None,
-            first_visible_period: 0,
+            first_visible_period_row: 0,
         }
     }
 
@@ -320,7 +323,8 @@ impl App {
             KeyCode::BackTab => self.move_focus_horizontally(Direction::Backward),
             KeyCode::Enter => self.add_period_on_enter(),
             KeyCode::Delete if ctrl && self.focus.is_some() => {
-                self.popup = Some(Popup::delete_period());
+                let label = self.focused_period().map(Period::label).unwrap_or_default();
+                self.popup = Some(Popup::delete_period(&label));
             }
             KeyCode::Char(c) if !ctrl && !alt => self.type_char(c),
             _ => {}
@@ -362,6 +366,11 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    fn focused_period(&self) -> Option<&Period> {
+        let focus = self.focus?;
+        self.timesheet.day(self.selected).periods.get(focus.period)
     }
 
     /// Space toggles a focused checkbox; otherwise typing starts editing.
@@ -622,14 +631,13 @@ impl App {
             period: focus.period.min(count - 1),
             ..focus
         });
-        self.first_visible_period = self.first_visible_period.min(count.saturating_sub(1));
     }
 
     /// Selects another day; no period or field has focus on the new day.
     fn select_day(&mut self, date: Date) {
         self.selected = date;
         self.focus = None;
-        self.first_visible_period = 0;
+        self.first_visible_period_row = 0;
     }
 
     fn period_count(&self) -> usize {
@@ -670,11 +678,11 @@ impl App {
         }
         let first = FieldFocus {
             period: 0,
-            field: Field::From,
+            field: Field::FIRST,
         };
         let last = FieldFocus {
             period: count - 1,
-            field: Field::Holiday,
+            field: Field::LAST,
         };
         self.focus = Some(match self.focus {
             None if forward => first,
@@ -683,7 +691,7 @@ impl App {
                 Some(field) => FieldFocus { field, ..focus },
                 None if focus.period + 1 < count => FieldFocus {
                     period: focus.period + 1,
-                    field: Field::From,
+                    field: Field::FIRST,
                 },
                 None => focus,
             },
@@ -691,7 +699,7 @@ impl App {
                 Some(field) => FieldFocus { field, ..focus },
                 None if focus.period > 0 => FieldFocus {
                     period: focus.period - 1,
-                    field: Field::Holiday,
+                    field: Field::LAST,
                 },
                 None => focus,
             },

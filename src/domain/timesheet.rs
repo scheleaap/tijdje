@@ -328,11 +328,22 @@ impl Day {
 
     /// Whether there is a gap between the period at `index` and the next one.
     pub fn has_implied_break_after(&self, index: usize) -> bool {
-        let (Some(period), Some(next)) = (self.periods.get(index), self.periods.get(index + 1))
-        else {
-            return false;
-        };
-        matches!((period.to, next.from), (Some(to), Some(from)) if from > to)
+        self.implied_break_after(index).is_some()
+    }
+
+    /// The implied break after the period at `index`, as a break period from
+    /// its end to the start of the next period, if there is a gap.
+    pub fn implied_break_after(&self, index: usize) -> Option<Period> {
+        let (period, next) = (self.periods.get(index)?, self.periods.get(index + 1)?);
+        match (period.to, next.from) {
+            (Some(to), Some(from)) if from > to => Some(Period {
+                from: Some(to),
+                to: Some(from),
+                period_type: PeriodType::Break,
+                ..Period::default()
+            }),
+            _ => None,
+        }
     }
 
     pub fn day_balance(&self) -> Minutes {
@@ -371,6 +382,11 @@ impl Period {
     /// An open period has no To yet, because it is still running.
     pub fn is_open(&self) -> bool {
         self.to.is_none()
+    }
+
+    /// Whether the period needs attention: an unusual time or a duration of 0h00m.
+    pub fn has_period_warning(&self) -> bool {
+        self.has_unusual_time() || self.duration() == Some(Minutes(0))
     }
 
     /// Whether the period starts before 06:00 or ends after 20:00.

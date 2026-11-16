@@ -22,14 +22,11 @@ fn right_panel_shows_the_periods_of_the_selected_day() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
     let screen = rows(&render(&mut app, 120, 24));
     let first = right(row_containing(&screen, "0845"));
-    for text in ["0845", "1230", "3h45m", "internal", "Onboarding", "[ ]"] {
+    for text in ["0845", "1230", "3h45m", "internal", "Onboarding"] {
         assert!(first.contains(text), "{text} missing in {first:?}");
     }
     let lunch = right(row_containing(&screen, "1230 1300"));
-    assert!(
-        lunch.contains("0h30m") && lunch.contains("[x]"),
-        "{lunch:?}"
-    );
+    assert!(lunch.contains("0h30m") && lunch.contains("✓"), "{lunch:?}");
     assert!(screen[0].contains("Periods: ma 2 nov"));
 }
 
@@ -42,11 +39,79 @@ fn open_period_has_no_duration() {
 }
 
 #[test]
-fn gap_after_a_period_shows_an_implied_break() {
+fn a_gap_between_periods_is_shown_as_an_implied_break_row() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 5));
+    let buffer = render(&mut app, 120, 24);
+    let screen = rows(&buffer);
+    let first = row_index(&screen, "0540 1228");
+    let implied = row_index(&screen, "1228 1325");
+    let second = row_index(&screen, "1325 1530");
+    assert_eq!(
+        (implied, second),
+        (first + 2, first + 4),
+        "empty rows in between"
+    );
+    assert!(
+        right(&screen[first + 1])
+            .trim_matches(['│', ' '])
+            .is_empty()
+    );
+    let row = right(&screen[implied]);
+    assert!(
+        row.contains("0h57m") && row.matches('✓').count() == 1,
+        "{row:?}"
+    );
+    // Plain text, not fields.
+    let x = u16::try_from(46 + row.find("1228").unwrap()).unwrap();
+    assert_eq!(buffer[(x, u16::try_from(implied).unwrap())].bg, Color::Blue);
+}
+
+#[test]
+fn consecutive_periods_are_separated_by_one_empty_row() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 2));
+    let screen = rows(&render(&mut app, 120, 24));
+    let first = row_index(&screen, "0845 1230");
+    assert_eq!(row_index(&screen, "1230 1300"), first + 2);
+}
+
+#[test]
+fn the_period_warning_is_left_of_from() {
     let mut app = app_with(SAMPLE, date(2026, 11, 5));
     let screen = rows(&render(&mut app, 120, 24));
-    assert!(right(row_containing(&screen, "0540 1228")).contains("→ ☕"));
-    assert!(!right(row_containing(&screen, "1325 1530")).contains("→ ☕"));
+    assert!(right(row_containing(&screen, "0540 1228")).starts_with("│⚠️"));
+}
+
+#[test]
+fn checkboxes_come_right_after_project_as_colored_boxes() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 2));
+    let buffer = render(&mut app, 120, 24);
+    let screen = rows(&buffer);
+    let y = row_index(&screen, "0845 1230");
+    let row = right(&screen[y]);
+    let project_end = row.find("internal").unwrap() + 10;
+    let notes = row.find("Onboarding").unwrap();
+    let y = u16::try_from(y).unwrap();
+    // Four 3-cell boxes, each after a one-cell gap, then Notes.
+    for box_start in [
+        project_end + 1,
+        project_end + 5,
+        project_end + 9,
+        project_end + 13,
+    ] {
+        let x = u16::try_from(LEFT_PANEL_WIDTH + box_start).unwrap();
+        assert_eq!(buffer[(x, y)].bg, Color::Gray, "box at {box_start}");
+    }
+    assert_eq!(notes, project_end + 17, "{row:?}");
+}
+
+#[test]
+fn fields_are_light_gray() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 2));
+    let buffer = render(&mut app, 120, 24);
+    let screen = rows(&buffer);
+    let y = row_index(&screen, "0845 1230");
+    let x = u16::try_from(46 + right(&screen[y]).find("0845").unwrap()).unwrap();
+    assert_eq!(buffer[(x, u16::try_from(y).unwrap())].bg, Color::Gray);
 }
 
 #[test]
@@ -87,9 +152,13 @@ fn active_panel_title_and_inactive_selection_are_styled() {
     let screen = rows(&buffer);
     let title_x = screen[0].find("Periods").unwrap();
     let title_x = u16::try_from(screen[0][..title_x].chars().count()).unwrap();
-    assert_eq!(buffer[(title_x, 0)].bg, Color::Cyan);
-    let y = row_index(&screen, "ma  2 nov  ");
-    assert_eq!(buffer[(2, u16::try_from(y).unwrap())].bg, Color::Gray);
+    assert_eq!(buffer[(title_x, 0)].bg, Color::Gray);
+    let y = u16::try_from(row_index(&screen, "ma  2 nov ")).unwrap();
+    // Inactive panel: no bar; the whole row's text is cyan.
+    for x in [2, 20] {
+        assert_eq!(buffer[(x, y)].fg, Color::Cyan);
+        assert_eq!(buffer[(x, y)].bg, Color::Blue);
+    }
 }
 
 #[test]
@@ -135,7 +204,7 @@ fn up_and_down_keep_the_field_and_stop_at_the_edges() {
 }
 
 #[test]
-fn tab_walks_through_fields_and_continues_in_the_next_period() {
+fn tab_follows_the_fields_on_screen_and_continues_in_the_next_period() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Tab);
@@ -143,11 +212,11 @@ fn tab_walks_through_fields_and_continues_in_the_next_period() {
     for expected in [
         Field::To,
         Field::Project,
-        Field::Notes,
         Field::Break,
         Field::Vacation,
         Field::Sick,
         Field::Holiday,
+        Field::Notes,
     ] {
         press(&mut app, KeyCode::Tab);
         assert_eq!(app.focus(), focus(0, expected));
@@ -155,7 +224,7 @@ fn tab_walks_through_fields_and_continues_in_the_next_period() {
     press(&mut app, KeyCode::Tab);
     assert_eq!(app.focus(), focus(1, Field::From));
     press(&mut app, KeyCode::BackTab);
-    assert_eq!(app.focus(), focus(0, Field::Holiday));
+    assert_eq!(app.focus(), focus(0, Field::Notes));
 }
 
 #[test]
@@ -169,7 +238,7 @@ fn tab_stays_at_the_very_first_and_last_field() {
     for _ in 0..30 {
         press(&mut app, KeyCode::Tab);
     }
-    assert_eq!(app.focus(), focus(2, Field::Holiday));
+    assert_eq!(app.focus(), focus(2, Field::Notes));
 }
 
 #[test]

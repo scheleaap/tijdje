@@ -68,6 +68,9 @@ The sum of all day balances from the first recorded day up to and including a gi
 **Consistency check**:
 The rules a day's periods must follow, e.g. no overlaps and From before To.
 
+**Period warning**:
+The ⚠️ indicator for a period that needs attention: one with an unusual time or a duration of 0h00m.
+
 **Day warning**:
 The ⚠️ indicator for a day that needs attention, e.g. an empty day or one with an open period.
 

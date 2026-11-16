@@ -16,15 +16,20 @@ pub enum PopupAction {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Popup {
-    pub question: String,
+    /// A short title, shown in the frame.
+    pub title: &'static str,
+    /// The full text, shown inside and wrapped if needed.
+    pub message: String,
     pub buttons: Vec<(&'static str, PopupAction)>,
     pub selected: usize,
 }
 
 impl Popup {
-    pub fn delete_period() -> Self {
+    /// Asks to delete the period with times `label`, e.g. `0845–1230`.
+    pub fn delete_period(label: &str) -> Self {
         Self {
-            question: "Delete period?".to_owned(),
+            title: "Delete period",
+            message: format!("Delete period {label}?"),
             buttons: vec![
                 ("Delete", PopupAction::DeletePeriod),
                 ("Cancel", PopupAction::Cancel),
@@ -35,7 +40,8 @@ impl Popup {
 
     pub fn save_before_quitting() -> Self {
         Self {
-            question: "Save before quitting?".to_owned(),
+            title: "Quit",
+            message: "Save before quitting?".to_owned(),
             buttons: vec![
                 ("Save", PopupAction::Save),
                 ("Don't save", PopupAction::DontSave),
@@ -47,7 +53,8 @@ impl Popup {
 
     pub fn file_changed_on_disk() -> Self {
         Self {
-            question: "File changed on disk".to_owned(),
+            title: "File changed",
+            message: "The file changed on disk since it was loaded or saved.".to_owned(),
             buttons: vec![
                 ("Overwrite", PopupAction::Overwrite),
                 ("Cancel", PopupAction::Cancel),
@@ -60,7 +67,8 @@ impl Popup {
     /// continues regardless ("Save anyway" or "Quit anyway").
     pub fn inconsistent_day(problem: String, anyway: (&'static str, PopupAction)) -> Self {
         Self {
-            question: problem,
+            title: "Consistency",
+            message: problem,
             buttons: vec![
                 ("Go to day", PopupAction::GoToDay),
                 anyway,

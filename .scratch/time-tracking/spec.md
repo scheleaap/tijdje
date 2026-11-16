@@ -73,8 +73,8 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 46. As a consultant, I want Ctrl+V to put the clipboard text into the focused field as accepted input (replacing any active input), so that pasting is one step.
 47. As a consultant, I want pasted times like `12:35` accepted as `1235`, invalid times rejected with a message, and pasting onto a checkbox ignored, so that pasting never corrupts data.
 48. As a consultant, I want Ctrl+Del to delete the focused period after confirming (Delete/Cancel), so that I can remove mistakes.
-49. As a consultant, I want a "→ ☕" indicator to the right of a period that is not directly followed by the next period, so that implied breaks are visible.
-50. As a consultant, I want a "⚠️" indicator to the right of a period that starts before 06:00 or ends after 20:00, so that unusual times stand out.
+49. As a consultant, I want an implied break shown as its own row between two periods that don't follow each other directly, so that implied breaks are visible.
+50. As a consultant, I want a period warning ⚠️ left of From for a period with an unusual time (before 06:00 or after 20:00) or a duration of 0h00m, so that such periods stand out.
 51. As a consultant, I want the bottom of the right panel to show the actual expected working time, e.g. `Actual expected: 3h36m (regular 7h12m − 3h36m absence)`, with all absences grouped into one term, or just `Actual expected: 7h12m`, so that I understand my target for the day.
 52. As a consultant, I want the right panel to scroll when periods do not fit, so that busy days remain usable.
 53. As a consultant, I want long notes cut off with `…` and scrolled horizontally while editing, so that the layout stays intact.
@@ -132,9 +132,10 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Delete popup**: Delete is the default button.
 - **Period types**: unchecking an absence empties From and To only if the period is still the day's only one and they still hold the auto-filled full day (0900 and 0900 + regular expected working time); the values decide, so hand-typed times equal to a full day are emptied too (accepted; undo covers it). Switching from one absence (or to Break) keeps From and To, without emptying or auto-fill. Alt+b/v/s/h/p/n need a focused period in the right panel; they accept active input first and do nothing if that fails.
 - **Deleting**: after deleting a period, focus moves to the same field of the period taking its place (the previous one if the last was deleted); no focus if the day becomes empty.
-- **Tab order** within a period: From, To, Project, Notes, Break, Vacation, Sick, Holiday. Duration is not focusable. Tab with nothing focused focuses From of the first period.
-- **Right panel layout**: checkbox columns have emoji headers (☕ break, 🏖️ vacation, 🤒 sick, 🎄 holiday). Project is 10 cells wide; Notes takes the remaining width. A period with both indicators shows `→ ☕ ⚠️`.
-- **Panel focus**: the active panel's title is highlighted; in an inactive left panel the selected day has a gray bar. Leaving and re-entering the right panel on the same day keeps the focused field; selecting another day clears it. Shift-Tab with nothing focused focuses Holiday of the last period.
+- **Tab order** within a period follows the fields on screen: From, To, Project, Break, Vacation, Sick, Holiday, Notes. Duration is not focusable. Tab with nothing focused focuses From of the first period.
+- **Right panel layout**: period warning ⚠️ left of From (unusual time or 0h00m); then From, To, Duration, Project, the four checkboxes (emoji headers ☕ 🏖️ 🤒 🎄) and Notes, which takes the remaining width. An empty row separates periods; an implied break is its own row in plain text with Break checked, not focusable.
+- **Look** (Midnight Commander): light gray text on blue, single-line borders, yellow column headers, the active panel's title black on light gray. Selection: cyan bar with black text; in an inactive left panel the selected day's row is cyan text without a bar. Left panel title `Days: <year>`; the year separator shows the new year centered. Fields and checkboxes are light gray boxes (a checked box shows ✓), cyan when focused or being edited. Popups: light gray with a black shadow, a short title in the frame (`Delete period`, `Quit`, `File changed`, `Consistency`), the message inside (wrapped), solid buttons black on white, the selected one black on cyan, hotkey letter in blue.
+- **Panel focus**: the active panel's title is highlighted; in an inactive left panel the selected day's row is cyan text without a bar. Leaving and re-entering the right panel on the same day keeps the focused field; selecting another day clears it. Shift-Tab with nothing focused focuses the last field (Notes) of the last period.
 - **Right panel title**: shows the selected day without padding, e.g. `Periods: ma 2 nov`; popups use the same unpadded date.
 
 ### Undo

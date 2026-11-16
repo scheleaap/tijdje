@@ -75,9 +75,7 @@ fn text_with_quotes_and_special_characters_survives_saving() {
     let (mut app, fs) = sample_on(date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Down);
-    for _ in 0..3 {
-        press(&mut app, KeyCode::Tab);
-    }
+    alt_key(&mut app, KeyCode::Char('n'));
     let notes = r#"say "hi" \ # : - [x] {y} 'z' ü"#;
     type_text(&mut app, notes);
     press(&mut app, KeyCode::Enter);
@@ -186,7 +184,7 @@ fn saving_after_saving_needs_no_confirmation() {
     let (mut app, _fs) = app_with_a_change();
     ctrl(&mut app, 's');
     ctrl(&mut app, 's');
-    assert!(!screen(&mut app).contains("File changed on disk"));
+    assert!(!screen(&mut app).contains("─ File changed ─"));
 }
 
 #[test]
@@ -195,7 +193,7 @@ fn a_file_changed_on_disk_asks_before_overwriting() {
     fs.set(TIMESHEET, "days: {}\n");
     ctrl(&mut app, 's');
     let text = screen(&mut app);
-    assert!(text.contains("File changed on disk") && text.contains(" Overwrite "));
+    assert!(text.contains("─ File changed ─") && text.contains(" Overwrite "));
     press(&mut app, KeyCode::Char('c'));
     assert_eq!(fs.get(TIMESHEET).as_deref(), Some("days: {}\n"));
     assert!(app.has_unsaved_changes());
@@ -259,7 +257,7 @@ fn quitting_with_a_file_changed_on_disk_asks_and_then_quits() {
     fs.set(TIMESHEET, "days: {}\n");
     ctrl(&mut app, 'q');
     assert_eq!(press(&mut app, KeyCode::Char('s')), Outcome::Continue);
-    assert!(screen(&mut app).contains("File changed on disk"));
+    assert!(screen(&mut app).contains("─ File changed ─"));
     assert_eq!(press(&mut app, KeyCode::Char('o')), Outcome::Quit);
     assert!(fs.get(TIMESHEET).unwrap().contains("\"08:15\""));
 }
