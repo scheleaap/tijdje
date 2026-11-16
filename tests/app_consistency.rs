@@ -96,7 +96,7 @@ fn a_fixed_day_can_be_left() {
 fn leaving_a_day_sorts_its_periods() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Enter);
+    alt_key(&mut app, KeyCode::Enter);
     type_text(&mut app, "0700");
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "0800");
@@ -112,7 +112,7 @@ fn leaving_a_day_sorts_its_periods() {
 fn leaving_a_day_removes_empty_periods() {
     let (mut app, _fs) = sample_on(date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Enter);
+    alt_key(&mut app, KeyCode::Enter);
     alt_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 12));
     assert!(app.timesheet().day(date(2026, 11, 11)).periods.is_empty());

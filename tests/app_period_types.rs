@@ -31,14 +31,14 @@ fn tab_to(app: &mut App, field: Field) {
 }
 
 #[test]
-fn space_toggles_the_focused_checkbox() {
+fn enter_toggles_the_focused_checkbox() {
     let mut app = monday_with_first_period_focused();
     tab_to(&mut app, Field::Break);
-    press(&mut app, KeyCode::Char(' '));
+    press(&mut app, KeyCode::Enter);
     assert_eq!(first_period(&app).period_type, PeriodType::Break);
     // 1300–1757 is the only work period left.
     assert!(row_containing(&screen(&mut app), "ma  2 nov").contains("4h57m"));
-    press(&mut app, KeyCode::Char(' '));
+    press(&mut app, KeyCode::Enter);
     assert_eq!(first_period(&app).period_type, PeriodType::Work);
     assert!(app.has_unsaved_changes());
 }
@@ -82,7 +82,7 @@ fn checking_an_absence_updates_the_figures_and_indicator() {
 fn an_absence_on_an_empty_day_fills_a_full_day_and_unchecking_empties_it() {
     let mut app = app_with(SAMPLE, date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Enter);
+    alt_key(&mut app, KeyCode::Enter);
     alt_key(&mut app, KeyCode::Char('v'));
     assert_eq!(first_period(&app).from, TimeOfDay::new(9, 0));
     assert_eq!(first_period(&app).to, TimeOfDay::new(16, 12));
@@ -175,4 +175,13 @@ fn period_types_are_saved() {
         ),
         "{yaml}"
     );
+}
+
+#[test]
+fn space_does_not_toggle_a_checkbox() {
+    let mut app = monday_with_first_period_focused();
+    tab_to(&mut app, Field::Break);
+    press(&mut app, KeyCode::Char(' '));
+    assert_eq!(first_period(&app).period_type, PeriodType::Work);
+    assert!(!app.is_editing());
 }

@@ -10,11 +10,12 @@ pub struct ActiveInput {
 }
 
 impl ActiveInput {
-    /// Starts editing with the first typed character, replacing the old value.
-    pub fn new(first: char) -> Self {
+    /// Starts editing with `text`, the cursor at the end.
+    pub fn with_text(text: &str) -> Self {
+        let text: Vec<char> = text.chars().collect();
         Self {
-            text: vec![first],
-            cursor: 1,
+            cursor: text.len(),
+            text,
             scroll: 0,
         }
     }

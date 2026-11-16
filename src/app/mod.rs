@@ -325,12 +325,13 @@ impl App {
             KeyCode::Down => self.move_focus_vertically(Direction::Forward),
             KeyCode::Tab => self.move_focus_horizontally(Direction::Forward),
             KeyCode::BackTab => self.move_focus_horizontally(Direction::Backward),
-            KeyCode::Enter => self.add_period_on_enter(),
-            KeyCode::Delete if ctrl && self.focus.is_some() => {
+            KeyCode::Enter if alt => self.add_period(),
+            KeyCode::Enter => self.edit_or_toggle_focused_field(),
+            KeyCode::Delete if alt && self.focus.is_some() => {
                 let label = self.focused_period().map(Period::label).unwrap_or_default();
                 self.popup = Some(Popup::delete_period(&label));
             }
-            KeyCode::Char(c) if !ctrl && !alt => self.type_char(c),
+            KeyCode::Char(c) if !ctrl && !alt => self.start_editing(c),
             _ => {}
         }
     }
@@ -378,10 +379,28 @@ impl App {
     }
 
     /// Space toggles a focused checkbox; otherwise typing starts editing.
-    fn type_char(&mut self, c: char) {
-        match self.focus.and_then(|focus| focus.field.period_type()) {
-            Some(period_type) if c == ' ' => self.toggle_period_type(period_type),
-            _ => self.start_editing(c),
+    fn edit_or_toggle_focused_field(&mut self) {
+        let Some(focus) = self.focus else {
+            return;
+        };
+        match focus.field.period_type() {
+            Some(period_type) => self.toggle_period_type(period_type),
+            None => self.active_input = Some(ActiveInput::with_text(&self.focused_text())),
+        }
+    }
+
+    /// The focused text field's current value, as it is shown.
+    fn focused_text(&self) -> String {
+        let (Some(focus), Some(period)) = (self.focus, self.focused_period()) else {
+            return String::new();
+        };
+        let time = |t: Option<TimeOfDay>| t.map(TimeOfDay::format_hhmm).unwrap_or_default();
+        match focus.field {
+            Field::From => time(period.from),
+            Field::To => time(period.to),
+            Field::Project => period.project.clone().unwrap_or_default(),
+            Field::Notes => period.notes.clone().unwrap_or_default(),
+            Field::Break | Field::Vacation | Field::Sick | Field::Holiday => String::new(),
         }
     }
 
@@ -406,9 +425,17 @@ impl App {
         let Some(focus) = self.focus else {
             return;
         };
-        if focus.field.accepts(c, 0) {
-            self.active_input = Some(ActiveInput::new(c));
+        if !focus.field.accepts(c, 0) {
+            return;
         }
+        // Notes keeps its text; other fields are replaced by what you type.
+        let mut input = if focus.field == Field::Notes {
+            ActiveInput::with_text(&self.focused_text())
+        } else {
+            ActiveInput::with_text("")
+        };
+        input.insert(c);
+        self.active_input = Some(input);
     }
 
     /// Stores the active input in the focused field. An invalid time keeps the
@@ -544,15 +571,9 @@ impl App {
         }
     }
 
-    /// Enter on a day without periods, without focus, or in the last period adds
-    /// a period and focuses its From, unless the last period is still open
-    /// (which includes an empty period).
-    fn add_period_on_enter(&mut self) {
-        let count = self.period_count();
-        let in_last_period = self.focus.is_some_and(|f| f.period + 1 == count);
-        if count > 0 && self.focus.is_some() && !in_last_period {
-            return;
-        }
+    /// Alt+Enter adds a period after the last one and focuses its From,
+    /// unless the last period is still open (which includes an empty period).
+    fn add_period(&mut self) {
         let last_is_open = self
             .timesheet
             .day(self.selected)

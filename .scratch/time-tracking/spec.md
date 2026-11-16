@@ -56,14 +56,14 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 29. As a consultant, I want ↑/↓ to move focus to the same field in the previous/next period, or, if none has focus, to the first field of the first period (↓) or the last period (↑), so that I can move vertically.
 30. As a consultant, I want Tab/Shift-Tab to move focus to the next/previous field of a period (including checkboxes), continuing in the next/previous period and stopping at the very first and last field, so that I can move horizontally.
 31. As a consultant, I want Alt+↑/↓ and Alt+PgUp/PgDn to select the previous/next day and week from the right panel, so that I can record several days in a row.
-32. As a consultant, I want typing in a focused field to replace its value, as in a spreadsheet, so that overwriting is fast.
+32. As a consultant, I want typing in a focused From, To or Project field to replace its value, as in a spreadsheet, and typing in Notes to add to its text, so that overwriting is fast and notes can be extended. Enter on a focused field starts editing with its existing text.
 33. As a consultant, I want to accept active input with Enter and reject it with Esc (restoring the previously accepted value), so that I stay in control of every change.
 34. As a consultant, I want ←/→/Home/End to move the cursor while editing, so that I can correct typos.
-35. As a consultant, I want Enter (when not editing) in the last period, or on a day with periods but none focused, to create a new period whose From is the previous period's To, with focus on its From field, so that consecutive periods are quick to enter.
-36. As a consultant, I want Enter on a day without periods to create its first period with an empty From, so that I can start a day.
+35. As a consultant, I want Alt+Enter to add a new period after the last one, whose From is the previous period's To, with focus on its From field, so that consecutive periods are quick to enter.
+36. As a consultant, I want Alt+Enter on a day without periods to create its first period with an empty From, so that I can start a day.
 37. As a consultant, I want an open period (empty To) to be allowed on the current day only, so that I can record a period that is still running.
 38. As a consultant, I want an open period not to count toward worked time until To is filled in, so that balances only reflect finished work.
-39. As a consultant, I want Space to toggle the focused checkbox, so that checkboxes work like other fields.
+39. As a consultant, I want Enter to toggle the focused checkbox, so that checkboxes work like other fields.
 40. As a consultant, I want Alt+b/v/s/h to toggle Break/Vacation/Sick/Holiday, accepting any active input first, so that I can set the period type from anywhere in the period.
 41. As a consultant, I want the period-type checkboxes to be mutually exclusive, so that a period always has a single type.
 42. As a consultant, I want checking Vacation, Sick or Holiday on a day whose only period has empty From and To to fill in From 0900 and To 0900 + regular expected working time (e.g. 1612), and unchecking it to empty From and To again, so that whole-day absences take one keystroke.
@@ -72,7 +72,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 45. As a consultant, I want Ctrl+C to copy the focused field's value to the system clipboard, so that I can reuse it elsewhere.
 46. As a consultant, I want Ctrl+V to put the clipboard text into the focused field as accepted input (replacing any active input), so that pasting is one step.
 47. As a consultant, I want pasted times like `12:35` accepted as `1235`, invalid times rejected with a message, and pasting onto a checkbox ignored, so that pasting never corrupts data.
-48. As a consultant, I want Ctrl+Del to delete the focused period after confirming (Delete/Cancel), so that I can remove mistakes.
+48. As a consultant, I want Alt+Del to delete the focused period after confirming (Delete/Cancel), so that I can remove mistakes.
 49. As a consultant, I want an implied break shown as its own row between two periods that don't follow each other directly, so that implied breaks are visible.
 50. As a consultant, I want a period warning ⚠️ left of From for a period with an unusual time (before 06:00 or after 20:00) or a duration of 0h00m, so that such periods stand out.
 51. As a consultant, I want the bottom of the right panel to show the actual expected working time, e.g. `Actual expected: 3h36m (regular 7h12m − 3h36m absence)`, with all absences grouped into one term, or just `Actual expected: 7h12m`, so that I understand my target for the day.
@@ -124,11 +124,11 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Check triggers**: leaving a day (B) checks that day, but only if it was changed in this session, so you can always browse past broken days. Ctrl+S and Ctrl+Q first sort all days and remove empty periods (which alone isn't an unsaved change), then check all days; the popup names the earliest failing day, and "Go to day" selects it, focuses the right panel and shows the problem there. On Ctrl+Q the consistency popup comes before the "Save before quitting?" popup.
 - **Check results**: messages name periods by their times (e.g. `0900–1200 overlaps 1130–1300`, `Open period 1230– on a past day`, `More than one sick period`); only the first problem is shown. The offending periods get a red background until the next key press. Every day that currently fails a check gets a day warning.
 - **Shortcut modifiers** used in the original design: (A) not available while a field is being edited; (B) runs a consistency check and cancels the action if it fails; (C) accepts the active input first.
-  - Alt+↑/↓/PgUp/PgDn in the right panel: A, B (ignored while editing; they don't accept active input). ←/→ in the right panel: previous/next field of the period, stopping at its edges; while editing they move the cursor. ↑/↓ in the right panel: A. Alt+b/v/s/h/p/n: C. Alt+←/→: A. Ctrl+Q: A, B. Ctrl+S: A, B (all days). Ctrl+Z/Y: A. Ctrl+Del: A.
+  - Alt+↑/↓/PgUp/PgDn in the right panel: A, B (ignored while editing; they don't accept active input). ←/→ in the right panel: previous/next field of the period, stopping at its edges; while editing they move the cursor. ↑/↓ in the right panel: A. Alt+b/v/s/h/p/n: C. Alt+←/→: A. Ctrl+Q: A, B. Ctrl+S: A, B (all days). Ctrl+Z/Y: A. Alt+Del, Alt+Enter: A.
 - **Editing**: From/To take only digits, at most 4; an empty value may be accepted. Enter with an invalid time keeps the field in edit mode and shows a message. Tab/Shift-Tab accept and move on (staying put if accepting fails). All other non-editing shortcuts are ignored while editing. Typing on a checkbox does nothing.
 - **Messages**: one-line notices in the right panel (invalid time, failed consistency check, rejected paste); a message disappears at the next key press. The right panel always reserves a row for them.
 - **Active input display**: while editing, the field shows the text around the cursor; `…` only appears outside edit mode.
-- **Adding periods**: Enter doesn't add a period while the last period is open (no To yet), which includes an empty last period.
+- **Adding periods**: Alt+Enter adds a period from any field or without focus, but not while the last period is open (no To yet), which includes an empty last period. Enter no longer adds periods; Space no longer toggles checkboxes.
 - **Delete popup**: Delete is the default button.
 - **Period types**: unchecking an absence empties From and To only if the period is still the day's only one and they still hold the auto-filled full day (0900 and 0900 + regular expected working time); the values decide, so hand-typed times equal to a full day are emptied too (accepted; undo covers it). Switching from one absence (or to Break) keeps From and To, without emptying or auto-fill. Alt+b/v/s/h/p/n need a focused period in the right panel; they accept active input first and do nothing if that fails.
 - **Deleting**: after deleting a period, focus moves to the same field of the period taking its place (the previous one if the last was deleted); no focus if the day becomes empty.

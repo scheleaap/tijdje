@@ -74,6 +74,8 @@ fn saved_yaml_follows_the_documented_schema() {
 fn text_with_quotes_and_special_characters_survives_saving() {
     let (mut app, fs) = sample_on(date(2026, 11, 2));
     alt_key(&mut app, KeyCode::Right);
+    // The break (period 1) has no notes yet.
+    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Down);
     alt_key(&mut app, KeyCode::Char('n'));
     let notes = r#"say "hi" \ # : - [x] {y} 'z' ü"#;
@@ -82,7 +84,7 @@ fn text_with_quotes_and_special_characters_survives_saving() {
     ctrl(&mut app, 's');
     let saved = reload(&fs);
     assert_eq!(
-        saved.days[&date(2026, 11, 2)].periods[0].notes.as_deref(),
+        saved.days[&date(2026, 11, 2)].periods[1].notes.as_deref(),
         Some(notes)
     );
 }
@@ -92,7 +94,7 @@ fn days_without_periods_are_not_written() {
     let (mut app, fs) = sample_on(date(2026, 11, 6));
     alt_key(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Down);
-    ctrl_key(&mut app, KeyCode::Delete);
+    alt_key(&mut app, KeyCode::Delete);
     press(&mut app, KeyCode::Char('d'));
     ctrl(&mut app, 's');
     assert!(!fs.get(TIMESHEET).unwrap().contains("2026-11-06"));
@@ -102,7 +104,7 @@ fn days_without_periods_are_not_written() {
 fn a_new_day_stores_the_regular_expected_working_time() {
     let (mut app, fs) = sample_on(date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Enter);
+    alt_key(&mut app, KeyCode::Enter);
     type_text(&mut app, "0900");
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "1200");
@@ -171,7 +173,7 @@ fn saving_a_new_file_creates_it_without_a_backup() {
     )
     .unwrap();
     alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Enter);
+    alt_key(&mut app, KeyCode::Enter);
     type_text(&mut app, "0900");
     press(&mut app, KeyCode::Enter);
     ctrl(&mut app, 's');
