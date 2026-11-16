@@ -1,11 +1,16 @@
 //! Interactive application state and key handling. Drawing lives in `render`.
 
+mod active_input;
+mod popup;
 mod render;
 
 use jiff::civil::Date;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
-use crate::domain::{Timesheet, calendar};
+use active_input::ActiveInput;
+use popup::{Popup, PopupAction};
+
+use crate::domain::{Period, TimeOfDay, Timesheet, calendar};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Screen {
@@ -62,6 +67,25 @@ impl Field {
     fn previous(self) -> Option<Field> {
         self.index().checked_sub(1).map(|i| Self::ALL[i])
     }
+
+    /// From and To take times typed as HHMM.
+    fn is_time(self) -> bool {
+        matches!(self, Field::From | Field::To)
+    }
+
+    /// Fields that take typed text (as opposed to checkboxes).
+    fn takes_text(self) -> bool {
+        matches!(
+            self,
+            Field::From | Field::To | Field::Project | Field::Notes
+        )
+    }
+
+    /// Whether typing `c` adds it to an active input of `len` characters:
+    /// time fields take at most four digits, other text fields anything.
+    fn accepts(self, c: char, len: usize) -> bool {
+        self.takes_text() && (!self.is_time() || (c.is_ascii_digit() && len < 4))
+    }
 }
 
 /// Which way focus moves.
@@ -85,6 +109,11 @@ pub struct App {
     panel: Panel,
     selected: Date,
     focus: Option<FieldFocus>,
+    /// The focused field is being edited while this is set.
+    active_input: Option<ActiveInput>,
+    /// A one-line notice in the right panel; cleared at the next key press.
+    message: Option<String>,
+    popup: Option<Popup>,
     /// `None` until the first render.
     first_visible_day: Option<Date>,
     first_visible_period: usize,
@@ -99,6 +128,9 @@ impl App {
             panel: Panel::Days,
             selected: calendar::start_day(today),
             focus: None,
+            active_input: None,
+            message: None,
+            popup: None,
             first_visible_day: None,
             first_visible_period: 0,
         }
@@ -120,9 +152,29 @@ impl App {
         self.focus
     }
 
+    pub fn is_editing(&self) -> bool {
+        self.active_input.is_some()
+    }
+
+    pub fn timesheet(&self) -> &Timesheet {
+        &self.timesheet
+    }
+
     pub fn handle_key(&mut self, key: KeyEvent) -> Outcome {
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let alt = key.modifiers.contains(KeyModifiers::ALT);
+        self.message = None;
+        if let Some(popup) = &mut self.popup {
+            if let Some(action) = popup.handle_key(key.code) {
+                self.popup = None;
+                self.run_popup_action(action);
+            }
+            return Outcome::Continue;
+        }
+        if self.active_input.is_some() {
+            self.handle_editing_key(key);
+            return Outcome::Continue;
+        }
         if ctrl && key.code == KeyCode::Char('q') {
             return Outcome::Quit;
         }
@@ -134,7 +186,7 @@ impl App {
             (Screen::Tracking, KeyCode::Right) if alt => self.panel = Panel::Periods,
             (Screen::Tracking, code) => match self.panel {
                 Panel::Days => self.handle_days_key(code),
-                Panel::Periods => self.handle_periods_key(code, ctrl),
+                Panel::Periods => self.handle_periods_key(code, ctrl, alt),
             },
         }
         Outcome::Continue
@@ -150,7 +202,7 @@ impl App {
         }
     }
 
-    fn handle_periods_key(&mut self, code: KeyCode, ctrl: bool) {
+    fn handle_periods_key(&mut self, code: KeyCode, ctrl: bool, alt: bool) {
         match code {
             KeyCode::Up if ctrl => self.select_day(calendar::previous_weekday(self.selected)),
             KeyCode::Down if ctrl => self.select_day(calendar::next_weekday(self.selected)),
@@ -158,8 +210,146 @@ impl App {
             KeyCode::Down => self.move_focus_vertically(Direction::Forward),
             KeyCode::Tab => self.move_focus_horizontally(Direction::Forward),
             KeyCode::BackTab => self.move_focus_horizontally(Direction::Backward),
+            KeyCode::Enter => self.add_period_on_enter(),
+            KeyCode::Delete if ctrl && self.focus.is_some() => {
+                self.popup = Some(Popup::delete_period());
+            }
+            KeyCode::Char(c) if !ctrl && !alt => self.start_editing(c),
             _ => {}
         }
+    }
+
+    /// While editing, only editing keys work; Enter/Tab accept, Esc rejects.
+    fn handle_editing_key(&mut self, key: KeyEvent) {
+        let plain = !key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
+        let Some(field) = self.focus.map(|f| f.field) else {
+            return;
+        };
+        let Some(input) = &mut self.active_input else {
+            return;
+        };
+        match key.code {
+            KeyCode::Char(c) if plain && field.accepts(c, input.len()) => input.insert(c),
+            KeyCode::Backspace => input.backspace(),
+            KeyCode::Delete => input.delete(),
+            KeyCode::Left => input.left(),
+            KeyCode::Right => input.right(),
+            KeyCode::Home => input.home(),
+            KeyCode::End => input.end(),
+            KeyCode::Esc => self.active_input = None,
+            KeyCode::Enter => {
+                self.accept();
+            }
+            KeyCode::Tab | KeyCode::BackTab => {
+                let direction = if key.code == KeyCode::Tab {
+                    Direction::Forward
+                } else {
+                    Direction::Backward
+                };
+                if self.accept() {
+                    self.move_focus_horizontally(direction);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    /// Typing in a focused text field replaces its value with active input.
+    fn start_editing(&mut self, c: char) {
+        let Some(focus) = self.focus else {
+            return;
+        };
+        if focus.field.accepts(c, 0) {
+            self.active_input = Some(ActiveInput::new(c));
+        }
+    }
+
+    /// Stores the active input in the focused field. An invalid time keeps the
+    /// active input and shows a message. Returns whether it was accepted.
+    fn accept(&mut self) -> bool {
+        let (Some(focus), Some(input)) = (self.focus, &self.active_input) else {
+            return false;
+        };
+        let text = input.text();
+        let time = if focus.field.is_time() && !text.is_empty() {
+            match TimeOfDay::parse_hhmm(&text) {
+                Some(time) => Some(time),
+                None => {
+                    self.message = Some(format!("{text} is not a valid time (HHMM, 0000–2359)"));
+                    return false;
+                }
+            }
+        } else {
+            None
+        };
+        let value = (!text.is_empty()).then_some(text);
+        if let Some(period) = self.focused_period_mut() {
+            match focus.field {
+                Field::From => period.from = time,
+                Field::To => period.to = time,
+                Field::Project => period.project = value,
+                Field::Notes => period.notes = value,
+                _ => {}
+            }
+        }
+        self.active_input = None;
+        true
+    }
+
+    fn focused_period_mut(&mut self) -> Option<&mut Period> {
+        let focus = self.focus?;
+        self.timesheet
+            .day_mut(self.selected)
+            .periods
+            .get_mut(focus.period)
+    }
+
+    /// Enter on a day without periods, without focus, or in the last period adds
+    /// a period and focuses its From, unless the last period is still empty.
+    fn add_period_on_enter(&mut self) {
+        let count = self.period_count();
+        let in_last_period = self.focus.is_some_and(|f| f.period + 1 == count);
+        if count > 0 && self.focus.is_some() && !in_last_period {
+            return;
+        }
+        let last_is_empty = self
+            .timesheet
+            .day(self.selected)
+            .periods
+            .last()
+            .is_some_and(Period::is_empty);
+        if last_is_empty {
+            return;
+        }
+        let period = self.timesheet.day_mut(self.selected).add_period();
+        self.focus = Some(FieldFocus {
+            period,
+            field: Field::From,
+        });
+    }
+
+    fn run_popup_action(&mut self, action: PopupAction) {
+        match action {
+            PopupAction::DeletePeriod => self.delete_focused_period(),
+            PopupAction::Cancel => {}
+        }
+    }
+
+    /// Deletes the focused period; focus moves to the period taking its place.
+    fn delete_focused_period(&mut self) {
+        let Some(focus) = self.focus else {
+            return;
+        };
+        let day = self.timesheet.day_mut(self.selected);
+        day.remove_period(focus.period);
+        let count = day.periods.len();
+        self.focus = (count > 0).then(|| FieldFocus {
+            period: focus.period.min(count - 1),
+            ..focus
+        });
+        self.first_visible_period = self.first_visible_period.min(count.saturating_sub(1));
     }
 
     /// Selects another day; no period or field has focus on the new day.

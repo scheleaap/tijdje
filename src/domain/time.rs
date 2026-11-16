@@ -20,6 +20,14 @@ impl TimeOfDay {
         self.0
     }
 
+    /// Parses a time typed as exactly four digits HHMM, e.g. `1235`.
+    pub fn parse_hhmm(input: &str) -> Option<Self> {
+        if input.len() != 4 || !input.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        Self::new(input[..2].parse().ok()?, input[2..].parse().ok()?)
+    }
+
     /// Formats the time like `1235`, as typed in the From and To fields.
     pub fn format_hhmm(self) -> String {
         format!("{:02}{:02}", self.0 / 60, self.0 % 60)

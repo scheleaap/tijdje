@@ -14,6 +14,9 @@ _Avoid_: Entry, block, slot
 **Project**:
 The work a period is attributed to, e.g. a customer engagement or internal work.
 
+**Empty period**:
+A period without any values: no start or end time, project or notes, and not marked as a non-working period.
+
 **Open period**:
 A period whose end time is not yet known, because it is still running.
 

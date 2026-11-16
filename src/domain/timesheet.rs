@@ -12,8 +12,9 @@ const LATEST_USUAL_END: TimeOfDay = TimeOfDay::new(20, 0).expect("valid time");
 /// 7h12m.
 pub const DEFAULT_REGULAR_EXPECTED_WORKING_TIME: Minutes = Minutes(432);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PeriodType {
+    #[default]
     Work,
     Break,
     Vacation,
@@ -51,7 +52,7 @@ impl PeriodType {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Period {
     pub from: Option<TimeOfDay>,
     pub to: Option<TimeOfDay>,
@@ -116,6 +117,24 @@ impl Day {
             .min()
     }
 
+    /// Adds an empty work period at the end whose From is the last period's To.
+    /// Returns its index.
+    pub fn add_period(&mut self) -> usize {
+        let from = self.periods.last().and_then(|last| last.to);
+        self.periods.push(Period {
+            from,
+            ..Period::default()
+        });
+        self.periods.len() - 1
+    }
+
+    /// Removes the period at `index`, if there is one.
+    pub fn remove_period(&mut self, index: usize) {
+        if index < self.periods.len() {
+            self.periods.remove(index);
+        }
+    }
+
     /// Whether there is a gap between the period at `index` and the next one.
     pub fn has_implied_break_after(&self, index: usize) -> bool {
         let (Some(period), Some(next)) = (self.periods.get(index), self.periods.get(index + 1))
@@ -131,6 +150,11 @@ impl Day {
 }
 
 impl Period {
+    /// An empty period has no values: no times, project or notes, and type work.
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+
     /// An open period has no To yet, because it is still running.
     pub fn is_open(&self) -> bool {
         self.to.is_none()
@@ -158,6 +182,11 @@ impl Timesheet {
     /// The day on `date`; empty if it isn't in the timesheet.
     pub fn day(&self, date: Date) -> &Day {
         self.days.get(&date).unwrap_or(&EMPTY_DAY)
+    }
+
+    /// The day on `date` for changing it; added to the timesheet if it isn't there.
+    pub fn day_mut(&mut self, date: Date) -> &mut Day {
+        self.days.entry(date).or_default()
     }
 
     /// The worked time on `date`, or `None` when nothing is recorded that day.

@@ -6,10 +6,10 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Paragraph},
+    widgets::{Block, BorderType, Clear, Paragraph},
 };
 
-use super::{App, Field, Panel, Screen};
+use super::{App, Field, Panel, Popup, Screen};
 use crate::domain::{
     Day, Minutes, Period, PeriodType, TimeOfDay,
     calendar::{self, Separator},
@@ -67,6 +67,8 @@ const PANEL: Style = Style::new().fg(Color::Cyan).bg(Color::Blue);
 const SELECTED: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 const INACTIVE_SELECTED: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const INPUT: Style = Style::new().fg(Color::White).bg(Color::Indexed(17));
+const EDITING: Style = Style::new().fg(Color::Black).bg(Color::White);
+const MESSAGE: Style = Style::new().fg(Color::Yellow).bg(Color::Blue);
 const KEY_NUMBER: Style = Style::new().fg(Color::White).bg(Color::Black);
 const KEY_LABEL: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 
@@ -84,6 +86,9 @@ impl App {
             Screen::Help => render_help(frame, main),
         }
         render_function_keys(frame, keys);
+        if let Some(popup) = &self.popup {
+            render_popup(frame, popup);
+        }
     }
 
     fn render_tracking(&mut self, frame: &mut Frame, area: Rect) {
@@ -184,9 +189,10 @@ impl App {
         let block = panel_block(&title, self.panel == Panel::Periods);
         let inner = block.inner(area);
         frame.render_widget(block, area);
-        let [header, list, actual_expected] = Layout::vertical([
+        let [header, list, message, actual_expected] = Layout::vertical([
             Constraint::Length(1),
             Constraint::Fill(1),
+            Constraint::Length(1),
             Constraint::Length(1),
         ])
         .areas(inner);
@@ -204,6 +210,19 @@ impl App {
 
         let height = usize::from(list.height);
         let first = self.scroll_to_focused_period(height);
+        let active_input_text = match (self.focus, self.active_input.as_mut()) {
+            (Some(focus), Some(input)) => {
+                let (text, column) = input.visible(field_width(focus.field, notes_width));
+                if let (Some(row), Some(x)) = (
+                    focus.period.checked_sub(first).filter(|&row| row < height),
+                    field_offset(focus.field),
+                ) {
+                    frame.set_cursor_position((list.x + to_u16(x + column), list.y + to_u16(row)));
+                }
+                Some(text)
+            }
+            _ => None,
+        };
         let day = self.timesheet.day(self.selected);
         let lines: Vec<Line> = day
             .periods
@@ -211,9 +230,21 @@ impl App {
             .enumerate()
             .skip(first)
             .take(height)
-            .map(|(index, period)| self.period_line(day, index, period, notes_width))
+            .map(|(index, period)| {
+                self.period_line(
+                    day,
+                    index,
+                    period,
+                    notes_width,
+                    active_input_text.as_deref(),
+                )
+            })
             .collect();
         frame.render_widget(Paragraph::new(lines).style(PANEL), list);
+
+        if let Some(text) = &self.message {
+            frame.render_widget(Paragraph::new(format!(" {text}")).style(MESSAGE), message);
+        }
 
         frame.render_widget(
             Paragraph::new(format!(" {}", actual_expected_text(day))).style(PANEL),
@@ -227,14 +258,15 @@ impl App {
         index: usize,
         period: &'a Period,
         notes_width: usize,
+        active_input_text: Option<&str>,
     ) -> Line<'a> {
-        let field = |field: Field, text: &str, width: usize| {
-            let style = if self.is_focused(index, field) {
-                SELECTED
-            } else {
-                INPUT
-            };
-            Span::styled(fit(text, width), style)
+        let field = |field: Field, text: &str, width: usize| match (
+            self.is_focused(index, field),
+            active_input_text,
+        ) {
+            (true, Some(active_input)) => Span::styled(fit(active_input, width), EDITING),
+            (true, None) => Span::styled(fit(text, width), SELECTED),
+            (false, _) => Span::styled(fit(text, width), INPUT),
         };
         let time = |t: Option<TimeOfDay>| t.map(|t| t.format_hhmm()).unwrap_or_default();
         let duration = period
@@ -305,6 +337,62 @@ impl App {
         }
         self.first_visible_period
     }
+}
+
+/// The width of a text field.
+fn field_width(field: Field, notes_width: usize) -> usize {
+    match field {
+        Field::From | Field::To => TIME_WIDTH,
+        Field::Project => PROJECT_WIDTH,
+        _ => notes_width,
+    }
+}
+
+/// Where a text field starts in a period row.
+fn field_offset(field: Field) -> Option<usize> {
+    let project = GAP + TIME_WIDTH + GAP + TIME_WIDTH + GAP + DURATION_WIDTH + GAP;
+    match field {
+        Field::From => Some(GAP),
+        Field::To => Some(GAP + TIME_WIDTH + GAP),
+        Field::Project => Some(project),
+        Field::Notes => Some(project + PROJECT_WIDTH + GAP),
+        _ => None,
+    }
+}
+
+fn to_u16(n: usize) -> u16 {
+    u16::try_from(n).unwrap_or(u16::MAX)
+}
+
+fn render_popup(frame: &mut Frame, popup: &Popup) {
+    let width = 40.min(frame.area().width);
+    let area = Rect {
+        x: frame.area().width.saturating_sub(width) / 2,
+        y: frame.area().height.saturating_sub(5) / 2,
+        width,
+        height: 5,
+    };
+    let buttons: Vec<Span> = popup
+        .buttons
+        .iter()
+        .enumerate()
+        .flat_map(|(i, (label, _))| {
+            let style = if i == popup.selected { SELECTED } else { PANEL };
+            [Span::raw("  "), Span::styled(format!(" {label} "), style)]
+        })
+        .collect();
+    let lines = vec![
+        Line::raw(format!(" {}", popup.question)),
+        Line::raw(""),
+        Line::from(buttons),
+    ];
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines)
+            .block(panel_block("", true))
+            .style(PANEL),
+        area,
+    );
 }
 
 fn actual_expected_text(day: &Day) -> String {
@@ -401,6 +489,13 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ("↑/↓", "Right panel: same field in the previous/next period"),
         ("Tab/Shift-Tab", "Right panel: next/previous field"),
         ("Ctrl+↑/↓", "Right panel: previous/next day"),
+        ("Type", "Right panel: replace the focused field's value"),
+        (
+            "Enter",
+            "Accept input; otherwise add a period (in the last period, without focus, or on an empty day)",
+        ),
+        ("Esc", "Reject input"),
+        ("Ctrl+Del", "Delete the focused period"),
         ("F1", "Help"),
         ("F2, Esc", "Back to Tracking"),
         ("Ctrl+Q", "Quit"),

@@ -117,3 +117,10 @@ pub fn day(periods: Vec<Period>) -> Day {
         periods,
     }
 }
+
+/// Types `text` key by key.
+pub fn type_text(app: &mut App, text: &str) {
+    for c in text.chars() {
+        press(app, KeyCode::Char(c));
+    }
+}
