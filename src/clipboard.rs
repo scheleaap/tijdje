@@ -1,3 +1,4 @@
+fn   badly_formatted( ){}
 //! The system clipboard, injected so tests can use a fake one.
 
 pub trait Clipboard {
