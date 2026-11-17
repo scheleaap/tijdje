@@ -36,7 +36,7 @@ Every action is pinned to an immutable commit SHA. The repo allows only squash m
 16. As the maintainer, I want the first release to be `v0.1.0`, so that the history starts at a sensible version.
 17. As the maintainer, I want releases tagged `vX.Y.Z`, so that tags follow the usual convention.
 18. As the maintainer, I want a release only after the checks pass, so that broken code is never released.
-19. As the maintainer, I want releases from back-to-back pushes to run one at a time, so that two runs never compute the same version.
+19. As the maintainer, I want releases from back-to-back pushes to run one at a time, and only for the newest commit on `main`, so that two runs never compute the same version or release out of order.
 20. As the maintainer, I want the release notes to list every commit since the previous release, so that nothing is hidden.
 21. As the maintainer, I want the release notes grouped by commit type (Features, Bug fixes, Performance, Refactoring, Documentation, Tests, Build and CI, …), so that they're easy to scan.
 22. As the maintainer, I want non-releasable commits to appear in the next release's notes, so that they're still recorded.
@@ -63,18 +63,18 @@ Every action is pinned to an immutable commit SHA. The repo allows only squash m
 ## Implementation Decisions
 
 - **Workflows:** a CI workflow with a `check` job (fmt, clippy with warnings as errors, tests, all with locked dependencies) and a `release` job that depends on `check` and runs only for pushes to `main`. A separate workflow handles Dependabot auto-merge.
-- **Rust toolchain:** CI installs Rust via the mise action, limited to the `rust` tool. The mise config pins the current stable version (1.99.1 at time of writing) instead of `latest`. rustfmt and clippy components are ensured explicitly.
+- **Rust toolchain:** CI installs Rust via the mise action, limited to the `rust` tool. The mise config pins the current stable version (1.99.1 at time of writing) instead of `latest`, and declares the rustfmt and clippy components there, so CI and local installs get them the same way without a separate component step.
 - **Action pinning:** every `uses:` refers to a full commit SHA, with the release tag in a trailing comment. Only the checkout and mise actions are needed. Releases are created with the preinstalled `gh` CLI, not a release action.
 - **Versioning and notes:** git-cliff, a pinned version run through mise in CI (not added to the project's mise config). A git-cliff config at the repo root:
   - Conventional commits parsing, unconventional commits not filtered out.
   - Tag pattern `v[0-9].*`.
   - Commit groups in a fixed order, with a catch-all "Other" group.
   - Bump rules: `feat` → minor, breaking → minor (0.x), initial tag `v0.1.0`.
-- **Release decision:** the release job checks the commits since the last `v*` tag (or since the start, when there is none) for a `feat`, `fix` or `perf` subject, a `!` breaking marker, or a `BREAKING CHANGE` footer. If none is found, it logs that and skips the remaining steps. The decision isn't delegated to git-cliff, because git-cliff may bump the patch version for any commit.
-- **Release build:** the crate version is set to the computed version in the CI workspace only. Then a release build, and the binary is copied to the asset name with a SHA-256 checksum file. The release is created with `gh`, targeting the pushed commit SHA, titled with the version, with the git-cliff unreleased notes as body.
-- **Concurrency:** the release job is in a single concurrency group that doesn't cancel runs in progress.
+- **Release decision:** the release job first skips when its commit is no longer the tip of `main`; the newer run releases everything. Otherwise it checks the commits since the last `v*` tag (or since the start, when there is none): commit *subjects* for a `feat`, `fix` or `perf` type or a `!` breaking marker, and commit *bodies* for a `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer. Only these Conventional Commits forms count, so the release check and the version bump always agree. If none is found, it logs that and skips the remaining steps. The decision isn't delegated to git-cliff, because git-cliff may bump the patch version for any commit.
+- **Release build:** the crate version is set to the computed version in the CI workspace only. The step fails when the crate's version line isn't exactly `0.0.0`, instead of silently releasing a `0.0.0` binary. Then a release build, and the binary is copied to the asset name with a SHA-256 checksum file. The release is created with `gh`, targeting the pushed commit SHA, titled with the version, with the git-cliff unreleased notes as body.
+- **Concurrency:** the release job is in a single concurrency group that doesn't cancel runs in progress. Combined with the tip-of-`main` check, an older run never releases after a newer one.
 - **Permissions:** read-only contents by default. The release job gets contents write. The auto-merge workflow gets contents and pull-requests write.
-- **Dependabot:** monthly updates for the `github-actions` and `cargo` ecosystems. Commit prefixes `chore` and `fix` respectively, with scope (yielding `chore(deps)` / `fix(deps)`).
+- **Dependabot:** monthly updates for the `github-actions` and `cargo` ecosystems. Commit prefixes `chore` and `fix` respectively, with scope (yielding `chore(deps)` / `fix(deps)`). Dependabot's descriptions start lowercase and can't be changed; this is an accepted exception to the capitalized-description commit format. Release notes capitalize them.
 - **Auto-merge:** on PRs opened by Dependabot, enable auto-merge with squash via `gh`.
 - **Repo settings, applied with `gh` after showing the commands:**
   - Allow auto-merge.
