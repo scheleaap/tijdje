@@ -5,3 +5,5 @@ disable-model-invocation: true
 ---
 
 Call the Skill tool twice, for "grilling" and "domain-modeling".
+
+After the user confirms a shared understanding, stop. Do not implement; the user runs `/to-spec` or `/to-tickets` next.
