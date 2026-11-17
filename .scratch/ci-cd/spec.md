@@ -65,7 +65,7 @@ Every action is pinned to an immutable commit SHA. The repo allows only squash m
 - **Workflows:** a CI workflow with a `check` job (fmt, clippy with warnings as errors, tests, all with locked dependencies) and a `release` job that depends on `check` and runs only for pushes to `main`. A separate workflow handles Dependabot auto-merge.
 - **Rust toolchain:** CI installs Rust via the mise action, limited to the `rust` tool. The mise config pins the current stable version (1.99.1 at time of writing) instead of `latest`, and declares the rustfmt and clippy components there, so CI and local installs get them the same way without a separate component step.
 - **Action pinning:** every `uses:` refers to a full commit SHA, with the release tag in a trailing comment. Only the checkout and mise actions are needed. Releases are created with the preinstalled `gh` CLI, not a release action.
-- **Versioning and notes:** git-cliff, a pinned version run through mise in CI (not added to the project's mise config). A git-cliff config at the repo root:
+- **Versioning and notes:** git-cliff, pinned in the project's mise config next to Rust and installed in CI by the mise action, so CI and local dry runs use the same version. A git-cliff config at the repo root:
   - Conventional commits parsing, unconventional commits not filtered out.
   - Tag pattern `v[0-9].*`.
   - Commit groups in a fixed order, with a catch-all "Other" group.
@@ -109,6 +109,5 @@ Every action is pinned to an immutable commit SHA. The repo allows only squash m
 
 - `gh` is logged in. The repo is public, auto-merge is currently off, all three merge methods are allowed, and `main` has no protection.
 - The mise config also lists Node and the `skills` npm tool at `latest`. Those stay untouched.
-- Running git-cliff locally (seam 2) means installing it temporarily via mise. Ask first.
 - Action versions at time of writing: checkout v7.0.1, mise-action v5.2.9, git-cliff 2.14.2. Re-resolve SHAs when implementing.
 - The skills sync may overwrite the local addition to the grill-with-docs skill.

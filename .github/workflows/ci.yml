@@ -34,8 +34,6 @@ jobs:
       group: release
       cancel-in-progress: false
     env:
-      # A command, not a value: expand it unquoted ($GIT_CLIFF) so it splits into words.
-      GIT_CLIFF: mise exec git-cliff@2.14.2 -- git-cliff
       TARGET: x86_64-unknown-linux-gnu
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -43,7 +41,7 @@ jobs:
           fetch-depth: 0
       - uses: jdx/mise-action@236a21c3b91f5db6d4e174b348674a0f0caac06d # v5.2.9
         with:
-          install_args: rust
+          install_args: rust git-cliff
 
       - name: Decide whether to release
         id: decide
@@ -57,7 +55,7 @@ jobs:
           range=${last_tag:+$last_tag..}HEAD
           if git log --format=%s "$range" | grep -qE '^[a-z]+(\(.+\))?!:|^(feat|fix|perf)(\(.+\))?:' \
             || git log --format=%b "$range" | grep -qE '^BREAKING[ -]CHANGE:'; then
-            echo "version=$($GIT_CLIFF --bumped-version)" >> "$GITHUB_OUTPUT"
+            echo "version=$(git-cliff --bumped-version)" >> "$GITHUB_OUTPUT"
           else
             echo "No releasable commits since ${last_tag:-the start}."
           fi
@@ -83,7 +81,7 @@ jobs:
           VERSION: ${{ steps.decide.outputs.version }}
           GH_TOKEN: ${{ github.token }}
         run: |
-          $GIT_CLIFF --unreleased --tag "$VERSION" --strip all > notes.md
+          git-cliff --unreleased --tag "$VERSION" --strip all > notes.md
           asset="tijdje-$VERSION-$TARGET"
           gh release create "$VERSION" "$asset" "$asset.sha256" \
             --target "$GITHUB_SHA" --title "$VERSION" --notes-file notes.md

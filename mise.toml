@@ -1,4 +1,5 @@
 [tools]
 rust = { version = "1.99.1", components = ["rustfmt", "clippy"] }
+git-cliff = "2.14.2"
 node = "latest"
 "npm:skills" = "latest"
