@@ -10,6 +10,7 @@ Running list of user feedback and known open points that aren't covered by a tic
 - **Empty field on a day without periods** (user feedback, 2026-11-17, after ticket 08): in the right panel, show an empty field (period row) when the day has no periods.
 - **Alt+1/2/3 fill a day fraction** (user feedback, 2026-11-17, after ticket 08): Alt+1 sets the focused period to 100% of the day (0900 to 0900 + regular expected working time), Alt+2 to the first half (from 0900 to 50%), Alt+3 to the second half (50% to 100%).
 - **Remaining time** (user feedback, 2026-11-17, after ticket 08): after "Actual expected" in the right panel, show how much time is left to work.
+- **`--help` argument** (user feedback, 2026-11-18): the command line should support `--help`. Today the single argument is always taken as the timesheet path.
 - **Clock port** (review of ticket 01): today is fixed at startup, so "today" doesn't change while the app runs past midnight. (The file-system port was added in ticket 05.)
 - **Other terminals unverified** (ADR-0001): emoji rendering is only checked in Ptyxis. Konsole, kitty, foot and ghostty are still to be checked.
 - **Total balance performance** (review of ticket 02): the total balance is recalculated from the first recorded day for every visible row. Fine for now; may need caching after years of data.
