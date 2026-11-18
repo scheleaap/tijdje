@@ -1,6 +1,6 @@
 # CI/CD pipeline
 
-Status: done
+Status: ready-for-agent
 
 ## Problem Statement
 
@@ -11,7 +11,7 @@ tijdje is published on GitHub, but nothing checks it automatically and there are
 A GitHub Actions pipeline that:
 
 - On every PR and every push to `main`, checks formatting, lints and tests with the Rust version pinned in the mise config.
-- On a push to `main` that contains releasable commits, computes the next semantic version from the conventional commit messages. It then builds a Linux binary and publishes a GitHub release with the binary, its checksum and release notes listing every change since the previous release.
+- On a push to `main` that contains releasable commits, computes the next semantic version from the conventional commit messages. It then builds Linux binaries for x86_64 and arm64 (aarch64) and publishes a GitHub release with the binaries, their checksums and release notes listing every change since the previous release.
 - Has Dependabot propose monthly updates for actions and Cargo dependencies, which merge automatically once CI passes.
 
 Every action is pinned to an immutable commit SHA. The repo allows only squash merges, and `main` has a ruleset that makes PRs wait for CI.
@@ -44,9 +44,9 @@ Every action is pinned to an immutable commit SHA. The repo allows only squash m
 24. As the maintainer, I want the changelog only in GitHub release notes, not in a committed file, so that CI never pushes to `main`.
 25. As the maintainer, I want the crate version in git to stay at `0.0.0`, so that nobody mistakes it for the real version (see ADR-0002).
 26. As the maintainer, I want CI to write the real version into the crate just before the release build, so that the released binary carries it.
-27. As a user, I want to download a ready-built Linux x86_64 binary from the release page, so that I don't need a Rust toolchain.
-28. As a user, I want the binary named `tijdje-vX.Y.Z-x86_64-unknown-linux-gnu`, so that I can tell the version and platform.
-29. As a user, I want a `.sha256` file next to the binary, so that I can verify my download with `sha256sum -c`.
+27. As a user, I want to download a ready-built Linux x86_64 or arm64 binary from the release page, so that I don't need a Rust toolchain.
+28. As a user, I want the binaries named `tijdje-vX.Y.Z-<target>`, with `<target>` the Rust target (`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`), so that I can tell the version and platform.
+29. As a user, I want a `.sha256` file next to each binary, so that I can verify my download with `sha256sum -c`.
 30. As a user, I want the source archives GitHub attaches to every release, so that the GPL source is available with each binary.
 31. As the maintainer, I want Dependabot to propose action updates monthly, so that pinned SHAs don't go stale.
 32. As the maintainer, I want Dependabot to propose Cargo dependency updates monthly, so that dependencies stay current.
@@ -59,19 +59,21 @@ Every action is pinned to an immutable commit SHA. The repo allows only squash m
 39. As the maintainer, I want a ruleset on `main` that requires the CI check before a PR merges, so that auto-merge waits for green CI.
 40. As the maintainer, I want to keep pushing directly to `main`, so that the ruleset doesn't slow down my own workflow.
 41. As the maintainer, I want to see the exact `gh` commands for the repo settings before they're applied, so that I stay in control of my repo.
+42. As a user on an arm64 Linux machine (e.g. an Ubuntu VM on a Mac), I want to install tijdje with mise's `github:` backend, so that installing works the same as on x86_64.
+43. As the maintainer, I want all binaries of a release published together, so that a release never appears with only some platforms.
 
 ## Implementation Decisions
 
-- **Workflows:** a CI workflow with a `check` job (fmt, clippy with warnings as errors, tests, all with locked dependencies) and a `release` job that depends on `check` and runs only for pushes to `main`. A separate workflow handles Dependabot auto-merge.
+- **Workflows:** a CI workflow with a `check` job (fmt, clippy with warnings as errors, tests, all with locked dependencies) and three release jobs that run only for pushes to `main` after `check`: `prepare` (decide whether to release, compute the version), `build` (a matrix with one job per target, each uploading its binary and checksum as a workflow artifact) and `publish` (downloads all artifacts and creates one release). `check` runs on x86_64 only, so the required status check stays `check`. A separate workflow handles Dependabot auto-merge.
 - **Rust toolchain:** CI installs Rust via the mise action, limited to the `rust` tool. The mise config pins the current stable version (1.99.1 at time of writing) instead of `latest`, and declares the rustfmt and clippy components there, so CI and local installs get them the same way without a separate component step.
-- **Action pinning:** every `uses:` refers to a full commit SHA, with the release tag in a trailing comment. Only the checkout and mise actions are needed. Releases are created with the preinstalled `gh` CLI, not a release action.
+- **Action pinning:** every `uses:` refers to a full commit SHA, with the release tag in a trailing comment. Only the checkout, mise, upload-artifact and download-artifact actions are needed. Releases are created with the preinstalled `gh` CLI, not a release action.
 - **Versioning and notes:** git-cliff, pinned in the project's mise config next to Rust and installed in CI by the mise action, so CI and local dry runs use the same version. A git-cliff config at the repo root:
   - Conventional commits parsing, unconventional commits not filtered out.
   - Tag pattern `v[0-9].*`.
   - Commit groups in a fixed order, with a catch-all "Other" group.
   - Bump rules: `feat` → minor, breaking → minor (0.x), initial tag `v0.1.0`.
 - **Release decision:** the release job first skips when its commit is no longer the tip of `main`; the newer run releases everything. Otherwise it checks the commits since the last `v*` tag (or since the start, when there is none): commit *subjects* for a `feat`, `fix` or `perf` type or a `!` breaking marker, and commit *bodies* for a `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer. Only these Conventional Commits forms count, so the release check and the version bump always agree. If none is found, it logs that and skips the remaining steps. The decision isn't delegated to git-cliff, because git-cliff may bump the patch version for any commit.
-- **Release build:** the crate version is set to the computed version in the CI workspace only. The step fails when the crate's version line isn't exactly `0.0.0`, instead of silently releasing a `0.0.0` binary. Then a release build, and the binary is copied to the asset name with a SHA-256 checksum file. The release is created with `gh`, targeting the pushed commit SHA, titled with the version, with the git-cliff unreleased notes as body.
+- **Release build:** the crate version is set to the computed version in the CI workspace only. The step fails when the crate's version line isn't exactly `0.0.0`, instead of silently releasing a `0.0.0` binary. Then a release build per target, each on a native runner (`ubuntu-24.04` for x86_64, the free `ubuntu-24.04-arm` for aarch64; no cross-compiling), and the binary is copied to the asset name with a SHA-256 checksum file. The release is created with `gh`, targeting the pushed commit SHA, titled with the version, with the git-cliff unreleased notes as body.
 - **Concurrency:** the release job is in a single concurrency group that doesn't cancel runs in progress. Combined with the tip-of-`main` check, an older run never releases after a newer one.
 - **Permissions:** read-only contents by default. The release job gets contents write. The auto-merge workflow gets contents and pull-requests write.
 - **Dependabot:** monthly updates for the `github-actions` and `cargo` ecosystems. Commit prefixes `chore` and `fix` respectively, with scope (yielding `chore(deps)` / `fix(deps)`). Dependabot's descriptions start lowercase and can't be changed; this is an accepted exception to the capitalized-description commit format. Release notes capitalize them.
@@ -97,7 +99,9 @@ Every action is pinned to an immutable commit SHA. The repo allows only squash m
 
 ## Out of Scope
 
-- Platforms other than Linux x86_64 (aarch64, macOS, Windows).
+- Platforms other than Linux x86_64 and aarch64 (macOS, Windows, musl).
+- Running `check` on arm64.
+- Automated verification of mise asset matching (e.g. `mise lock --platform`); the maintainer confirms the arm64 install on a VM.
 - Archives (`.tar.gz`) or bundling README/LICENSE with the binary.
 - A committed `CHANGELOG.md`, release PRs, or CI commits to `main`.
 - Publishing to crates.io or package managers.
