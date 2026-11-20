@@ -425,3 +425,12 @@ fn emptying_every_period_keeps_them_until_the_day_is_left_and_focus_keeps_workin
     let periods = &app.timesheet().day(date(2026, 11, 2)).periods;
     assert_eq!(periods[1].from, tijdje::domain::TimeOfDay::new(12, 0));
 }
+
+#[test]
+fn ctrl_tab_and_alt_tab_do_not_move_focus() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 2));
+    ctrl_key(&mut app, KeyCode::Tab);
+    alt_key(&mut app, KeyCode::Tab);
+    ctrl_key(&mut app, KeyCode::BackTab);
+    assert_eq!(app.focus(), focus(0, Field::From));
+}

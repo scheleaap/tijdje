@@ -436,7 +436,7 @@ fn format_duration(period: &Period) -> String {
         .unwrap_or_default()
 }
 
-/// Where a text field starts in a period row, and how wide it is; `None` for checkboxes.
+/// Where an input field starts in a period row, and how wide it is; `None` for checkboxes.
 fn text_field_geometry(field: Field, notes_width: usize) -> Option<(usize, usize)> {
     match field {
         Field::From => Some((FROM_X, TIME_WIDTH)),

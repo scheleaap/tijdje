@@ -116,7 +116,7 @@ impl Field {
         self.period_type().is_none()
     }
 
-    /// The value a pasted text gives this text field: a time becomes `HHMM`,
+    /// The value a pasted text gives this input field: a time becomes `HHMM`,
     /// other fields get the text on one line. `None` for an invalid time.
     fn pasted_value(self, text: &str) -> Option<String> {
         if self.is_time() {
@@ -127,7 +127,7 @@ impl Field {
     }
 
     /// Whether typing `c` adds it to an active input of `len` characters:
-    /// time fields take at most four digits, other text fields anything.
+    /// time fields take at most four digits, other input fields anything.
     fn accepts(self, c: char, len: usize) -> bool {
         self.takes_text() && (!self.is_time() || (c.is_ascii_digit() && len < 4))
     }
@@ -149,6 +149,27 @@ fn period_type_for_alt_key(code: KeyCode) -> Option<PeriodType> {
 enum Direction {
     Backward,
     Forward,
+}
+
+/// The Ctrl and Alt modifiers a key was pressed with; Shift doesn't count.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Modifiers {
+    None,
+    Ctrl,
+    /// Alt, or Ctrl+Alt.
+    Alt,
+}
+
+impl Modifiers {
+    fn of(key: KeyEvent) -> Self {
+        if key.modifiers.contains(KeyModifiers::ALT) {
+            Modifiers::Alt
+        } else if key.modifiers.contains(KeyModifiers::CONTROL) {
+            Modifiers::Ctrl
+        } else {
+            Modifiers::None
+        }
+    }
 }
 
 /// The focused field of the focused period in the right panel.
@@ -302,6 +323,7 @@ impl App {
     pub fn handle_key(&mut self, key: KeyEvent) -> Outcome {
         // The date may have changed while waiting for this key.
         self.refresh_today();
+        let modifiers = Modifiers::of(key);
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let alt = key.modifiers.contains(KeyModifiers::ALT);
         self.notification = None;
@@ -364,16 +386,16 @@ impl App {
             (_, KeyCode::F(1)) => self.screen = Screen::Help,
             (_, KeyCode::F(2)) | (Screen::Help, KeyCode::Esc) => self.screen = Screen::Tracking,
             (Screen::Help, _) => {}
-            (Screen::Tracking, code) => self.handle_tracking_key(code, ctrl, alt),
+            (Screen::Tracking, code) => self.handle_tracking_key(code, modifiers),
         }
         Outcome::Continue
     }
 
     /// Keys of the Tracking screen while not editing. Focus is always in the
     /// right panel; the left panel has no keys of its own.
-    fn handle_tracking_key(&mut self, code: KeyCode, ctrl: bool, alt: bool) {
-        let plain = !ctrl && !alt;
-        let ctrl_only = ctrl && !alt;
+    fn handle_tracking_key(&mut self, code: KeyCode, modifiers: Modifiers) {
+        let plain = modifiers == Modifiers::None;
+        let ctrl_only = modifiers == Modifiers::Ctrl;
         match code {
             KeyCode::Up if ctrl_only => {
                 self.leave_day_for(calendar::previous_weekday(self.selected))
@@ -389,9 +411,9 @@ impl App {
             KeyCode::Right if plain => self.move_focus_within_period(Direction::Forward),
             KeyCode::Up if plain => self.move_focus_vertically(Direction::Backward),
             KeyCode::Down if plain => self.move_focus_vertically(Direction::Forward),
-            KeyCode::Tab => self.move_focus_in_tab_order(Direction::Forward),
-            KeyCode::BackTab => self.move_focus_in_tab_order(Direction::Backward),
-            KeyCode::Enter if ctrl_only => self.go_to_next_period_or_add_one(),
+            KeyCode::Tab if plain => self.move_focus_in_tab_order(Direction::Forward),
+            KeyCode::BackTab if plain => self.move_focus_in_tab_order(Direction::Backward),
+            KeyCode::Enter if ctrl_only => self.focus_next_period(),
             KeyCode::Enter if plain => self.edit_or_toggle_focused_field(),
             // The empty period of a day without periods can't be deleted.
             KeyCode::Delete if ctrl_only && !self.shows_empty_period() => {
@@ -407,10 +429,9 @@ impl App {
     /// While editing, only editing keys work; Enter, Tab/Shift-Tab and
     /// Ctrl+Enter accept, Esc rejects. Other keys are ignored silently.
     fn handle_editing_key(&mut self, key: KeyEvent) {
-        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-        let alt = key.modifiers.contains(KeyModifiers::ALT);
-        let plain = !ctrl && !alt;
-        let ctrl_only = ctrl && !alt;
+        let modifiers = Modifiers::of(key);
+        let plain = modifiers == Modifiers::None;
+        let ctrl_only = modifiers == Modifiers::Ctrl;
         let field = self.focus.field;
         let Some(input) = &mut self.active_input else {
             return;
@@ -437,10 +458,10 @@ impl App {
             }
             KeyCode::Enter if ctrl_only => {
                 if self.accept() {
-                    self.go_to_next_period_or_add_one();
+                    self.focus_next_period();
                 }
             }
-            KeyCode::Tab | KeyCode::BackTab => {
+            KeyCode::Tab | KeyCode::BackTab if plain => {
                 let direction = if key.code == KeyCode::Tab {
                     Direction::Forward
                 } else {
@@ -462,7 +483,8 @@ impl App {
             .get(self.focus.period)
     }
 
-    /// Space toggles a focused checkbox; otherwise typing starts editing.
+    /// Enter (not editing): toggles a focused checkbox, or starts editing a
+    /// focused input field with its current value.
     fn edit_or_toggle_focused_field(&mut self) {
         match self.focus.field.period_type() {
             Some(period_type) => self.toggle_period_type(period_type),
@@ -512,7 +534,7 @@ impl App {
         }
     }
 
-    /// The focused text field's current value, as it is shown.
+    /// The focused input field's current value, as it is shown.
     fn focused_text(&self) -> String {
         let Some(period) = self.focused_period() else {
             return String::new();
@@ -532,7 +554,7 @@ impl App {
         self.edit_selected_day(|day| day.toggle_period_type(period, period_type));
     }
 
-    /// Typing in a focused text field replaces its value with active input.
+    /// Typing in a focused input field replaces its value with active input.
     fn start_editing(&mut self, c: char) {
         if !self.focus.field.accepts(c, 0) {
             return;
@@ -542,7 +564,7 @@ impl App {
         self.active_input = Some(input);
     }
 
-    /// Del (not editing): empties a text field or unchecks a checkbox, as an
+    /// Del (not editing): empties a input field or unchecks a checkbox, as an
     /// accepted change.
     fn clear_focused_field(&mut self) {
         let focus = self.focus;
@@ -555,17 +577,10 @@ impl App {
                     self.toggle_period_type(period_type);
                 }
             }
-            None => self.edit_selected_day(|day| {
-                if let Some(period) = day.periods.get_mut(focus.period) {
-                    match focus.field {
-                        Field::From => period.from = None,
-                        Field::To => period.to = None,
-                        Field::Project => period.project = None,
-                        Field::Notes => period.notes = None,
-                        Field::Break | Field::Vacation | Field::Sick | Field::Holiday => {}
-                    }
-                }
-            }),
+            None => {
+                self.active_input = Some(ActiveInput::with_text(""));
+                self.accept();
+            }
         }
     }
 
@@ -767,7 +782,7 @@ impl App {
     /// a period after it and focuses its From, unless the last period is still
     /// open (without To, which includes an empty last period): then it only
     /// notifies. On the empty period of a day without periods it does nothing.
-    fn go_to_next_period_or_add_one(&mut self) {
+    fn focus_next_period(&mut self) {
         if self.shows_empty_period() {
             return;
         }

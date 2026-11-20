@@ -604,3 +604,27 @@ fn ctrl_del_while_editing_neither_deletes_a_character_nor_the_period() {
     assert_eq!(accepted_notes(&mut app).as_deref(), Some("ab"));
     assert_eq!(app.timesheet().days[&date(2026, 11, 2)].periods.len(), 3);
 }
+
+#[test]
+fn ctrl_enter_while_editing_the_empty_period_accepts_and_says_it_is_still_open() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 11));
+    type_text(&mut app, "0900");
+    ctrl_key(&mut app, KeyCode::Enter);
+    assert!(!app.is_editing());
+    let periods = &app.timesheet().days[&date(2026, 11, 11)].periods;
+    assert_eq!(periods.len(), 1);
+    assert_eq!(periods[0].from, TimeOfDay::new(9, 0));
+    assert_eq!(app.focus(), focus(0, Field::From));
+    let screen = rows(&render(&mut app, 120, 24)).join("\n");
+    assert!(screen.contains("The last period is still open"), "{screen}");
+}
+
+#[test]
+fn ctrl_tab_and_alt_tab_do_not_accept_while_editing() {
+    let mut app = app_on_monday();
+    type_text(&mut app, "0815");
+    ctrl_key(&mut app, KeyCode::Tab);
+    alt_key(&mut app, KeyCode::Tab);
+    assert!(app.is_editing());
+    assert_eq!(app.focus(), focus(0, Field::From));
+}
