@@ -13,7 +13,9 @@ fn a_terminal_with_the_protocol_is_accepted() {
 
 #[test]
 fn a_terminal_without_the_protocol_is_refused_with_the_supported_terminals() {
-    let message = terminal::require_keyboard_protocol(Ok(false)).unwrap_err();
+    let message = terminal::require_keyboard_protocol(Ok(false))
+        .unwrap_err()
+        .to_string();
     assert!(message.contains("Kitty keyboard protocol"), "{message}");
     for name in [
         "Ghostty",

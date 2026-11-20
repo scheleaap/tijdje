@@ -4,7 +4,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** done
+**Status:** awaiting manual check
 
 - [x] On start, before the event loop, the application detects Kitty keyboard protocol support; without it, it prints a message naming supported terminals (Ghostty, kitty, foot, Alacritty, WezTerm with `enable_kitty_keyboard`) and exits with a non-zero code
 - [x] Disambiguated key codes are enabled on start and restored on exit and on a panic (before leaving the alternate screen)
