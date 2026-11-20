@@ -8,7 +8,7 @@
 
 - [ ] `Worked [<worked time>] of [<actual expected working time>] | Work until [<time>] for [8h]`, with the bracketed parts on a cyan background
 - [ ] "Work until" = base + (8h − worked time) + missing break time; base = latest To of the from–to periods, or the From of an open last period; missing break time = 1h minus the explicit and implied break time, if that is under 1h; free periods don't count as break (domain built test-first)
-- [ ] `[–]` when 8h is already worked or the day has no from–to periods
+- [ ] `[–]` when 8h is already worked, the day has no from–to periods, or the result would be 24:00 or later; implied breaks are taken in time order (a sorted copy), not the order on screen
 - [ ] Example: 0900–1200 and 1230–1500 gives `Work until [18:00]`
 - [ ] Durations under an hour show as `42m` (padded where columns align); balances `+42m`/`-12m`; zero is `0m`
 

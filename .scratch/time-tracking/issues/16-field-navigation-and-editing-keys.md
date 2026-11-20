@@ -8,7 +8,7 @@
 
 - [ ] ←/→ move to the field left/right (stopping at the row's edges); ↑/↓ to the closest field in the row above/below, skipping implied-break rows
 - [ ] Tab/Shift-Tab walk through all fields in order, wrapping around within the day: per period From, To, Project, Break, Vacation, Sick, Holiday, Notes (tickets 19 and 20 add the day note and Free)
-- [ ] Ctrl+Enter moves to the next period's From; in the last period it adds a period after it (not while the last period is open), focused on its From, which is the previous period's To
+- [ ] Ctrl+Enter moves to the next period's From; in the last period it adds a period after it (not while the last period is open), focused on its From, which is the previous period's To; when the last period is open, a notification "The last period is still open"; on the placeholder empty period nothing
 - [ ] Enter toggles a checkbox, starts editing an input field with its existing text, or accepts the active input; Esc rejects
 - [ ] Typing replaces an input field's value, Notes included
 - [ ] Del (not editing) clears an input field or unchecks a checkbox

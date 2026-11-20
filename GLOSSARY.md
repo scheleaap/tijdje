@@ -78,7 +78,7 @@ The sum of all day balances from the first recorded day up to and including a gi
 The rules a day's periods must follow, e.g. no overlaps and From before To.
 
 **Period warning**:
-The ❗ indicator for a period that is allowed but likely a mistake: an unusual time, a duration of 0m, or a needless split from the previous period.
+The ❗ indicator for a period that is allowed but likely a mistake: an unusual time or a needless split from the previous period.
 
 **Consistency failure**:
 A violation of the consistency check, shown as ⚠️.
