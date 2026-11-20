@@ -4,12 +4,12 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `--help` prints the usage `tijdje [PATH]`, including the default path, and exits with 0
-- [ ] `--version` prints the version and exits with 0
-- [ ] Any other option prints an error and exits with a non-zero code; a single non-option argument is still the timesheet path
-- [ ] Saving writes `schema_version: 1` at the top of the file
-- [ ] A file without `schema_version` is read as version 1; any other version than 1 makes the application refuse to start with a clear message, leaving the file untouched
+- [x] `--help` prints the usage `tijdje [PATH]`, including the default path, and exits with 0
+- [x] `--version` prints the version and exits with 0
+- [x] Any other option prints an error and exits with a non-zero code; a single non-option argument is still the timesheet path
+- [x] Saving writes `schema_version: 1` at the top of the file
+- [x] A file without `schema_version` is read as version 1; any other version than 1 makes the application refuse to start with a clear message, leaving the file untouched
 
 Spec: `.scratch/time-tracking/spec.md`
