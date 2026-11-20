@@ -10,6 +10,6 @@
 - [x] Disambiguated key codes are enabled on start and restored on exit and on a panic (before leaving the alternate screen)
 - [x] Only key presses are handled
 - [x] The README documents the Ghostty setting `keybind = ctrl+enter=unbind` and that Ctrl+PgUp/PgDn and Alt+1..8 come through in a window with a single tab
-- [x] Checked by hand in Ghostty: Ctrl+Enter, Ctrl+Backspace, Ctrl+Del, Shift+Tab and Alt+digits arrive distinctly
+- [ ] Checked by hand in Ghostty: Ctrl+Enter, Ctrl+Backspace, Ctrl+Del, Shift+Tab and Alt+digits arrive distinctly (moved to ticket 16: these keys only do something there; the start-up check, the refusal in Ptyxis, day navigation and restoring the shell were checked)
 
 Spec: `.scratch/time-tracking/spec.md`
