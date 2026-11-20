@@ -9,10 +9,9 @@ use tijdje::{
     wide_symbols,
 };
 
-/// `~/Documents/timesheet.yaml`.
 fn default_timesheet_path() -> PathBuf {
     let home = env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
-    home.join("Documents").join("timesheet.yaml")
+    cli::default_timesheet_path(&home)
 }
 
 fn main() -> ExitCode {

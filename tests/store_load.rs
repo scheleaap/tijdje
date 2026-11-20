@@ -126,10 +126,26 @@ fn a_file_without_schema_version_is_read_as_version_1() {
 fn another_schema_version_is_refused_with_a_clear_message() {
     let err = load("schema_version: 2\ndays: {}\n").unwrap_err();
     assert!(
-        matches!(err, LoadError::UnsupportedSchemaVersion(2)),
+        matches!(&err, LoadError::UnsupportedSchemaVersion(v) if v == "2"),
         "{err}"
     );
     let message = err.to_string();
     assert!(message.contains("schema version 2"), "{message}");
     assert!(message.contains("version 1"), "{message}");
+}
+
+#[test]
+fn a_newer_schema_version_with_new_keys_is_refused_with_the_clear_message() {
+    let err = load("schema_version: 2\nnew_setting: true\ndays: {}\n").unwrap_err();
+    let message = err.to_string();
+    assert!(message.contains("schema version 2"), "{message}");
+}
+
+#[test]
+fn a_schema_version_that_is_not_a_whole_number_is_refused_with_the_clear_message() {
+    for version in ["\"1\"", "1.5"] {
+        let err = load(&format!("schema_version: {version}\ndays: {{}}\n")).unwrap_err();
+        let message = err.to_string();
+        assert!(message.contains("schema version"), "{version}: {message}");
+    }
 }

@@ -1,27 +1,44 @@
 //! The command line: `tijdje [PATH]`, `tijdje --help` and `tijdje --version`.
 
-use std::{ffi::OsString, path::PathBuf};
+use std::{
+    ffi::OsString,
+    path::{Path, PathBuf},
+};
+
+/// Where the timesheet is by default, relative to the home folder.
+const DEFAULT_PATH_IN_HOME: [&str; 2] = ["Documents", "timesheet.yaml"];
+
+/// The default timesheet path in `home`: `<home>/Documents/timesheet.yaml`.
+pub fn default_timesheet_path(home: &Path) -> PathBuf {
+    DEFAULT_PATH_IN_HOME
+        .iter()
+        .fold(home.to_owned(), |path, part| path.join(part))
+}
 
 /// What the command line asks for.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Invocation {
     /// Start the application on the given timesheet, or the default one.
     Run(Option<PathBuf>),
+    /// Print the usage and exit.
     Help,
+    /// Print the version and exit.
     Version,
 }
 
 /// The usage, printed by `--help`.
 pub fn usage() -> String {
-    "Usage: tijdje [PATH]\n\
-     \n\
-     Records working time in the timesheet at PATH.\n\
-     PATH defaults to ~/Documents/timesheet.yaml.\n\
-     \n\
-     Options:\n\
-     \x20 --help     Print this help and exit\n\
-     \x20 --version  Print the version and exit\n"
-        .to_owned()
+    format!(
+        "Usage: tijdje [PATH]\n\
+         \n\
+         Records working time in the timesheet at PATH.\n\
+         PATH defaults to ~/{}.\n\
+         \n\
+         Options:\n\
+         \x20 --help     Print this help and exit\n\
+         \x20 --version  Print the version and exit\n",
+        DEFAULT_PATH_IN_HOME.join("/")
+    )
 }
 
 /// The version, printed by `--version`.

@@ -179,6 +179,8 @@ The terminal must support the Kitty keyboard protocol (ADR-0003); the applicatio
 
 - `tijdje [PATH]`: PATH defaults to `~/Documents/timesheet.yaml`.
 - `--help` prints the usage (including the default path) and exits; `--version` prints the version and exits; any other option is an error with a non-zero exit code.
+- Every argument starting with `-` is an option, so a path starting with `-` is given as `./-file.yaml`. Two or more paths are an error. A wrong invocation exits with code 2, a file that can't be loaded with 1.
+- The schema version is checked before the rest of the file is parsed, so a newer file with new keys still gets the clear version message; a version that isn't a whole number is refused the same way.
 
 ### Storage
 

@@ -72,10 +72,7 @@ fn help_prints_the_usage_and_succeeds() {
 fn version_prints_the_version_and_succeeds() {
     let output = run("--version");
     assert!(output.status.success());
-    assert_eq!(
-        String::from_utf8(output.stdout).unwrap(),
-        format!("tijdje {}\n", env!("CARGO_PKG_VERSION"))
-    );
+    assert_eq!(String::from_utf8(output.stdout).unwrap(), cli::version());
 }
 
 #[test]
@@ -85,4 +82,12 @@ fn an_unknown_option_prints_an_error_and_fails() {
     assert!(output.stdout.is_empty());
     let stderr = String::from_utf8(output.stderr).unwrap();
     assert!(stderr.contains("'--bogus'"), "{stderr}");
+}
+
+#[test]
+fn the_default_path_is_documents_timesheet_in_the_home_folder() {
+    assert_eq!(
+        cli::default_timesheet_path(std::path::Path::new("/home/x")),
+        std::path::PathBuf::from("/home/x/Documents/timesheet.yaml")
+    );
 }

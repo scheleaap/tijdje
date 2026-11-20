@@ -98,8 +98,9 @@ impl Fingerprint {
 pub enum LoadError {
     Io(io::Error),
     Parse(String),
-    /// The file has a schema version this application can't read.
-    UnsupportedSchemaVersion(u32),
+    /// The file has a schema version this application can't read, as written
+    /// in the file.
+    UnsupportedSchemaVersion(String),
 }
 
 impl fmt::Display for LoadError {
@@ -148,7 +149,11 @@ pub enum Backup {
 
 /// The schema version this application reads and writes. It increases only
 /// on breaking changes to the file format.
-const SCHEMA_VERSION: u32 = 1;
+const SCHEMA_VERSION: u64 = 1;
+
+/// The schema version of a file without one: files from before the version
+/// was written. Stays 1 even when `SCHEMA_VERSION` increases.
+const UNVERSIONED_SCHEMA_VERSION: u64 = 1;
 
 /// Loads the timesheet at `path`. A missing or empty file is an empty
 /// timesheet, and a file without a schema version has version 1.
@@ -158,16 +163,42 @@ pub fn load(fs: &dyn FileSystem, path: &Path) -> Result<(Timesheet, Fingerprint)
     let Some(text) = text.filter(|text| !text.trim().is_empty()) else {
         return Ok((Timesheet::default(), fingerprint));
     };
+    check_schema_version(&text)?;
     let file: FileModel =
         serde_yaml_ng::from_str(&text).map_err(|e| LoadError::Parse(e.to_string()))?;
-    let version = file.schema_version.unwrap_or(1);
-    if version != SCHEMA_VERSION {
-        return Err(LoadError::UnsupportedSchemaVersion(version));
-    }
     Ok((
         file.into_timesheet().map_err(LoadError::Parse)?,
         fingerprint,
     ))
+}
+
+/// Checks the schema version before anything else is parsed, so a newer file
+/// with new keys still gets the clear version message.
+fn check_schema_version(text: &str) -> Result<(), LoadError> {
+    #[derive(Deserialize)]
+    struct VersionOnly {
+        #[serde(default)]
+        schema_version: Option<serde_yaml_ng::Value>,
+    }
+    let version_only: VersionOnly =
+        serde_yaml_ng::from_str(text).map_err(|e| LoadError::Parse(e.to_string()))?;
+    let version = match version_only.schema_version {
+        None | Some(serde_yaml_ng::Value::Null) => UNVERSIONED_SCHEMA_VERSION,
+        Some(serde_yaml_ng::Value::Number(n)) if n.as_u64().is_some() => {
+            n.as_u64().expect("checked")
+        }
+        Some(other) => {
+            let written = serde_yaml_ng::to_string(&other).unwrap_or_default();
+            return Err(LoadError::UnsupportedSchemaVersion(
+                written.trim().to_owned(),
+            ));
+        }
+    };
+    if version == SCHEMA_VERSION {
+        Ok(())
+    } else {
+        Err(LoadError::UnsupportedSchemaVersion(version.to_string()))
+    }
 }
 
 /// Saves the timesheet to `path`. If `path` is a symlink, the file it points
@@ -213,21 +244,22 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
-/// Writes the timesheet as YAML, starting with the schema version. Dates, times and text are always
-/// double-quoted, so YAML 1.1 readers don't take `08:45` for a number or
-/// `2026-11-02` for a timestamp. Days with only empty periods are not written, and
-/// every written day gets its regular expected working time, so a new day
-/// stores the default.
+/// Writes the timesheet as YAML, starting with the schema version. Dates,
+/// times and text are always double-quoted, so YAML 1.1 readers don't take
+/// `08:45` for a number or `2026-11-02` for a timestamp. Days with only empty
+/// periods are not written, and every written day gets its regular expected
+/// working time, so a new day stores the default.
 fn to_yaml(timesheet: &Timesheet) -> String {
+    let header = format!("schema_version: {SCHEMA_VERSION}\n");
     let days: Vec<_> = timesheet
         .days
         .iter()
         .filter(|(_, day)| !day.is_empty())
         .collect();
     if days.is_empty() {
-        return format!("schema_version: {SCHEMA_VERSION}\ndays: {{}}\n");
+        return format!("{header}days: {{}}\n");
     }
-    let mut out = format!("schema_version: {SCHEMA_VERSION}\ndays:\n");
+    let mut out = format!("{header}days:\n");
     for (date, day) in days {
         out += &format!(
             "  \"{date}\":\n    regular_expected_working_time_in_minutes: {}\n    periods:\n",
@@ -301,7 +333,9 @@ fn period_type_from_name(name: &str) -> Option<PeriodType> {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FileModel {
-    schema_version: Option<u32>,
+    /// Already checked by `check_schema_version`.
+    #[serde(default, rename = "schema_version")]
+    _schema_version: Option<u64>,
     #[serde(default)]
     days: BTreeMap<Date, DayModel>,
 }
