@@ -183,8 +183,10 @@ pub struct App {
     has_unsaved_changes: bool,
     /// Set when "Save" was chosen in the "Save before quitting?" popup.
     quit_after_saving: bool,
+    /// Where today comes from; injected so tests can fake it.
     clock: Box<dyn Clock>,
-    /// The clock's date as last read; see `refresh_today`.
+    /// The clock's date as last read, so a frame or key press uses one date
+    /// throughout; read again before each frame and each key press.
     today: Date,
     screen: Screen,
     panel: Panel,
@@ -299,6 +301,8 @@ impl App {
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> Outcome {
+        // The date may have changed while waiting for this key.
+        self.refresh_today();
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let alt = key.modifiers.contains(KeyModifiers::ALT);
         self.message = None;
