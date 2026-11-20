@@ -60,8 +60,9 @@ fn main() -> ExitCode {
     let result = (|| -> std::io::Result<()> {
         loop {
             app.refresh_today();
-            let frame = terminal.draw(|frame| app.render(frame))?;
-            wide_symbols::paint_backgrounds(frame.buffer, &mut std::io::stdout())?;
+            wide_symbols::draw(&mut terminal, &mut std::io::stdout(), |frame| {
+                app.render(frame);
+            })?;
             if event::poll(CLOCK_CHECK_INTERVAL)?
                 && let Event::Key(key) = event::read()?
                 && key.kind == KeyEventKind::Press
