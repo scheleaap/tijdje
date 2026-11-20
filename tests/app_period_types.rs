@@ -91,8 +91,8 @@ fn an_absence_on_an_empty_day_fills_a_full_day_and_unchecking_empties_it() {
 
     alt_key(&mut app, KeyCode::Char('v'));
     assert!(
-        app.timesheet().day(date(2026, 11, 11)).periods.is_empty(),
-        "back to the empty period, which isn't a real period"
+        app.timesheet().day(date(2026, 11, 11)).is_empty(),
+        "an empty period again, which stays until the day is left and isn't saved"
     );
 }
 

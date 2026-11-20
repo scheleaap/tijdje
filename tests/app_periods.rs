@@ -367,10 +367,40 @@ fn a_period_emptied_again_is_never_saved() {
     assert_eq!(app.timesheet().day(DAY_WITHOUT_PERIODS).periods.len(), 1);
     press(&mut app, KeyCode::Enter);
     assert_eq!(app.focus(), focus(0, Field::Break));
-    assert!(app.timesheet().day(DAY_WITHOUT_PERIODS).periods.is_empty());
+    // The emptied period stays until the day is left, but is never saved.
+    assert!(app.timesheet().day(DAY_WITHOUT_PERIODS).is_empty());
     ctrl(&mut app, 's');
     // The sample's open period of 10 Nov fails the check: "Save anyway".
     press(&mut app, KeyCode::Char('s'));
     let saved = fs.get(TIMESHEET).unwrap();
     assert!(!saved.contains("2026-11-11"), "{saved}");
+}
+
+/// Clears the focused input field: edit, delete everything, accept.
+fn clear_field(app: &mut tijdje::app::App) {
+    press(app, KeyCode::Enter);
+    for _ in 0..12 {
+        press(app, KeyCode::Backspace);
+    }
+    press(app, KeyCode::Enter);
+}
+
+#[test]
+fn emptying_every_period_keeps_them_until_the_day_is_left_and_focus_keeps_working() {
+    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n      - { from: \"09:00\", to: \"10:00\", project: null, notes: null, type: work }\n      - { from: \"10:00\", to: \"11:00\", project: null, notes: null, type: work }\n";
+    let mut app = app_with(yaml, date(2026, 11, 2));
+    clear_field(&mut app); // period 0 From
+    press(&mut app, KeyCode::Right);
+    clear_field(&mut app); // period 0 To
+    press(&mut app, KeyCode::Down);
+    clear_field(&mut app); // period 1 To
+    press(&mut app, KeyCode::Left);
+    clear_field(&mut app); // period 1 From
+    assert_eq!(app.focus(), focus(1, Field::From));
+    assert_eq!(app.timesheet().day(date(2026, 11, 2)).periods.len(), 2);
+    // The focused field still works.
+    type_text(&mut app, "1200");
+    press(&mut app, KeyCode::Enter);
+    let periods = &app.timesheet().day(date(2026, 11, 2)).periods;
+    assert_eq!(periods[1].from, tijdje::domain::TimeOfDay::new(12, 0));
 }

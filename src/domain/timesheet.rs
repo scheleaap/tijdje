@@ -147,6 +147,25 @@ impl SortedDay {
 
 impl Day {
     /// A day is empty when it has no periods other than empty periods.
+    /// Whether the day has no periods at all; the right panel then shows one
+    /// empty period, which only becomes a real period once something is
+    /// filled in.
+    pub fn shows_empty_period(&self) -> bool {
+        self.periods.is_empty()
+    }
+
+    /// The day as the right panel shows it: with one empty period if it has
+    /// no periods.
+    pub fn as_shown(&self) -> std::borrow::Cow<'_, Day> {
+        if self.shows_empty_period() {
+            let mut day = self.clone();
+            day.periods.push(Period::default());
+            std::borrow::Cow::Owned(day)
+        } else {
+            std::borrow::Cow::Borrowed(self)
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
         self.periods.iter().all(Period::is_empty)
     }

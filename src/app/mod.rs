@@ -172,7 +172,7 @@ impl FieldFocus {
     /// From of the first period: the focus after switching days.
     const START: FieldFocus = FieldFocus {
         period: 0,
-        field: Field::From,
+        field: Field::FIRST,
     };
 }
 
@@ -285,19 +285,12 @@ impl App {
     /// shows one empty period, which only becomes a real period once
     /// something is filled in.
     fn shown_day(&self) -> Cow<'_, Day> {
-        let day = self.timesheet.day(self.selected);
-        if day.periods.is_empty() {
-            let mut day = day.clone();
-            day.periods.push(Period::default());
-            Cow::Owned(day)
-        } else {
-            Cow::Borrowed(day)
-        }
+        self.timesheet.day(self.selected).as_shown()
     }
 
     /// Whether the selected day shows the empty period of a day without periods.
-    fn shows_placeholder_period(&self) -> bool {
-        self.timesheet.day(self.selected).periods.is_empty()
+    fn shows_empty_period(&self) -> bool {
+        self.timesheet.day(self.selected).shows_empty_period()
     }
 
     /// Uses `clipboard` for Ctrl+C/Ctrl+V; without one, they do nothing.
@@ -389,14 +382,18 @@ impl App {
     /// right panel; the left panel has no keys of its own.
     fn handle_tracking_key(&mut self, code: KeyCode, ctrl: bool, alt: bool) {
         let plain = !ctrl && !alt;
-        let day_key = ctrl && !alt;
+        let ctrl_only = ctrl && !alt;
         match code {
-            KeyCode::Up if day_key => self.leave_day_for(calendar::previous_weekday(self.selected)),
-            KeyCode::Down if day_key => self.leave_day_for(calendar::next_weekday(self.selected)),
-            KeyCode::PageUp if day_key => {
+            KeyCode::Up if ctrl_only => {
+                self.leave_day_for(calendar::previous_weekday(self.selected))
+            }
+            KeyCode::Down if ctrl_only => self.leave_day_for(calendar::next_weekday(self.selected)),
+            KeyCode::PageUp if ctrl_only => {
                 self.leave_day_for(calendar::previous_week(self.selected))
             }
-            KeyCode::PageDown if day_key => self.leave_day_for(calendar::next_week(self.selected)),
+            KeyCode::PageDown if ctrl_only => {
+                self.leave_day_for(calendar::next_week(self.selected))
+            }
             KeyCode::Left if plain => self.move_focus_within_period(Direction::Backward),
             KeyCode::Right if plain => self.move_focus_within_period(Direction::Forward),
             KeyCode::Up if plain => self.move_focus_vertically(Direction::Backward),
@@ -406,7 +403,7 @@ impl App {
             KeyCode::Enter if alt => self.add_period(),
             KeyCode::Enter => self.edit_or_toggle_focused_field(),
             // The empty period of a day without periods can't be deleted.
-            KeyCode::Delete if alt && !self.shows_placeholder_period() => {
+            KeyCode::Delete if alt && !self.shows_empty_period() => {
                 let label = self.focused_period().map(Period::label).unwrap_or_default();
                 self.popup = Some(Popup::delete_period(&label));
             }
@@ -590,16 +587,17 @@ impl App {
     /// tracked as unsaved, but only when something did change. Undo/redo and
     /// sorting change days without going through here. On a day without
     /// periods, `edit` sees the empty period the day shows; it only becomes a
-    /// real period if `edit` fills something in. A day left with only empty
-    /// periods goes back to having none, which shows the same.
+    /// real period if `edit` fills something in. Periods emptied later stay
+    /// until the day is left (they are never saved).
     fn edit_selected_day<R>(&mut self, edit: impl FnOnce(&mut Day) -> R) -> R {
         let day = self.timesheet.day_mut(self.selected);
         let before = day.clone();
-        if day.periods.is_empty() {
+        let showed_empty_period = day.shows_empty_period();
+        if showed_empty_period {
             day.periods.push(Period::default());
         }
         let result = edit(day);
-        if day.is_empty() {
+        if showed_empty_period && day.is_empty() {
             day.periods.clear();
         }
         if *day != before {
