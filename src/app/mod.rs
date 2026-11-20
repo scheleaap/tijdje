@@ -475,7 +475,7 @@ impl App {
             None => self.focused_text(),
         };
         if !self.clipboard.set_text(&text) {
-            self.notification = Some(NO_CLIPBOARD.to_owned());
+            self.notify(NO_CLIPBOARD);
         }
     }
 
@@ -488,16 +488,16 @@ impl App {
             return;
         }
         let Some(text) = self.clipboard.get_text() else {
-            self.notification = Some(NO_CLIPBOARD.to_owned());
+            self.notify(NO_CLIPBOARD);
             return;
         };
         let text = text.trim();
         if text.is_empty() {
-            self.notification = Some("The clipboard is empty".to_owned());
+            self.notify("The clipboard is empty");
             return;
         }
         let Some(value) = focus.field.pasted_value(text) else {
-            self.notification = Some(invalid_time_message(text));
+            self.notify(invalid_time_message(text));
             return;
         };
         let previous = self.active_input.replace(ActiveInput::with_text(&value));
@@ -561,7 +561,7 @@ impl App {
             match TimeOfDay::parse_hhmm(&text) {
                 Some(time) => Some(time),
                 None => {
-                    self.notification = Some(invalid_time_message(&text));
+                    self.notify(invalid_time_message(&text));
                     return false;
                 }
             }
@@ -621,19 +621,25 @@ impl App {
     /// Ctrl+Z: undoes the last change, selecting its day.
     fn undo(&mut self) {
         let restored = self.history.undo().map(|c| (c.date, c.before.clone()));
-        self.restore_or_say(restored, "Nothing to undo");
+        self.restore_or_notify(restored, "Nothing to undo");
     }
 
     /// Ctrl+Y: redoes the last undone change, selecting its day.
     fn redo(&mut self) {
         let restored = self.history.redo().map(|c| (c.date, c.after.clone()));
-        self.restore_or_say(restored, "Nothing to redo");
+        self.restore_or_notify(restored, "Nothing to redo");
     }
 
-    fn restore_or_say(&mut self, restored: Option<(Date, Day)>, nothing: &str) {
+    /// Shows `text` as a global notification until the next key press.
+    fn notify(&mut self, text: impl Into<String>) {
+        self.notification = Some(text.into());
+    }
+
+    /// Restores an undone or redone day, or notifies `nothing_to_do` if there is none.
+    fn restore_or_notify(&mut self, restored: Option<(Date, Day)>, nothing_to_do: &str) {
         match restored {
             Some((date, day)) => self.restore_day(date, day),
-            None => self.notification = Some(nothing.to_owned()),
+            None => self.notify(nothing_to_do),
         }
     }
 
@@ -688,7 +694,7 @@ impl App {
     }
 
     fn show_problem(&mut self, problem: ConsistencyProblem) {
-        self.notification = Some(problem.message);
+        self.notify(problem.message);
         self.inconsistent_periods = problem.periods;
     }
 
@@ -795,11 +801,11 @@ impl App {
                 if self.quit_after_saving {
                     return Outcome::Quit;
                 }
-                self.notification = Some("Saved".to_owned());
+                self.notify("Saved");
             }
             Err(SaveError::ChangedOnDisk) => self.popup = Some(Popup::file_changed_on_disk()),
             Err(e @ SaveError::Io(_)) => {
-                self.notification = Some(e.to_string());
+                self.notify(e.to_string());
                 self.quit_after_saving = false;
             }
         }

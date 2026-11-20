@@ -55,7 +55,8 @@ const HEADER: Style = Style::new().fg(Color::Yellow).bg(Color::Blue);
 const SELECTED: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 const FIELD: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const FOCUSED_FIELD: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
-const NOTIFICATION: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
+/// Global notifications: black on cyan, like the selection bar.
+const NOTIFICATION: Style = SELECTED;
 /// Periods that failed the consistency check.
 const HIGHLIGHTED: Style = Style::new().fg(Color::White).bg(Color::Red);
 const POPUP: Style = Style::new().fg(Color::Black).bg(Color::Gray);
@@ -553,7 +554,7 @@ fn render_notification(frame: &mut Frame, main: Rect, text: &str) {
     let line = format!(" {} ", fit(text, width.saturating_sub(2)));
     let width = to_u16(width);
     let area = Rect {
-        x: main.x + (main.width - width) / 2,
+        x: main.x + main.width.saturating_sub(width) / 2,
         y: main.bottom().saturating_sub(2),
         width,
         height: 1,

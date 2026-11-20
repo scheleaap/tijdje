@@ -10,15 +10,31 @@ const HEIGHT: u16 = 24;
 /// The row just above the panels' bottom border, which is above the function-key bar.
 const NOTIFICATION_ROW: u16 = HEIGHT - 3;
 
-/// The text on the notification row with a cyan background, if any.
+/// The notification: the centered run of cyan cells on the notification row
+/// (a selection bar on that row is cyan too, but not centered).
 fn notification(buffer: &Buffer) -> Option<String> {
-    let text: String = (0..buffer.area.width)
-        .map(|x| &buffer[(x, NOTIFICATION_ROW)])
-        .filter(|cell| cell.bg == Color::Cyan)
-        .map(|cell| cell.symbol())
-        .collect();
-    let text = text.trim();
-    (!text.is_empty()).then(|| text.to_owned())
+    let width = buffer.area.width;
+    let cyan = |x: u16| buffer[(x, NOTIFICATION_ROW)].bg == Color::Cyan;
+    let mut x = 0;
+    while x < width {
+        if !cyan(x) {
+            x += 1;
+            continue;
+        }
+        let start = x;
+        while x < width && cyan(x) {
+            x += 1;
+        }
+        let end = x - 1;
+        if start.abs_diff(width - 1 - end) <= 1 {
+            let text: String = (start..=end)
+                .map(|x| buffer[(x, NOTIFICATION_ROW)].symbol())
+                .collect();
+            let text = text.trim();
+            return (!text.is_empty()).then(|| text.to_owned());
+        }
+    }
+    None
 }
 
 fn shown_notification(app: &mut App) -> Option<String> {
@@ -161,4 +177,14 @@ fn the_period_list_uses_the_former_message_row() {
     assert!(last_period.contains("1700 1800"), "{last_period}");
     let below = &rows[usize::from(NOTIFICATION_ROW)];
     assert!(below.contains("Actual expected"), "{below}");
+}
+
+#[test]
+fn overwriting_a_changed_file_while_quitting_does_not_show_saved() {
+    let (mut app, fs) = app_with_a_change();
+    fs.set(TIMESHEET, "days: {}\n");
+    ctrl(&mut app, 'q');
+    press(&mut app, KeyCode::Char('s'));
+    assert_eq!(press(&mut app, KeyCode::Char('o')), Outcome::Quit);
+    assert_eq!(shown_notification(&mut app), None);
 }
