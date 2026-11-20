@@ -17,4 +17,4 @@
 - [x] An implied break is its own row: From/To/Duration as plain text, Break checked, no fields, not focusable
 - [x] Popups: light gray background with black text, a black drop shadow, a short title in the frame in blue and the message inside (wrapped); solid buttons, black on white, the selected one black on cyan, the hotkey letter in blue
 
-Spec: `.scratch/time-tracking/spec.md` ("Look" and "Right panel layout"); decisions Q127–Q134, adjusted by the user's feedback during implementation (no column lines, light gray fields, ✓ checkboxes, Tab order).
+Spec: `.scratch/time-tracking/spec.md` ("Look" and "Right panel layout"), including the user's adjustments during implementation (no column lines, light gray fields, ✓ checkboxes, Tab order).
