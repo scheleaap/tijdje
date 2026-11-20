@@ -3,20 +3,34 @@ use std::{env, path::PathBuf, process::ExitCode};
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use tijdje::{
     app::{App, Outcome},
+    cli::{self, Invocation},
     clipboard::SystemClipboard,
     store::RealFileSystem,
     wide_symbols,
 };
 
-fn timesheet_path() -> PathBuf {
-    env::args_os().nth(1).map(PathBuf::from).unwrap_or_else(|| {
-        let home = env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
-        home.join("Documents").join("timesheet.yaml")
-    })
+/// `~/Documents/timesheet.yaml`.
+fn default_timesheet_path() -> PathBuf {
+    let home = env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
+    home.join("Documents").join("timesheet.yaml")
 }
 
 fn main() -> ExitCode {
-    let path = timesheet_path();
+    let path = match cli::parse(env::args_os().skip(1)) {
+        Ok(Invocation::Run(path)) => path.unwrap_or_else(default_timesheet_path),
+        Ok(Invocation::Help) => {
+            print!("{}", cli::usage());
+            return ExitCode::SUCCESS;
+        }
+        Ok(Invocation::Version) => {
+            print!("{}", cli::version());
+            return ExitCode::SUCCESS;
+        }
+        Err(e) => {
+            eprintln!("tijdje: {e}\nTry 'tijdje --help' for more information.");
+            return ExitCode::from(2);
+        }
+    };
     let today = jiff::Zoned::now().date();
     let mut app = match App::open(Box::new(RealFileSystem), path.clone(), today) {
         Ok(app) => app,
