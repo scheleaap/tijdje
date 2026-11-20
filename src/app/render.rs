@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Paragraph},
 };
 
-use super::{App, Field, Panel, Popup, Screen};
+use super::{App, Field, Popup, Screen};
 use crate::domain::{
     Day, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay,
     calendar::{self, Separator},
@@ -52,10 +52,7 @@ fn period_type_emoji(period_type: PeriodType) -> &'static str {
 
 const PANEL: Style = Style::new().fg(Color::Gray).bg(Color::Blue);
 const HEADER: Style = Style::new().fg(Color::Yellow).bg(Color::Blue);
-const ACTIVE_TITLE: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const SELECTED: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
-/// The selected day in an inactive left panel.
-const INACTIVE_SELECTED: Style = Style::new().fg(Color::Cyan).bg(Color::Blue);
 const FIELD: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const FOCUSED_FIELD: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 const MESSAGE: Style = Style::new().fg(Color::Yellow).bg(Color::Blue);
@@ -98,7 +95,7 @@ impl App {
 
     fn render_days(&mut self, frame: &mut Frame, area: Rect) {
         let title = format!(" Days: {} ", self.selected.year());
-        let block = panel_block(&title, self.panel == Panel::Days);
+        let block = panel_block(&title);
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let [header, list] =
@@ -123,10 +120,10 @@ impl App {
     }
 
     fn day_line(&self, date: Date, width: usize) -> Line<'static> {
-        let style = match (date == self.selected, self.panel) {
-            (false, _) => PANEL,
-            (true, Panel::Days) => SELECTED,
-            (true, Panel::Periods) => INACTIVE_SELECTED,
+        let style = if date == self.selected {
+            SELECTED
+        } else {
+            PANEL
         };
         Line::from(Span::styled(fit(&self.day_row_text(date), width), style))
     }
@@ -179,7 +176,7 @@ impl App {
 
     fn render_periods(&mut self, frame: &mut Frame, area: Rect) {
         let title = format!(" Periods: {} ", calendar::format_dutch_short(self.selected));
-        let block = panel_block(&title, self.panel == Panel::Periods);
+        let block = panel_block(&title);
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let [header, list, message, actual_expected] = Layout::vertical([
@@ -203,12 +200,12 @@ impl App {
         );
         frame.render_widget(Paragraph::new(header_text).style(HEADER), header);
 
-        let day = self.timesheet.day(self.selected);
-        let rows = period_rows(day);
+        let rows = period_rows(&self.shown_day());
         let height = usize::from(list.height);
         let first = self.scroll_to_focused_period(&rows, height);
-        let active_input_text = match (self.focus, self.active_input.as_mut()) {
-            (Some(focus), Some(input)) => {
+        let focus = self.focus;
+        let active_input_text = match self.active_input.as_mut() {
+            Some(input) => {
                 let (x, width) = text_field_geometry(focus.field, notes_width).unwrap_or_default();
                 let (text, column) = input.visible(width);
                 let row = row_of(&rows, focus.period)
@@ -219,10 +216,10 @@ impl App {
                 }
                 Some(text)
             }
-            _ => None,
+            None => None,
         };
-        // Looked up again: the active input above needed `self` mutably.
-        let day = self.timesheet.day(self.selected);
+        // Looked up only now: the active input above needed `self` mutably.
+        let day = self.shown_day();
         let indicators = day.period_indicators(self.selected, self.today);
         let lines: Vec<Line> = rows
             .iter()
@@ -230,7 +227,7 @@ impl App {
             .take(height)
             .map(|&row| match row {
                 PeriodRow::Blank => Line::raw(""),
-                PeriodRow::ImpliedBreak(after) => implied_break_line(day, after),
+                PeriodRow::ImpliedBreak(after) => implied_break_line(&day, after),
                 PeriodRow::Period(index) => {
                     let mut line = self.period_line(
                         index,
@@ -255,7 +252,7 @@ impl App {
         }
 
         frame.render_widget(
-            Paragraph::new(format!(" {}", actual_expected_text(day))).style(PANEL),
+            Paragraph::new(format!(" {}", actual_expected_text(&day))).style(PANEL),
             actual_expected,
         );
     }
@@ -315,8 +312,7 @@ impl App {
     }
 
     fn is_focused(&self, period: usize, field: Field) -> bool {
-        self.focus
-            .is_some_and(|f| f.period == period && f.field == field)
+        self.focus.period == period && self.focus.field == field
     }
 
     /// Adjusts the first visible row so the first period that failed the
@@ -327,8 +323,8 @@ impl App {
             .iter()
             .min()
             .copied()
-            .or(self.focus.map(|focus| focus.period))
-            .and_then(|period| row_of(rows, period));
+            .unwrap_or(self.focus.period);
+        let target = row_of(rows, target);
         if let Some(row) = target {
             if row < self.first_visible_period_row {
                 self.first_visible_period_row = row;
@@ -631,12 +627,9 @@ fn line_of(first: Date, date: Date) -> usize {
         .expect("the list is endless and first <= date")
 }
 
-/// A panel frame; the active panel's title is highlighted.
-fn panel_block(title: &str, active: bool) -> Block<'_> {
-    let title_style = if active { ACTIVE_TITLE } else { PANEL };
-    Block::bordered()
-        .title(Span::styled(title, title_style))
-        .style(PANEL)
+/// A panel frame; its title has no highlight.
+fn panel_block(title: &str) -> Block<'_> {
+    Block::bordered().title(title).style(PANEL)
 }
 
 fn render_function_keys(frame: &mut Frame, area: Rect) {
@@ -659,18 +652,12 @@ fn render_function_keys(frame: &mut Frame, area: Rect) {
 
 fn render_help(frame: &mut Frame, area: Rect) {
     let shortcuts = [
-        ("Alt+←/→", "Focus the left/right panel"),
-        ("↑/↓", "Left panel: previous/next day"),
-        ("PgUp/PgDn", "Left panel: previous/next week"),
-        ("↑/↓", "Right panel: same field in the previous/next period"),
-        ("Tab/Shift-Tab", "Right panel: next/previous field"),
-        ("←/→", "Right panel: previous/next field of the period"),
-        ("Alt+↑/↓", "Right panel: previous/next day"),
-        ("Alt+PgUp/PgDn", "Right panel: previous/next week"),
-        (
-            "Type",
-            "Right panel: replace the field's value (Notes: add to it)",
-        ),
+        ("Ctrl+↑/↓", "Previous/next day"),
+        ("Ctrl+PgUp/PgDn", "Previous/next week"),
+        ("↑/↓", "Same field in the previous/next period"),
+        ("Tab/Shift-Tab", "Next/previous field"),
+        ("←/→", "Previous/next field of the period"),
+        ("Type", "Replace the field's value (Notes: add to it)"),
         (
             "Enter",
             "Edit the focused field, or toggle a checkbox; while editing: accept",
@@ -682,7 +669,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ("Alt+p/n", "Go to Project/Notes"),
         ("F1", "Help"),
         ("F2, Esc", "Back to Tracking"),
-        ("Ctrl+C/Ctrl+V", "Right panel: copy/paste the focused field"),
+        ("Ctrl+C/Ctrl+V", "Copy/paste the focused field"),
         ("Ctrl+Z/Ctrl+Y", "Undo/redo"),
         ("Ctrl+S", "Save"),
         ("Ctrl+Q", "Quit"),
@@ -693,7 +680,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         .collect();
     frame.render_widget(
         Paragraph::new(lines)
-            .block(panel_block(" Help ", true))
+            .block(panel_block(" Help "))
             .style(PANEL),
         area,
     );

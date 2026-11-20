@@ -4,12 +4,12 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The left panel has no keys; the selected day always has the cyan bar; panel titles have no highlight
-- [ ] Ctrl+↑/↓ select the previous/next day, Ctrl+PgUp/PgDn the previous/next week; leaving a changed day still runs its consistency check
-- [ ] A day without periods shows one empty period; it becomes a real period once something is filled in and is never saved while empty
-- [ ] A field always has focus; switching days focuses From of the first period; after deleting the only period, the empty period's From has focus
-- [ ] Removed: Alt+←/→, Alt+↑/↓, Alt+PgUp/PgDn and the left panel's keys
+- [x] The left panel has no keys; the selected day always has the cyan bar; panel titles have no highlight
+- [x] Ctrl+↑/↓ select the previous/next day, Ctrl+PgUp/PgDn the previous/next week; leaving a changed day still runs its consistency check
+- [x] A day without periods shows one empty period; it becomes a real period once something is filled in and is never saved while empty
+- [x] A field always has focus; switching days focuses From of the first period; after deleting the only period, the empty period's From has focus
+- [x] Removed: Alt+←/→, Alt+↑/↓, Alt+PgUp/PgDn and the left panel's keys
 
 Spec: `.scratch/time-tracking/spec.md`

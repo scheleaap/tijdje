@@ -4,7 +4,7 @@ use common::*;
 use jiff::civil::date;
 use ratatui::{crossterm::event::KeyCode, style::Color};
 use tijdje::{
-    app::{App, Outcome, Panel},
+    app::{App, Outcome},
     domain::TimeOfDay,
 };
 
@@ -12,8 +12,6 @@ use tijdje::{
 /// the 1230–1300 break.
 fn monday_with_an_overlap() -> (App, InMemoryFileSystem) {
     let (mut app, fs) = sample_on(date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "1245");
     press(&mut app, KeyCode::Enter);
@@ -32,7 +30,7 @@ fn screen(app: &mut App) -> String {
 #[test]
 fn leaving_a_changed_inconsistent_day_is_refused_with_a_message() {
     let (mut app, _fs) = monday_with_an_overlap();
-    alt_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 2));
     assert!(screen(&mut app).contains("0845–1245 overlaps 1230–1300"));
 }
@@ -40,7 +38,7 @@ fn leaving_a_changed_inconsistent_day_is_refused_with_a_message() {
 #[test]
 fn the_offending_periods_are_highlighted_until_the_next_key() {
     let (mut app, _fs) = monday_with_an_overlap();
-    alt_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Down);
     let buffer = render(&mut app, 120, 24);
     let rows = rows(&buffer);
     for text in ["0845 1245", "1230 1300"] {
@@ -63,45 +61,48 @@ fn the_offending_periods_are_highlighted_until_the_next_key() {
 }
 
 #[test]
-fn leaving_from_the_left_panel_is_checked_too() {
+fn every_day_navigation_key_is_checked() {
     let (mut app, _fs) = monday_with_an_overlap();
-    alt_key(&mut app, KeyCode::Left);
-    press(&mut app, KeyCode::Down);
-    assert_eq!(app.selected_day(), date(2026, 11, 2));
-    press(&mut app, KeyCode::PageDown);
-    assert_eq!(app.selected_day(), date(2026, 11, 2));
+    for code in [
+        KeyCode::Up,
+        KeyCode::Down,
+        KeyCode::PageUp,
+        KeyCode::PageDown,
+    ] {
+        ctrl_key(&mut app, code);
+        assert_eq!(app.selected_day(), date(2026, 11, 2), "{code:?}");
+    }
 }
 
 #[test]
 fn unchanged_inconsistent_days_can_be_browsed() {
     let mut app = sample_with_a_past_open_period();
     while app.selected_day() > date(2026, 11, 10) {
-        press(&mut app, KeyCode::Up);
+        ctrl_key(&mut app, KeyCode::Up);
     }
-    press(&mut app, KeyCode::Up);
+    ctrl_key(&mut app, KeyCode::Up);
     assert_eq!(app.selected_day(), date(2026, 11, 9));
 }
 
 #[test]
 fn a_fixed_day_can_be_left() {
     let (mut app, _fs) = monday_with_an_overlap();
-    alt_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Down);
     type_text(&mut app, "1230");
     press(&mut app, KeyCode::Enter);
-    alt_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 3));
 }
 
 #[test]
 fn leaving_a_day_sorts_its_periods() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
     alt_key(&mut app, KeyCode::Enter);
     type_text(&mut app, "0700");
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "0800");
     press(&mut app, KeyCode::Enter);
-    alt_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 3));
     let monday = &app.timesheet().days[&date(2026, 11, 2)];
     assert_eq!(monday.periods[0].from, TimeOfDay::new(7, 0));
@@ -110,12 +111,18 @@ fn leaving_a_day_sorts_its_periods() {
 
 #[test]
 fn leaving_a_day_removes_empty_periods() {
-    let (mut app, _fs) = sample_on(date(2026, 11, 11));
-    alt_key(&mut app, KeyCode::Right);
+    let (mut app, _fs) = sample_on(date(2026, 11, 2));
+    // A fourth period from 1757, whose From is then cleared.
     alt_key(&mut app, KeyCode::Enter);
-    alt_key(&mut app, KeyCode::Down);
-    assert_eq!(app.selected_day(), date(2026, 11, 12));
-    assert!(app.timesheet().day(date(2026, 11, 11)).periods.is_empty());
+    press(&mut app, KeyCode::Enter);
+    for _ in 0..4 {
+        press(&mut app, KeyCode::Backspace);
+    }
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(app.timesheet().day(date(2026, 11, 2)).periods.len(), 4);
+    ctrl_key(&mut app, KeyCode::Down);
+    assert_eq!(app.selected_day(), date(2026, 11, 3));
+    assert_eq!(app.timesheet().day(date(2026, 11, 2)).periods.len(), 3);
 }
 
 #[test]
@@ -161,7 +168,7 @@ fn go_to_day_selects_the_day_and_shows_the_problem() {
     );
     press(&mut app, KeyCode::Enter);
     assert_eq!(app.selected_day(), date(2026, 11, 10));
-    assert_eq!(app.panel(), Panel::Periods);
+    assert_eq!(app.focus().period, 0);
     let buffer = render(&mut app, 120, 24);
     let rows = rows(&buffer);
     assert!(rows.join("\n").contains("Open period 1230– on a past day"));

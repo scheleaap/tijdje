@@ -8,15 +8,13 @@ use tijdje::{
     domain::{Minutes, TimeOfDay},
 };
 
-fn focus(period: usize, field: Field) -> Option<FieldFocus> {
-    Some(FieldFocus { period, field })
+fn focus(period: usize, field: Field) -> FieldFocus {
+    FieldFocus { period, field }
 }
 
 /// Mon 2 Nov from the sample: 0845–1230 work, 1230–1300 break, 1300–1757 work.
 fn app_on_monday() -> App {
-    let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    app
+    app_with(SAMPLE, date(2026, 11, 2))
 }
 
 fn period(app: &App, index: usize) -> &tijdje::domain::Period {
@@ -24,7 +22,7 @@ fn period(app: &App, index: usize) -> &tijdje::domain::Period {
 }
 
 fn tab_to(app: &mut App, field: Field) {
-    while app.focus().map(|f| f.field) != Some(field) {
+    while app.focus().field != field {
         press(app, KeyCode::Tab);
     }
 }
@@ -32,7 +30,6 @@ fn tab_to(app: &mut App, field: Field) {
 #[test]
 fn typing_replaces_the_value_and_enter_accepts_it() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "0815");
     assert!(app.is_editing());
     press(&mut app, KeyCode::Enter);
@@ -47,7 +44,6 @@ fn typing_replaces_the_value_and_enter_accepts_it() {
 #[test]
 fn active_input_is_shown_while_editing() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "07");
     let screen = rows(&render(&mut app, 120, 24));
     assert!(
@@ -59,7 +55,6 @@ fn active_input_is_shown_while_editing() {
 #[test]
 fn esc_rejects_the_active_input() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "07");
     press(&mut app, KeyCode::Esc);
     assert!(!app.is_editing());
@@ -70,7 +65,6 @@ fn esc_rejects_the_active_input() {
 fn cursor_keys_edit_within_the_active_input() {
     let mut app = app_on_monday();
     // The break (period 1) has no notes yet.
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Down);
     tab_to(&mut app, Field::Notes);
     type_text(&mut app, "abc");
@@ -89,7 +83,6 @@ fn cursor_keys_edit_within_the_active_input() {
 #[test]
 fn time_fields_take_at_most_four_digits() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "1a2:345");
     press(&mut app, KeyCode::Enter);
     assert_eq!(period(&app, 0).from, TimeOfDay::new(12, 34));
@@ -98,7 +91,6 @@ fn time_fields_take_at_most_four_digits() {
 #[test]
 fn typing_a_letter_in_a_time_field_does_not_start_editing() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "x");
     assert!(!app.is_editing());
 }
@@ -106,7 +98,6 @@ fn typing_a_letter_in_a_time_field_does_not_start_editing() {
 #[test]
 fn invalid_time_keeps_editing_and_shows_a_message() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "2575");
     press(&mut app, KeyCode::Enter);
     assert!(app.is_editing());
@@ -125,7 +116,6 @@ fn invalid_time_keeps_editing_and_shows_a_message() {
 #[test]
 fn incomplete_time_is_invalid() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "915");
     press(&mut app, KeyCode::Enter);
     assert!(app.is_editing());
@@ -134,7 +124,6 @@ fn incomplete_time_is_invalid() {
 #[test]
 fn an_empty_value_can_be_accepted() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "1");
     press(&mut app, KeyCode::Backspace);
     press(&mut app, KeyCode::Enter);
@@ -150,7 +139,6 @@ fn an_empty_value_can_be_accepted() {
 #[test]
 fn tab_accepts_and_moves_on() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     tab_to(&mut app, Field::Project);
     type_text(&mut app, "acme");
     press(&mut app, KeyCode::Tab);
@@ -167,7 +155,6 @@ fn tab_accepts_and_moves_on() {
 #[test]
 fn tab_with_an_invalid_time_stays_in_the_field() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "99");
     press(&mut app, KeyCode::Tab);
     assert!(app.is_editing());
@@ -177,19 +164,17 @@ fn tab_with_an_invalid_time_stays_in_the_field() {
 #[test]
 fn other_shortcuts_are_ignored_while_editing() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "07");
     press(&mut app, KeyCode::Up);
     press(&mut app, KeyCode::Down);
-    alt_key(&mut app, KeyCode::Left);
-    alt_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::PageDown);
     alt_key(&mut app, KeyCode::Delete);
     press(&mut app, KeyCode::F(1));
     assert_eq!(ctrl(&mut app, 'q'), Outcome::Continue);
     assert!(app.is_editing());
     assert_eq!(app.focus(), focus(0, Field::From));
     assert_eq!(app.selected_day(), date(2026, 11, 2));
-    assert_eq!(app.panel(), tijdje::app::Panel::Periods);
     assert_eq!(app.screen(), tijdje::app::Screen::Tracking);
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(!screen.contains("─ Delete period ─"));
@@ -198,7 +183,6 @@ fn other_shortcuts_are_ignored_while_editing() {
 #[test]
 fn alt_enter_adds_a_period_starting_where_the_last_one_ends() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     tab_to(&mut app, Field::Notes);
     alt_key(&mut app, KeyCode::Enter);
     assert_eq!(app.timesheet().days[&date(2026, 11, 2)].periods.len(), 4);
@@ -208,7 +192,7 @@ fn alt_enter_adds_a_period_starting_where_the_last_one_ends() {
 }
 
 #[test]
-fn alt_enter_without_focus_adds_a_period_too() {
+fn alt_enter_from_the_first_period_adds_a_period_too() {
     let mut app = app_on_monday();
     alt_key(&mut app, KeyCode::Enter);
     assert_eq!(app.focus(), focus(3, Field::From));
@@ -227,7 +211,6 @@ fn enter_no_longer_adds_a_period() {
 #[test]
 fn enter_starts_editing_with_the_existing_text() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Enter);
     assert!(app.is_editing());
     press(&mut app, KeyCode::Backspace);
@@ -239,7 +222,6 @@ fn enter_starts_editing_with_the_existing_text() {
 #[test]
 fn typing_in_notes_adds_to_the_existing_text() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     tab_to(&mut app, Field::Notes);
     type_text(&mut app, " day 1");
     press(&mut app, KeyCode::Enter);
@@ -249,7 +231,6 @@ fn typing_in_notes_adds_to_the_existing_text() {
 #[test]
 fn typing_in_other_fields_replaces_the_value() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     tab_to(&mut app, Field::Project);
     type_text(&mut app, "acme");
     press(&mut app, KeyCode::Enter);
@@ -259,20 +240,24 @@ fn typing_in_other_fields_replaces_the_value() {
 #[test]
 fn ctrl_del_no_longer_deletes() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     ctrl_key(&mut app, KeyCode::Delete);
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(!screen.contains("─ Delete period ─"));
 }
 
 #[test]
-fn alt_enter_on_an_empty_day_adds_its_first_period() {
+fn filling_in_the_empty_period_of_a_day_without_periods_adds_its_first_period() {
     let mut app = app_with(SAMPLE, date(2026, 11, 11));
-    alt_key(&mut app, KeyCode::Right);
     alt_key(&mut app, KeyCode::Enter);
+    assert!(
+        app.timesheet().day(date(2026, 11, 11)).periods.is_empty(),
+        "Alt+Enter does nothing on the empty period"
+    );
+    type_text(&mut app, "0900");
+    press(&mut app, KeyCode::Enter);
     let day = &app.timesheet().days[&date(2026, 11, 11)];
     assert_eq!(day.periods.len(), 1);
-    assert_eq!(day.periods[0].from, None);
+    assert_eq!(day.periods[0].from, TimeOfDay::new(9, 0));
     assert_eq!(day.regular_expected_working_time(), Minutes(432));
     assert_eq!(app.focus(), focus(0, Field::From));
 }
@@ -280,7 +265,6 @@ fn alt_enter_on_an_empty_day_adds_its_first_period() {
 #[test]
 fn ctrl_del_deletes_the_focused_period_after_confirming() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Tab);
     alt_key(&mut app, KeyCode::Delete);
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
@@ -308,7 +292,6 @@ fn delete_popup_can_be_canceled() {
         vec![KeyCode::Right, KeyCode::Enter],
     ] {
         let mut app = app_on_monday();
-        press(&mut app, KeyCode::Down);
         alt_key(&mut app, KeyCode::Delete);
         for key in keys {
             press(&mut app, key);
@@ -322,7 +305,6 @@ fn delete_popup_can_be_canceled() {
 #[test]
 fn delete_popup_buttons_are_chosen_with_arrows_and_enter() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     alt_key(&mut app, KeyCode::Delete);
     press(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Left);
@@ -333,26 +315,26 @@ fn delete_popup_buttons_are_chosen_with_arrows_and_enter() {
 #[test]
 fn deleting_the_last_period_focuses_the_previous_one() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Up);
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Down);
     alt_key(&mut app, KeyCode::Delete);
     press(&mut app, KeyCode::Char('d'));
     assert_eq!(app.focus(), focus(1, Field::From));
 }
 
 #[test]
-fn deleting_the_only_period_leaves_no_focus() {
+fn deleting_the_only_period_focuses_from_of_the_empty_period() {
     let mut app = app_with(SAMPLE, date(2026, 11, 6));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
+    tab_to(&mut app, Field::Notes);
     alt_key(&mut app, KeyCode::Delete);
     press(&mut app, KeyCode::Char('d'));
     assert!(app.timesheet().days[&date(2026, 11, 6)].periods.is_empty());
-    assert_eq!(app.focus(), None);
+    assert_eq!(app.focus(), focus(0, Field::From));
 }
 
 #[test]
-fn ctrl_del_without_focus_does_nothing() {
-    let mut app = app_on_monday();
+fn alt_del_on_the_empty_period_of_a_day_without_periods_does_nothing() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Delete);
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(!screen.contains("─ Delete period ─"));
@@ -362,7 +344,6 @@ fn ctrl_del_without_focus_does_nothing() {
 fn long_notes_are_cut_off_and_scroll_while_editing() {
     let mut app = app_on_monday();
     // The break (period 1) has no notes yet.
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Down);
     tab_to(&mut app, Field::Notes);
     let long = "the quick brown fox jumps over the lazy dog";
@@ -383,7 +364,6 @@ fn long_notes_are_cut_off_and_scroll_while_editing() {
 #[test]
 fn typing_on_a_checkbox_does_nothing() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     tab_to(&mut app, Field::Break);
     type_text(&mut app, "x");
     assert!(!app.is_editing());
@@ -392,7 +372,6 @@ fn typing_on_a_checkbox_does_nothing() {
 #[test]
 fn the_cursor_is_shown_in_the_edited_field() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     type_text(&mut app, "07");
     let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 24)).unwrap();
     terminal.draw(|frame| app.render(frame)).unwrap();
@@ -408,19 +387,18 @@ fn the_cursor_is_shown_in_the_edited_field() {
 
 #[test]
 fn alt_enter_does_not_add_a_period_after_an_empty_last_period() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 11));
-    alt_key(&mut app, KeyCode::Right);
+    // Fri 6 Nov from the sample has one period, 0900–1612.
+    let mut app = app_with(SAMPLE, date(2026, 11, 6));
     alt_key(&mut app, KeyCode::Enter);
-    press(&mut app, KeyCode::Enter);
-    assert_eq!(app.timesheet().days[&date(2026, 11, 11)].periods.len(), 1);
-    assert_eq!(app.focus(), focus(0, Field::From));
+    alt_key(&mut app, KeyCode::Enter);
+    assert_eq!(app.timesheet().days[&date(2026, 11, 6)].periods.len(), 2);
+    assert_eq!(app.focus(), focus(1, Field::From));
 }
 
 #[test]
 fn alt_enter_does_not_add_a_period_after_an_open_last_period() {
     // Tue 10 Nov from the sample: 0810–1200, then 1230– (open).
     let mut app = app_with(SAMPLE, date(2026, 11, 10));
-    alt_key(&mut app, KeyCode::Right);
     alt_key(&mut app, KeyCode::Enter);
     assert_eq!(app.timesheet().days[&date(2026, 11, 10)].periods.len(), 2);
     press(&mut app, KeyCode::Up);
@@ -431,7 +409,6 @@ fn alt_enter_does_not_add_a_period_after_an_open_last_period() {
 #[test]
 fn popups_have_a_short_title_and_a_message() {
     let mut app = app_on_monday();
-    press(&mut app, KeyCode::Down);
     alt_key(&mut app, KeyCode::Delete);
     let screen = rows(&render(&mut app, 120, 24));
     let title = row_index(&screen, "─ Delete period ─");
@@ -442,8 +419,6 @@ fn popups_have_a_short_title_and_a_message() {
 #[test]
 fn the_consistency_popup_has_a_short_title() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "1245");
     press(&mut app, KeyCode::Enter);
@@ -460,7 +435,6 @@ fn the_consistency_popup_has_a_short_title() {
 fn left_and_right_move_the_cursor_while_editing() {
     let mut app = app_on_monday();
     // The break (period 1) has no notes yet.
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Down);
     tab_to(&mut app, Field::Notes);
     type_text(&mut app, "ac");

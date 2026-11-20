@@ -7,16 +7,13 @@ const MONDAY: jiff::civil::Date = date(2026, 11, 2);
 
 use tijdje::{
     app::{App, Field, FieldFocus},
-    domain::{PeriodType, TimeOfDay},
+    domain::TimeOfDay,
 };
 
 /// Mon 2 Nov (0845–1230 work, 1230–1300 break, 1300–1757 work), right panel,
 /// first period focused.
 fn monday() -> App {
-    let (mut app, _fs) = sample_on(MONDAY);
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
-    app
+    sample_on(MONDAY).0
 }
 
 fn periods(app: &App, day: jiff::civil::Date) -> &[tijdje::domain::Period] {
@@ -56,17 +53,13 @@ fn several_changes_are_undone_one_at_a_time() {
 #[test]
 fn a_checkbox_toggle_with_its_auto_fill_is_one_step() {
     let (mut app, _fs) = sample_on(date(2026, 11, 11));
-    alt_key(&mut app, KeyCode::Right);
-    alt_key(&mut app, KeyCode::Enter);
     alt_key(&mut app, KeyCode::Char('v'));
     assert_eq!(
         periods(&app, date(2026, 11, 11))[0].from,
         TimeOfDay::new(9, 0)
     );
     ctrl(&mut app, 'z');
-    let period = &periods(&app, date(2026, 11, 11))[0];
-    assert_eq!(period.period_type, PeriodType::Work);
-    assert_eq!((period.from, period.to), (None, None));
+    assert!(periods(&app, date(2026, 11, 11)).is_empty());
 }
 
 #[test]
@@ -90,7 +83,7 @@ fn adding_and_deleting_periods_can_be_undone() {
 fn undoing_a_change_on_another_day_selects_that_day() {
     let mut app = monday();
     change_first_from(&mut app, "0815");
-    alt_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 3));
     ctrl(&mut app, 'z');
     assert_eq!(app.selected_day(), MONDAY);
@@ -104,10 +97,10 @@ fn undo_on_the_same_day_keeps_the_focus() {
     ctrl(&mut app, 'z');
     assert_eq!(
         app.focus(),
-        Some(FieldFocus {
+        FieldFocus {
             period: 0,
             field: Field::From
-        })
+        }
     );
 }
 
@@ -158,7 +151,7 @@ fn sorting_when_leaving_a_day_is_not_an_undo_step() {
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "0800");
     press(&mut app, KeyCode::Enter);
-    alt_key(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(
         periods(&app, MONDAY)[0].from,
         TimeOfDay::new(7, 0),

@@ -80,22 +80,22 @@ fn double_line_separates_years() {
 }
 
 #[test]
-fn arrows_select_previous_and_next_weekday() {
+fn ctrl_arrows_select_previous_and_next_weekday() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    press(&mut app, KeyCode::Down);
+    ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 16));
-    press(&mut app, KeyCode::Up);
-    press(&mut app, KeyCode::Up);
+    ctrl_key(&mut app, KeyCode::Up);
+    ctrl_key(&mut app, KeyCode::Up);
     assert_eq!(app.selected_day(), date(2026, 11, 12));
 }
 
 #[test]
-fn page_keys_select_previous_and_next_week() {
+fn ctrl_page_keys_select_previous_and_next_week() {
     let mut app = app_with(SAMPLE, date(2026, 11, 11));
-    press(&mut app, KeyCode::PageDown);
+    ctrl_key(&mut app, KeyCode::PageDown);
     assert_eq!(app.selected_day(), date(2026, 11, 18));
-    press(&mut app, KeyCode::PageUp);
-    press(&mut app, KeyCode::PageUp);
+    ctrl_key(&mut app, KeyCode::PageUp);
+    ctrl_key(&mut app, KeyCode::PageUp);
     assert_eq!(app.selected_day(), date(2026, 11, 4));
 }
 
@@ -104,13 +104,13 @@ fn list_scrolls_endlessly_and_keeps_the_selection_visible() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
     render(&mut app, 120, 24);
     for _ in 0..60 {
-        press(&mut app, KeyCode::PageUp);
+        ctrl_key(&mut app, KeyCode::PageUp);
     }
     let screen = rows(&render(&mut app, 120, 24));
     assert_eq!(app.selected_day(), date(2025, 9, 19));
     row_containing(&screen, "vr 19 sep");
     for _ in 0..120 {
-        press(&mut app, KeyCode::PageDown);
+        ctrl_key(&mut app, KeyCode::PageDown);
     }
     assert_eq!(app.selected_day(), date(2028, 1, 7));
     let screen = rows(&render(&mut app, 120, 24));

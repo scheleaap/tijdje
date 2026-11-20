@@ -15,13 +15,11 @@ const MONDAY: jiff::civil::Date = date(2026, 11, 2);
 fn monday_with(clipboard: &FakeClipboard) -> App {
     let mut app = app_with(SAMPLE, MONDAY);
     app.set_clipboard(Box::new(clipboard.clone()));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
     app
 }
 
 fn tab_to(app: &mut App, field: Field) {
-    while app.focus().map(|f| f.field) != Some(field) {
+    while app.focus().field != field {
         press(app, KeyCode::Tab);
     }
 }

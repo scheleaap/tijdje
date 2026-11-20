@@ -3,10 +3,10 @@ mod common;
 use common::*;
 use jiff::civil::date;
 use ratatui::{crossterm::event::KeyCode, style::Color};
-use tijdje::app::{Field, FieldFocus, Panel};
+use tijdje::app::{Field, FieldFocus};
 
-fn focus(period: usize, field: Field) -> Option<FieldFocus> {
-    Some(FieldFocus { period, field })
+fn focus(period: usize, field: Field) -> FieldFocus {
+    FieldFocus { period, field }
 }
 
 /// Width of the left panel, in cells.
@@ -109,8 +109,9 @@ fn fields_are_light_gray() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
     let buffer = render(&mut app, 120, 24);
     let screen = rows(&buffer);
-    let y = row_index(&screen, "0845 1230");
-    let x = u16::try_from(46 + right(&screen[y]).find("0845").unwrap()).unwrap();
+    // Not the first period: its From has focus.
+    let y = row_index(&screen, "1300 1757");
+    let x = u16::try_from(46 + right(&screen[y]).find("1300").unwrap()).unwrap();
     assert_eq!(buffer[(x, u16::try_from(y).unwrap())].bg, Color::Gray);
 }
 
@@ -135,57 +136,30 @@ fn actual_expected_working_time_is_shown_below_the_periods() {
 }
 
 #[test]
-fn alt_arrows_switch_panels() {
+fn the_selected_day_has_the_cyan_bar_and_panel_titles_have_no_highlight() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    assert_eq!(app.panel(), Panel::Days);
-    alt_key(&mut app, KeyCode::Right);
-    assert_eq!(app.panel(), Panel::Periods);
-    alt_key(&mut app, KeyCode::Left);
-    assert_eq!(app.panel(), Panel::Days);
-}
-
-#[test]
-fn active_panel_title_and_inactive_selection_are_styled() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
     let buffer = render(&mut app, 120, 24);
     let screen = rows(&buffer);
-    let title_x = screen[0].find("Periods").unwrap();
-    let title_x = u16::try_from(screen[0][..title_x].chars().count()).unwrap();
-    assert_eq!(buffer[(title_x, 0)].bg, Color::Gray);
+    for title in ["Days", "Periods"] {
+        let title_x = screen[0].find(title).unwrap();
+        let title_x = u16::try_from(screen[0][..title_x].chars().count()).unwrap();
+        assert_eq!(buffer[(title_x, 0)].bg, Color::Blue, "{title}");
+    }
     let y = u16::try_from(row_index(&screen, "ma  2 nov ")).unwrap();
-    // Inactive panel: no bar; the whole row's text is cyan.
     for x in [2, 20] {
-        assert_eq!(buffer[(x, y)].fg, Color::Cyan);
-        assert_eq!(buffer[(x, y)].bg, Color::Blue);
+        assert_eq!(buffer[(x, y)].bg, Color::Cyan);
     }
 }
 
 #[test]
-fn entering_the_right_panel_focuses_nothing() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    assert_eq!(app.focus(), None);
-}
-
-#[test]
-fn down_without_focus_focuses_the_first_period_and_up_the_last() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
+fn from_of_the_first_period_has_focus_at_start() {
+    let app = app_with(SAMPLE, date(2026, 11, 2));
     assert_eq!(app.focus(), focus(0, Field::From));
-
-    let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Up);
-    assert_eq!(app.focus(), focus(2, Field::From));
 }
 
 #[test]
 fn up_and_down_keep_the_field_and_stop_at_the_edges() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Tab);
     press(&mut app, KeyCode::Down);
     assert_eq!(app.focus(), focus(1, Field::To));
@@ -206,9 +180,6 @@ fn up_and_down_keep_the_field_and_stop_at_the_edges() {
 #[test]
 fn tab_follows_the_fields_on_screen_and_continues_in_the_next_period() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Tab);
-    assert_eq!(app.focus(), focus(0, Field::From));
     for expected in [
         Field::To,
         Field::Project,
@@ -230,11 +201,8 @@ fn tab_follows_the_fields_on_screen_and_continues_in_the_next_period() {
 #[test]
 fn tab_stays_at_the_very_first_and_last_field() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Tab);
     press(&mut app, KeyCode::BackTab);
     assert_eq!(app.focus(), focus(0, Field::From));
-    press(&mut app, KeyCode::Up);
     for _ in 0..30 {
         press(&mut app, KeyCode::Tab);
     }
@@ -242,24 +210,58 @@ fn tab_stays_at_the_very_first_and_last_field() {
 }
 
 #[test]
-fn ctrl_arrows_select_another_day_and_clear_focus() {
+fn ctrl_arrows_select_the_previous_and_next_day_and_focus_from_of_the_first_period() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
-    alt_key(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Tab);
+    ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 16));
-    assert_eq!(app.focus(), None);
-    alt_key(&mut app, KeyCode::Up);
-    alt_key(&mut app, KeyCode::Up);
+    assert_eq!(app.focus(), focus(0, Field::From));
+    press(&mut app, KeyCode::Tab);
+    ctrl_key(&mut app, KeyCode::Up);
+    ctrl_key(&mut app, KeyCode::Up);
     assert_eq!(app.selected_day(), date(2026, 11, 12));
-    assert_eq!(app.panel(), Panel::Periods);
+    assert_eq!(app.focus(), focus(0, Field::From));
+}
+
+#[test]
+fn ctrl_page_keys_select_the_previous_and_next_week() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 11));
+    ctrl_key(&mut app, KeyCode::PageDown);
+    assert_eq!(app.selected_day(), date(2026, 11, 18));
+    ctrl_key(&mut app, KeyCode::PageUp);
+    ctrl_key(&mut app, KeyCode::PageUp);
+    assert_eq!(app.selected_day(), date(2026, 11, 4));
+    assert_eq!(app.focus(), focus(0, Field::From));
+}
+
+#[test]
+fn the_left_panel_keys_and_alt_navigation_are_removed() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 4));
+    for code in [
+        KeyCode::PageDown,
+        KeyCode::PageUp,
+        KeyCode::Down,
+        KeyCode::Up,
+    ] {
+        press(&mut app, code);
+    }
+    for code in [
+        KeyCode::Left,
+        KeyCode::Right,
+        KeyCode::Down,
+        KeyCode::Up,
+        KeyCode::PageDown,
+        KeyCode::PageUp,
+    ] {
+        alt_key(&mut app, code);
+    }
+    assert_eq!(app.selected_day(), date(2026, 11, 4));
+    assert_eq!(app.focus(), focus(0, Field::From));
 }
 
 #[test]
 fn focused_field_is_highlighted() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
     let buffer = render(&mut app, 120, 24);
     let screen = rows(&buffer);
     let y = row_index(&screen, "0845");
@@ -283,8 +285,9 @@ fn right_panel_scrolls_to_keep_the_focused_period_visible() {
         "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n{periods}"
     );
     let mut app = app_with(&yaml, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Up);
+    for _ in 0..29 {
+        press(&mut app, KeyCode::Down);
+    }
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(screen.contains("P29"));
     assert!(!screen.contains("P0 "));
@@ -293,8 +296,6 @@ fn right_panel_scrolls_to_keep_the_focused_period_visible() {
 #[test]
 fn left_and_right_move_between_fields_and_stop_at_the_period_edges() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Right);
     assert_eq!(app.focus(), focus(0, Field::To));
     press(&mut app, KeyCode::Left);
@@ -314,24 +315,62 @@ fn left_and_right_move_between_fields_and_stop_at_the_period_edges() {
     );
 }
 
+/// The sample has no periods on Wed 11 Nov.
+const DAY_WITHOUT_PERIODS: jiff::civil::Date = date(2026, 11, 11);
+
 #[test]
-fn alt_page_keys_select_the_previous_and_next_week() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 11));
-    alt_key(&mut app, KeyCode::Right);
-    alt_key(&mut app, KeyCode::PageDown);
-    assert_eq!(app.selected_day(), date(2026, 11, 18));
-    alt_key(&mut app, KeyCode::PageUp);
-    alt_key(&mut app, KeyCode::PageUp);
-    assert_eq!(app.selected_day(), date(2026, 11, 4));
-    assert_eq!(app.panel(), Panel::Periods);
+fn a_day_without_periods_shows_one_empty_period_with_focus_on_from() {
+    let mut app = app_with(SAMPLE, DAY_WITHOUT_PERIODS);
+    assert_eq!(app.focus(), focus(0, Field::From));
+    let buffer = render(&mut app, 120, 24);
+    let screen = rows(&buffer);
+    let header = row_index(&screen, "From");
+    let y = u16::try_from(header + 1).unwrap();
+    let from_x =
+        u16::try_from(right(&screen[header]).find("From").unwrap() + LEFT_PANEL_WIDTH).unwrap();
+    assert_eq!(buffer[(from_x, y)].bg, Color::Cyan, "focused From");
+    assert_eq!(buffer[(from_x + 5, y)].bg, Color::Gray, "To field");
+    // Moving around stays within the one empty period.
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Tab);
+    assert_eq!(app.focus(), focus(0, Field::To));
 }
 
 #[test]
-fn ctrl_arrows_no_longer_change_the_day() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 11));
-    alt_key(&mut app, KeyCode::Right);
-    ctrl_key(&mut app, KeyCode::Down);
-    ctrl_key(&mut app, KeyCode::Up);
-    ctrl_key(&mut app, KeyCode::Up);
-    assert_eq!(app.selected_day(), date(2026, 11, 11));
+fn the_empty_period_becomes_a_real_period_once_something_is_filled_in() {
+    let mut app = app_with(SAMPLE, DAY_WITHOUT_PERIODS);
+    type_text(&mut app, "0900");
+    press(&mut app, KeyCode::Enter);
+    let periods = &app.timesheet().day(DAY_WITHOUT_PERIODS).periods;
+    assert_eq!(periods.len(), 1);
+    assert_eq!(periods[0].from, tijdje::domain::TimeOfDay::new(9, 0));
+    assert!(app.has_unsaved_changes());
+}
+
+#[test]
+fn the_empty_period_stays_unsaved_while_nothing_is_filled_in() {
+    let mut app = app_with(SAMPLE, DAY_WITHOUT_PERIODS);
+    press(&mut app, KeyCode::Enter);
+    press(&mut app, KeyCode::Enter);
+    assert!(app.timesheet().day(DAY_WITHOUT_PERIODS).periods.is_empty());
+    assert!(!app.has_unsaved_changes(), "accepting nothing is no change");
+    assert_eq!(app.focus(), focus(0, Field::From));
+}
+
+#[test]
+fn a_period_emptied_again_is_never_saved() {
+    let (mut app, fs) = app_with_fs(SAMPLE, DAY_WITHOUT_PERIODS);
+    for _ in 0..3 {
+        press(&mut app, KeyCode::Tab);
+    }
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(app.timesheet().day(DAY_WITHOUT_PERIODS).periods.len(), 1);
+    press(&mut app, KeyCode::Enter);
+    assert_eq!(app.focus(), focus(0, Field::Break));
+    assert!(app.timesheet().day(DAY_WITHOUT_PERIODS).periods.is_empty());
+    ctrl(&mut app, 's');
+    // The sample's open period of 10 Nov fails the check: "Save anyway".
+    press(&mut app, KeyCode::Char('s'));
+    let saved = fs.get(TIMESHEET).unwrap();
+    assert!(!saved.contains("2026-11-11"), "{saved}");
 }

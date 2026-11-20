@@ -16,8 +16,6 @@ fn left(row: &str) -> String {
 /// Mon 2 Nov on the sample, with focus on the first period's To.
 fn monday_on_the_first_to() -> App {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Right);
-    press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Tab);
     app
 }
@@ -89,11 +87,11 @@ fn an_empty_past_day_gets_a_day_warning() {
 #[test]
 fn saving_does_not_ask_about_an_empty_past_day() {
     let (mut app, fs) = app_with_fs(MONDAY_ONLY, date(2026, 11, 4));
-    // Select Tue 3 Nov and add an empty period to it.
-    press(&mut app, KeyCode::Up);
+    // Select Tue 3 Nov, and check and uncheck Break on its empty period.
+    ctrl_key(&mut app, KeyCode::Up);
     assert_eq!(app.selected_day(), date(2026, 11, 3));
-    alt_key(&mut app, KeyCode::Right);
-    alt_key(&mut app, KeyCode::Enter);
+    alt_key(&mut app, KeyCode::Char('b'));
+    alt_key(&mut app, KeyCode::Char('b'));
     assert!(app.has_unsaved_changes());
     let screen = rows(&render(&mut app, 120, 24));
     assert!(left(row_containing(&screen, "di  3 nov")).contains("⚠️"));

@@ -213,10 +213,10 @@ pub const SAMPLE_TODAY: Date = jiff::civil::date(2026, 11, 10);
 pub fn sample_on(day: Date) -> (App, InMemoryFileSystem) {
     let (mut app, fs) = app_with_fs(SAMPLE, SAMPLE_TODAY);
     while app.selected_day() < day {
-        press(&mut app, KeyCode::Down);
+        ctrl_key(&mut app, KeyCode::Down);
     }
     while app.selected_day() > day {
-        press(&mut app, KeyCode::Up);
+        ctrl_key(&mut app, KeyCode::Up);
     }
     (app, fs)
 }
