@@ -17,6 +17,17 @@ pub struct ConsistencyProblem {
     pub periods: Vec<usize>,
 }
 
+/// What the indicator left of From shows for a period.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PeriodIndicator {
+    /// The period is involved in the day's current consistency problem.
+    ConsistencyFailure,
+    /// The period is allowed but likely a mistake.
+    PeriodWarning,
+    /// The period is a non-working period of this type.
+    NonWorking(PeriodType),
+}
+
 /// A day that fails the consistency check, with its problem.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InconsistentDay {
@@ -115,12 +126,9 @@ static EMPTY_DAY: Day = Day {
 };
 
 impl Day {
+    /// A day is empty when it has no periods other than empty periods.
     pub fn is_empty(&self) -> bool {
-        self.periods.is_empty()
-    }
-
-    pub fn has_open_period(&self) -> bool {
-        self.periods.iter().any(Period::is_open)
+        self.periods.iter().all(Period::is_empty)
     }
 
     pub fn worked_time(&self) -> Minutes {
@@ -301,6 +309,57 @@ impl Day {
         indices
     }
 
+    /// The day's current consistency problem, checked on a sorted copy
+    /// without empty periods, with the periods involved as indices on screen.
+    fn live_check(&self, date: Date, today: Date) -> Option<ConsistencyProblem> {
+        let (sorted, on_screen) = self.sorted_copy();
+        let mut problem = sorted.check(date, today)?;
+        for index in &mut problem.periods {
+            *index = on_screen[*index];
+        }
+        Some(problem)
+    }
+
+    /// The indicator left of From for each period on screen: a consistency
+    /// failure, else a period warning, else a non-working period's type.
+    /// Determined live, on a sorted copy of the day without empty periods.
+    pub fn period_indicators(&self, date: Date, today: Date) -> Vec<Option<PeriodIndicator>> {
+        let mut indicators: Vec<Option<PeriodIndicator>> = self
+            .periods
+            .iter()
+            .map(|p| {
+                (!p.period_type.is_working()).then_some(PeriodIndicator::NonWorking(p.period_type))
+            })
+            .collect();
+        let (sorted, on_screen) = self.sorted_copy();
+        for (index, period) in sorted.periods.iter().enumerate() {
+            let previous = index.checked_sub(1).map(|i| &sorted.periods[i]);
+            if period.has_unusual_time() || previous.is_some_and(|p| period.needlessly_splits(p)) {
+                indicators[on_screen[index]] = Some(PeriodIndicator::PeriodWarning);
+            }
+        }
+        if let Some(problem) = sorted.check(date, today) {
+            for index in problem.periods {
+                indicators[on_screen[index]] = Some(PeriodIndicator::ConsistencyFailure);
+            }
+        }
+        indicators
+    }
+
+    /// A sorted copy of the day without empty periods, and for each of its
+    /// periods the index of the same period on screen.
+    fn sorted_copy(&self) -> (Day, Vec<usize>) {
+        let mut sorted = self.clone();
+        let moved = sorted.normalize();
+        let mut on_screen = vec![0; sorted.periods.len()];
+        for (old, new) in moved.into_iter().enumerate() {
+            if let Some(new) = new {
+                on_screen[new] = old;
+            }
+        }
+        (sorted, on_screen)
+    }
+
     /// Removes empty periods and sorts the rest by From. Returns, for each old
     /// period index, its new index (`None` if it was removed).
     pub fn normalize(&mut self) -> Vec<Option<usize>> {
@@ -384,9 +443,14 @@ impl Period {
         self.to.is_none()
     }
 
-    /// Whether the period needs attention: an unusual time or a duration of 0h00m.
-    pub fn has_period_warning(&self) -> bool {
-        self.has_unusual_time() || self.duration() == Some(Minutes(0))
+    /// Whether the period directly follows `previous` (its From is that
+    /// period's To) with the same project, period type and notes.
+    fn needlessly_splits(&self, previous: &Period) -> bool {
+        previous.to.is_some()
+            && previous.to == self.from
+            && previous.project == self.project
+            && previous.period_type == self.period_type
+            && previous.notes == self.notes
     }
 
     /// Whether the period starts before 06:00 or ends after 20:00.
@@ -453,14 +517,15 @@ impl Timesheet {
         )
     }
 
-    /// Whether a day fails the consistency check, or is a day before today
-    /// (from the first recorded day on) that is empty or has an open period.
+    /// Whether a day fails the consistency check, or is an empty day before
+    /// today from the first recorded day on.
     pub fn has_day_warning_on(&self, date: Date, today: Date) -> bool {
         let day = self.day(date);
-        let inconsistent = !day.is_empty() && day.check(date, today).is_some();
-        let unfinished =
-            self.is_tracked(date) && date < today && (day.is_empty() || day.has_open_period());
-        inconsistent || unfinished
+        if day.is_empty() {
+            self.is_tracked(date) && date < today
+        } else {
+            day.live_check(date, today).is_some()
+        }
     }
 
     /// The earliest day that fails the consistency check, with its problem.

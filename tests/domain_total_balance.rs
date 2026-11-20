@@ -150,3 +150,59 @@ fn days_before_the_first_recorded_day_and_future_days_are_not_warned() {
     assert!(!t.has_day_warning_on(date(2026, 10, 30), TODAY));
     assert!(!t.has_day_warning_on(date(2026, 11, 6), TODAY));
 }
+
+fn with_periods(mut t: Timesheet, on: Date, periods: Vec<Period>) -> Timesheet {
+    t.day_mut(on).periods.extend(periods);
+    t
+}
+
+#[test]
+fn a_day_failing_the_consistency_check_is_warned_wherever_it_is() {
+    let overlap = || {
+        vec![
+            period(900, Some(1200), PeriodType::Work),
+            period(1100, Some(1300), PeriodType::Work),
+        ]
+    };
+    for on in [
+        date(2026, 10, 30),
+        date(2026, 11, 3),
+        TODAY,
+        date(2026, 11, 6),
+    ] {
+        let t = with_periods(timesheet(), on, overlap());
+        assert!(t.has_day_warning_on(on, TODAY), "{on}");
+    }
+}
+
+#[test]
+fn a_past_day_with_only_empty_periods_counts_as_empty() {
+    let t = with_periods(timesheet(), date(2026, 11, 3), vec![Period::default()]);
+    assert!(t.has_day_warning_on(date(2026, 11, 3), TODAY));
+}
+
+#[test]
+fn a_day_with_only_empty_periods_is_not_the_first_recorded_day() {
+    let t = with_periods(timesheet(), date(2026, 10, 30), vec![Period::default()]);
+    assert_eq!(t.first_recorded_day(), Some(date(2026, 11, 2)));
+    assert!(!t.has_day_warning_on(date(2026, 10, 30), TODAY));
+}
+
+#[test]
+fn an_empty_period_next_to_others_does_not_warn_the_day() {
+    let t = with_periods(timesheet(), date(2026, 11, 4), vec![Period::default()]);
+    assert!(!t.has_day_warning_on(date(2026, 11, 4), TODAY));
+}
+
+#[test]
+fn a_period_warning_does_not_warn_the_day() {
+    let t = with_periods(
+        timesheet(),
+        date(2026, 11, 3),
+        vec![
+            period(500, Some(1200), PeriodType::Work),
+            period(1200, Some(1300), PeriodType::Work),
+        ],
+    );
+    assert!(!t.has_day_warning_on(date(2026, 11, 3), TODAY));
+}

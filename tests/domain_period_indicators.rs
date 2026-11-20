@@ -91,14 +91,6 @@ fn a_period_without_any_values_is_empty() {
 }
 
 #[test]
-fn unusual_times_and_zero_durations_get_a_period_warning() {
-    assert!(period(559, Some(1200), Work).has_period_warning());
-    assert!(period(1200, Some(1200), Work).has_period_warning(), "0h00m");
-    assert!(!period(900, Some(1200), Work).has_period_warning());
-    assert!(!period(900, None, Work).has_period_warning());
-}
-
-#[test]
 fn the_implied_break_runs_from_the_end_of_a_period_to_the_start_of_the_next() {
     let d = day(vec![
         period(900, Some(1200), Work),

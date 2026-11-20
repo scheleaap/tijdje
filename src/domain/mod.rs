@@ -6,5 +6,6 @@ mod timesheet;
 
 pub use time::{Minutes, TimeOfDay};
 pub use timesheet::{
-    Absence, ConsistencyProblem, Day, InconsistentDay, Period, PeriodType, Timesheet,
+    Absence, ConsistencyProblem, Day, InconsistentDay, Period, PeriodIndicator, PeriodType,
+    Timesheet,
 };

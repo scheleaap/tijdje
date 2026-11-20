@@ -78,7 +78,7 @@ fn consecutive_periods_are_separated_by_one_empty_row() {
 fn the_period_warning_is_left_of_from() {
     let mut app = app_with(SAMPLE, date(2026, 11, 5));
     let screen = rows(&render(&mut app, 120, 24));
-    assert!(right(row_containing(&screen, "0540 1228")).starts_with("│⚠️"));
+    assert!(right(row_containing(&screen, "0540 1228")).starts_with("│❗"));
 }
 
 #[test]
@@ -118,8 +118,8 @@ fn fields_are_light_gray() {
 fn unusual_times_show_a_warning() {
     let mut app = app_with(SAMPLE, date(2026, 11, 5));
     let screen = rows(&render(&mut app, 120, 24));
-    assert!(right(row_containing(&screen, "0540 1228")).contains("⚠️"));
-    assert!(!right(row_containing(&screen, "1325 1530")).contains("⚠️"));
+    assert!(right(row_containing(&screen, "0540 1228")).contains("❗"));
+    assert!(!right(row_containing(&screen, "1325 1530")).contains("❗"));
 }
 
 #[test]

@@ -11,7 +11,7 @@ use ratatui::{
 
 use super::{App, Field, Panel, Popup, Screen};
 use crate::domain::{
-    Day, Minutes, Period, PeriodType, TimeOfDay,
+    Day, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay,
     calendar::{self, Separator},
 };
 
@@ -223,6 +223,7 @@ impl App {
         };
         // Looked up again: the active input above needed `self` mutably.
         let day = self.timesheet.day(self.selected);
+        let indicators = day.period_indicators(self.selected, self.today);
         let lines: Vec<Line> = rows
             .iter()
             .skip(first)
@@ -234,6 +235,7 @@ impl App {
                     let mut line = self.period_line(
                         index,
                         &day.periods[index],
+                        indicators[index],
                         notes_width,
                         active_input_text.as_deref(),
                     );
@@ -262,6 +264,7 @@ impl App {
         &self,
         index: usize,
         period: &'a Period,
+        indicator: Option<PeriodIndicator>,
         notes_width: usize,
         active_input_text: Option<&str>,
     ) -> Line<'a> {
@@ -275,7 +278,7 @@ impl App {
         };
         let gap = || Span::raw(" ");
         let mut spans = vec![
-            Span::raw(warning_emoji(period.has_period_warning())),
+            Span::raw(indicator_emoji(indicator)),
             gap(),
             text_field(Field::From, &format_time(period.from), TIME_WIDTH),
             gap(),
@@ -403,8 +406,19 @@ fn plain_period_row(columns: [&str; 5], checkboxes: &str, notes: &str) -> String
     )
 }
 
+/// The day warning in the left panel.
 fn warning_emoji(warn: bool) -> &'static str {
     if warn { "⚠️" } else { "  " }
+}
+
+/// The indicator left of From.
+fn indicator_emoji(indicator: Option<PeriodIndicator>) -> &'static str {
+    match indicator {
+        Some(PeriodIndicator::ConsistencyFailure) => "⚠️",
+        Some(PeriodIndicator::PeriodWarning) => "❗",
+        Some(PeriodIndicator::NonWorking(period_type)) => period_type_emoji(period_type),
+        None => "  ",
+    }
 }
 
 /// A checkbox's content: a check mark when checked; the box itself is its background.
