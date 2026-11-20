@@ -7,7 +7,7 @@ use tijdje::{
     clipboard::SystemClipboard,
     clock::SystemClock,
     store::RealFileSystem,
-    wide_symbols,
+    terminal, wide_symbols,
 };
 
 /// How long the event loop waits for an event before checking the clock again.
@@ -34,6 +34,10 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    if let Err(e) = terminal::check_keyboard_protocol() {
+        eprintln!("tijdje: {e}");
+        return ExitCode::FAILURE;
+    }
     let mut app = match App::open(
         Box::new(RealFileSystem),
         path.clone(),
@@ -46,7 +50,13 @@ fn main() -> ExitCode {
         }
     };
     app.set_clipboard(Box::new(SystemClipboard::new()));
-    let mut terminal = ratatui::init();
+    let mut terminal = match terminal::init() {
+        Ok(terminal) => terminal,
+        Err(e) => {
+            eprintln!("tijdje: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
     let result = (|| -> std::io::Result<()> {
         loop {
             app.refresh_today();
@@ -61,7 +71,7 @@ fn main() -> ExitCode {
             }
         }
     })();
-    ratatui::restore();
+    terminal::restore();
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
