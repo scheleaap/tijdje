@@ -8,209 +8,235 @@ As a consultant, I record my working time by hand in a free-form text file. Addi
 
 ## Solution
 
-A keyboard-driven terminal application (TUI) in Rust, with the look and feel of Norton Commander and the polish of a modern TUI. Its first screen, **Tracking**, has two panels:
+A keyboard-driven terminal application (TUI) in Rust, with the look and feel of Midnight Commander and the polish of a modern TUI. It needs a terminal with the Kitty keyboard protocol, such as Ghostty (ADR-0003). Its first screen, **Tracking**, has two panels:
 
-- **Left panel**: an endless list of days (Monday–Friday) with worked time, day balance, total balance and indicators.
-- **Right panel**: the periods of the selected day, edited in place, with consistency checks and indicators.
+- **Left panel**: an endless list of days (Monday–Friday) with worked time, day balance, total balance and indicators. It shows the selected day; it has no keys of its own.
+- **Right panel**: the day note and the periods of the selected day, edited in place, with consistency checks and indicators. A field in it always has focus.
 
 Data is stored in a human-readable YAML file. Moco synchronization follows in a later milestone.
 
 ## User Stories
 
-### Navigation and layout
+### Starting and the screen
 
 1. As a consultant, I want the application to open on the Tracking screen with today selected, so that I can start recording immediately.
 2. As a consultant, I want the previous Friday to be selected when I start the application on a weekend, so that I land on the most recent working day.
-3. As a consultant, I want to switch screens with function keys, so that navigation feels like Norton Commander.
-4. As a consultant, I want the bottom line to show the function-key functions, so that I can discover them without a manual.
-5. As a consultant, I want F1 to show a help screen listing all shortcuts, and Esc or F2 to return to Tracking, so that I can look up keys quickly.
-6. As a consultant, I want Alt+←/→ to move focus between the left and right panel, so that I can navigate without a mouse.
+3. As a consultant, I want `tijdje --help` to print the usage and `tijdje --version` the version, and an unknown option to be an error, so that the command line explains itself.
+4. As a consultant, I want the application to refuse to start, with a message naming supported terminals, when my terminal doesn't support the Kitty keyboard protocol, so that I never end up with shortcuts that silently don't work.
+5. As a consultant, I want screens switched with function keys and a function-key bar across the full width of the bottom line (F1 Help, F2 Track), so that navigation feels like Midnight Commander.
+6. As a consultant, I want F1 to open a help popup listing all shortcuts in groups (General, Day navigation, Field navigation, Field editing, Period definition, Period management), closed with Esc or F1, so that I can look up keys quickly.
 7. As a consultant, I want a "terminal too small" message when my terminal is smaller than 120×24, so that the layout never breaks silently.
+8. As a consultant, I want "today" to stay correct while the application runs past midnight, so that balances and warnings stay right.
 
 ### Left panel (days)
 
-8. As a consultant, I want to see a vertical list of days with the columns date, worked time, day balance, total balance, absence indicator and warning indicator, so that I see my status at a glance.
-9. As a consultant, I want exactly one day to be selected at all times, so that the right panel always has a clear context.
-10. As a consultant, I want only Monday–Friday to be listed, so that weekends do not clutter the list.
-11. As a consultant, I want a single-line separator between every Friday and the following Monday, so that weeks are visually distinct.
-12. As a consultant, I want a double-line separator between two days in different years (also when the switch falls between Friday and Monday), so that year boundaries stand out.
-13. As a consultant, I want the list to scroll endlessly into the past and the future, so that I can plan vacation and review history.
-14. As a consultant, I want ↑/↓ to select the previous/next day and PgUp/PgDn the previous/next week, so that I can move quickly.
-15. As a consultant, I want dates in the Dutch format "ma 12 nov", so that they match how I think about my week.
-16. As a consultant, I want worked time shown like `1h55m` and balances signed like `+0h45m` and `-1h12m`, so that values are unambiguous.
-17. As a consultant, I want the total balance to add up from the first recorded day, so that I know my overall surplus or deficit.
-18. As a consultant, I want an empty weekday after the first recorded day to count with its full regular expected working time, so that forgotten days lower my balance until I record them.
-19. As a consultant, I want days before the first recorded day to show no balances and no warnings, so that history before I started tracking is not noise.
-20. As a consultant, I want future days to show neither day balance nor total balance, so that planned absences do not distort my current balance.
-21. As a consultant, I want an absence indicator per day (🤒 sick, 🏖️ vacation, 🎄 holiday; at most one, in that priority), so that I see absences at a glance.
-22. As a consultant, I want a ⚠️ in a separate warning column for days before today (and after the first recorded day) that are empty or contain an open period, so that I notice forgotten or unfinished days.
-23. As a consultant, I want a ⚠️ for days that failed a consistency check when the file was loaded, so that I can find and fix them.
+9. As a consultant, I want to see a vertical list of days with the columns date, worked time, day balance, total balance, absence indicator and day warning, so that I see my status at a glance.
+10. As a consultant, I want exactly one day to be selected at all times, shown with a cyan bar, so that the right panel always has a clear context.
+11. As a consultant, I want only Monday–Friday to be listed, with a single-line separator between weeks and a double-line separator with the new year between years, so that weeks and years are visually distinct.
+12. As a consultant, I want the list to scroll endlessly into the past and the future, so that I can plan vacation and review history.
+13. As a consultant, I want dates in the Dutch format "ma 12 nov", so that they match how I think about my week.
+14. As a consultant, I want durations like `1h55m`, `42m` for less than an hour, and balances signed like `+45m` and `-1h12m` (zero is `0m`), so that values are short and unambiguous.
+15. As a consultant, I want the total balance to add up from the first recorded day, with an empty weekday after it counting with its full regular expected working time, so that forgotten days lower my balance until I record them.
+16. As a consultant, I want days before the first recorded day to show no balances and no warnings, and future days no balances, so that history before I started tracking and planned absences are not noise.
+17. As a consultant, I want an absence indicator per day (🤒 sick, 🏖️ vacation, 🎄 holiday; at most one, in that priority), so that I see absences at a glance.
+18. As a consultant, I want a day warning ⚠️ for a day that fails the consistency check and for an empty past weekday after the first recorded day, so that I notice broken and forgotten days.
 
-### Right panel (periods)
+### Day navigation
 
-24. As a consultant, I want to see the periods of the selected day with From, To, Duration, Project, Notes and the checkboxes Break, Vacation, Sick and Holiday, so that I can record what I did.
-25. As a consultant, I want From and To to be exactly four characters wide and entered as HHMM without a colon, so that typing times is fast.
-26. As a consultant, I want input fields to have a different background color instead of borders, so that the panel looks clean.
+19. As a consultant, I want Ctrl+↑/↓ to select the previous/next day and Ctrl+PgUp/PgDn the previous/next week, so that I can move quickly.
+20. As a consultant, I want Ctrl+G to open a "Go to date" popup where I type a date (`2026-11-15`, `15 nov`, `15 nov 2025`, Dutch month abbreviations) or pick today, so that I can jump to any day.
+
+### Right panel (day note and periods)
+
+21. As a consultant, I want a day note as a full-width field at the top of the right panel, so that I can attach a remark to the day.
+22. As a consultant, I want to see the periods of the selected day with an indicator, From, To, Duration, Project, the checkboxes Break, Free, Vacation, Sick and Holiday, and Notes, so that I can record what I did.
+23. As a consultant, I want a day without periods to show one empty period I can fill in, so that I can start a day without an extra key.
+24. As a consultant, I want a field to have focus at all times, From of the first period after switching days, so that I can always start typing.
+25. As a consultant, I want From and To entered as four digits HHMM without a colon, so that typing times is fast.
+26. As a consultant, I want a period to have a part of day instead of From and To (full day, 1st half, 2nd half of the regular expected working time), shown as "Full day", "1st half" or "2nd half", so that whole and half days need no times.
 27. As a consultant, I want the duration of each period computed automatically, so that I do not have to calculate it.
-28. As a consultant, I want no period and no field to have focus when I enter a day, so that I do not accidentally edit something.
-29. As a consultant, I want ↑/↓ to move focus to the same field in the previous/next period, or, if none has focus, to the first field of the first period (↓) or the last period (↑), so that I can move vertically.
-30. As a consultant, I want Tab/Shift-Tab to move focus to the next/previous field of a period (including checkboxes), continuing in the next/previous period and stopping at the very first and last field, so that I can move horizontally.
-31. As a consultant, I want Alt+↑/↓ and Alt+PgUp/PgDn to select the previous/next day and week from the right panel, so that I can record several days in a row.
-32. As a consultant, I want typing in a focused From, To or Project field to replace its value, as in a spreadsheet, and typing in Notes to add to its text, so that overwriting is fast and notes can be extended. Enter on a focused field starts editing with its existing text.
-33. As a consultant, I want to accept active input with Enter and reject it with Esc (restoring the previously accepted value), so that I stay in control of every change.
-34. As a consultant, I want ←/→/Home/End to move the cursor while editing, so that I can correct typos.
-35. As a consultant, I want Alt+Enter to add a new period after the last one, whose From is the previous period's To, with focus on its From field, so that consecutive periods are quick to enter.
-36. As a consultant, I want Alt+Enter on a day without periods to create its first period with an empty From, so that I can start a day.
-37. As a consultant, I want an open period (empty To) to be allowed on the current day only, so that I can record a period that is still running.
-38. As a consultant, I want an open period not to count toward worked time until To is filled in, so that balances only reflect finished work.
-39. As a consultant, I want Enter to toggle the focused checkbox, so that checkboxes work like other fields.
-40. As a consultant, I want Alt+b/v/s/h to toggle Break/Vacation/Sick/Holiday, accepting any active input first, so that I can set the period type from anywhere in the period.
-41. As a consultant, I want the period-type checkboxes to be mutually exclusive, so that a period always has a single type.
-42. As a consultant, I want checking Vacation, Sick or Holiday on a day whose only period has empty From and To to fill in From 0900 and To 0900 + regular expected working time (e.g. 1612), and unchecking it to empty From and To again, so that whole-day absences take one keystroke.
-43. As a consultant, I want Alt+p and Alt+n to jump to the Project and Notes field, accepting any active input first, so that I can reach them quickly.
-44. As a consultant, I want project names to be free text with the best match from earlier projects shown as dimmed ghost text, accepted with → at the end of the input, so that I type project names consistently.
-45. As a consultant, I want Ctrl+C to copy the focused field's value to the system clipboard, so that I can reuse it elsewhere.
-46. As a consultant, I want Ctrl+V to put the clipboard text into the focused field as accepted input (replacing any active input), so that pasting is one step.
-47. As a consultant, I want pasted times like `12:35` accepted as `1235`, invalid times rejected with a message, and pasting onto a checkbox ignored, so that pasting never corrupts data.
-48. As a consultant, I want Alt+Del to delete the focused period after confirming (Delete/Cancel), so that I can remove mistakes.
-49. As a consultant, I want an implied break shown as its own row between two periods that don't follow each other directly, so that implied breaks are visible.
-50. As a consultant, I want a period warning ⚠️ left of From for a period with an unusual time (before 06:00 or after 20:00) or a duration of 0h00m, so that such periods stand out.
-51. As a consultant, I want the bottom of the right panel to show the actual expected working time, e.g. `Actual expected: 3h36m (regular 7h12m − 3h36m absence)`, with all absences grouped into one term, or just `Actual expected: 7h12m`, so that I understand my target for the day.
-52. As a consultant, I want the right panel to scroll when periods do not fit, so that busy days remain usable.
-53. As a consultant, I want long notes cut off with `…` and scrolled horizontally while editing, so that the layout stays intact.
+28. As a consultant, I want an implied break shown as its own row between two from–to periods that don't follow each other directly, and an empty row between periods, so that the day is easy to read.
+29. As a consultant, I want an indicator left of From: ⚠️ for periods involved in the day's consistency problem, otherwise ❗ for a period warning, otherwise the emoji of a non-working period type, so that I see at a glance what needs attention and what a period is.
+30. As a consultant, I want a period warning ❗ for an unusual time (before 06:00 or after 20:00), a duration of 0m, or a period that directly follows the previous one with the same project, period type and notes, so that likely mistakes stand out.
+31. As a consultant, I want the bottom of the right panel to show `Worked [6h12m] of [7h12m] | Work until [17:42] for [8h]`, so that I know where I stand and until when to work for 8h.
+32. As a consultant, I want the right panel to scroll when periods do not fit, and long notes cut off with `…`, so that busy days remain usable.
+
+### Field navigation and editing
+
+33. As a consultant, I want ←/→/↑/↓ to move focus to the field left/right/above/below, and Tab/Shift-Tab to walk through all fields in order, so that I can move freely.
+34. As a consultant, I want Ctrl+Enter to move to the next period's From, and in the last period to add a new period whose From is the previous period's To, so that consecutive periods are quick to enter.
+35. As a consultant, I want typing in a field to replace its value, Enter to start editing with the existing text, Enter again to accept and Esc to reject, so that I stay in control of every change.
+36. As a consultant, I want Enter on a checkbox to toggle it, so that checkboxes work like other fields.
+37. As a consultant, I want Del to clear a field (uncheck a checkbox, switch a part of day back to from–to), so that clearing is one key.
+38. As a consultant, I want shell-like editing keys while editing (Home/Ctrl+A, End/Ctrl+E, Ctrl+Backspace/Ctrl+W, Ctrl+U, Ctrl+K, Ctrl+←/→), so that editing feels familiar.
+39. As a consultant, I want Ctrl+C/Ctrl+V to copy and paste a field's value through the system clipboard, so that I can reuse values.
+40. As a consultant, I want changing a period's To to also change the next period's From when that was equal to the old To, so that consecutive periods stay connected.
+41. As a consultant, I want project names to be free text with the best match from earlier projects shown as dimmed ghost text, accepted with → at the end of the input while editing, so that I type project names consistently.
+
+### Period definition and management
+
+42. As a consultant, I want Alt+b/f/s/v/h to toggle Break/Free/Sick/Vacation/Holiday, with the checkboxes mutually exclusive, so that I can set the period type from anywhere in the period.
+43. As a consultant, I want a Free period type (🆓) for time I take off from my overtime, which neither counts as worked time nor reduces the actual expected working time, so that I can record working less on purpose.
+44. As a consultant, I want Alt+0 to switch a period to from–to and Alt+1/2/3 to full day, 1st half and 2nd half, so that I can switch quickly.
+45. As a consultant, I want checking Vacation, Sick or Holiday on the day's only empty period to set it to full day, and unchecking to undo that, so that whole-day absences take one key.
+46. As a consultant, I want Ctrl+Del to delete the focused period after confirming, so that I can remove mistakes.
 
 ### Consistency checks
 
-54. As a consultant, I want the day to be checked when I leave it (Alt+↑/↓/PgUp/PgDn in the right panel, or ↑/↓/PgUp/PgDn in the left panel), and to stay on the day if the check fails, so that I never leave an inconsistent day behind.
-55. As a consultant, I want periods sorted by From and completely empty periods removed automatically when I leave the day, so that I can add periods in any order and stray empty periods disappear.
-56. As a consultant, I want the check to reject an empty From, overlapping periods, a From that is not before To, more than one sick, vacation or holiday period per day, an open period on a day other than today, and a project on a non-working period, so that my data stays valid.
-57. As a consultant, I want non-consecutive periods to be allowed, so that implied breaks need no explicit break period.
-58. As a consultant, I want a failed check to show a message inside the right panel and highlight the offending period, so that I know what to fix.
+47. As a consultant, I want the day to be checked when I leave it after changing it, and to stay on the day if the check fails, so that I never leave an inconsistent day behind.
+48. As a consultant, I want periods sorted (full day, 1st half, from–to periods by From, 2nd half) and empty periods removed when I leave a day, so that I can add periods in any order.
+49. As a consultant, I want the check to reject a period without From or part of day, overlapping from–to periods, anything after an open period, a From not before To, more than one sick, vacation or holiday period, an open period on a day other than today, a project on a non-working period, a part of day on a break, and more than one full day or more than one of each half, so that my data stays valid.
 
-### Saving, quitting and undo
+### Saving, quitting, undo and notifications
 
-59. As a consultant, I want Ctrl+S to check all days and save, so that only consistent data is written by default.
-60. As a consultant, I want a popup "<day>: <problem> (Go to day / Save anyway / Cancel)" when Ctrl+S finds a failing day, so that I can fix it or save anyway.
-61. As a consultant, I want Ctrl+Q to check all days first, offering "Go to day / Quit anyway / Cancel" on failure, so that I do not quit with broken data by accident.
-62. As a consultant, I want Ctrl+Q with unsaved changes to then ask "Save before quitting? (Save/Don't save/Cancel)", so that I do not lose work.
-63. As a consultant, I want popup buttons selectable with ←/→ + Enter, with their first letter, and cancellable with Esc, so that popups are fast to use.
-64. As a consultant, I want Ctrl+Z/Ctrl+Y to undo/redo accepted changes in the right panel, across all days of the session (jumping to the affected day), so that I can recover from mistakes.
-65. As a consultant, I want saving to keep my undo history, so that I can still undo after saving.
-66. As a consultant, I want a popup "File changed on disk (Overwrite/Cancel)" when the file was changed outside the application since loading, so that I do not overwrite changes from a sync tool.
-67. As a consultant, I want the previous file kept as a `.bak` and the file written atomically, so that a crash never leaves me without data.
-68. As a consultant, I want the application to exit with a clear error, leaving the file untouched, when the YAML cannot be parsed, so that a broken file is never overwritten.
-69. As a consultant, I want my data stored in `~/Documents/timesheet.yaml` by default, overridable via a command-line argument, so that it is easy to find and back up.
+50. As a consultant, I want Ctrl+S to check all days and save, with "Go to day / Save anyway / Cancel" when a day fails, and a "Saved" notification afterwards, so that I know my data is written.
+51. As a consultant, I want Ctrl+Q to check all days first and to ask "Save before quitting?" when there are unsaved changes, so that I don't lose work.
+52. As a consultant, I want Ctrl+Z/Ctrl+Y to undo/redo accepted changes across all days of the session, so that I can recover from mistakes.
+53. As a consultant, I want messages (saved, invalid time, failed check, clipboard, nothing to undo) shown as a global notification, centered with a cyan background, until my next key, so that I always see them in the same place.
+54. As a consultant, I want a popup when the file changed on disk, the previous file kept as `.bak`, the file written atomically, and a clear error for a broken or unsupported file, so that I never lose data.
+55. As a consultant, I want my data stored in `~/Documents/timesheet.yaml` by default, overridable via a command-line argument, so that it is easy to find and back up.
 
 ### Appearance
 
-70. As a consultant, I want the classic Norton Commander palette (blue background, cyan selection bar, input fields on a darker blue), so that the application feels familiar.
-71. As a consultant, I want emoji to render as color emoji and still line up in columns in VTE terminals (GNOME Terminal, Ptyxis), Konsole, kitty, foot and ghostty, so that the UI looks good and stays aligned.
+56. As a consultant, I want the Midnight Commander look (light gray on blue, cyan selection, light gray fields, yellow headers), so that the application feels familiar.
+57. As a consultant, I want emoji to render as color emoji and line up in columns, so that the UI looks good and stays aligned.
 
 ## Implementation Decisions
 
 ### Domain rules
 
-- **Regular expected working time**: a constant 432 minutes (7h12m) for now, stored per day. For a day without a stored value (including empty days after the first recorded day) the constant applies. Vacation, sick and holiday periods never change it.
-- **Actual expected working time**: computed, never stored: the regular expected working time minus the duration of the day's vacation, sick and holiday periods.
-- **Worked time**: the total duration of a day's work periods. Breaks never count. Open periods count once To is filled in.
-- **Day balance**: worked time minus actual expected working time. Shown for days from the first recorded day up to and including today.
-- **Total balance**: sum of the day balances from the first recorded day up to and including that day. Not shown for future days or days before the first recorded day.
-- **Balance format**: signed (`+0h45m`, `-1h12m`); zero has no sign (`0h00m`).
-- **Day warning**: for days from the first recorded day (inclusive) up to but excluding today that are empty or have an open period.
-- **Period types**: work, break, vacation, sick, holiday. Exactly one per period. In the UI the four non-working checkboxes are mutually exclusive, and none checked means work.
+- **Regular expected working time**: a constant 432 minutes (7h12m) for now, stored per day. For a day without a stored value (including empty days after the first recorded day) the constant applies. Absences never change it.
+- **Actual expected working time**: computed, never stored: the regular expected working time minus the duration of the day's absences.
+- **Worked time**: the total duration of a day's work periods. Breaks and free periods never count. Open periods count once To is filled in.
+- **Day balance / total balance**: as before; shown from the first recorded day up to and including today; total balance adds up from the first recorded day.
+- **Durations**: `1h55m`; under an hour `42m` (padded where columns align); balances signed (`+42m`, `-1h12m`); zero is `0m`.
+- **Period types**: work, break, free, vacation, sick, holiday. Exactly one per period; the five non-working checkboxes are mutually exclusive, none checked means work. Free is a non-working period that is not an absence: it neither counts as worked time nor reduces the actual expected working time.
 - **Times**: From and To are exactly four digits HHMM, 0000–2359. Periods never cross midnight.
-- **Left panel display**: day numbers are padded to two characters (`ma  2 nov`) so columns align. A day with only non-working periods shows `0h00m` worked time; a day without periods shows nothing.
-- **Consistency checks** (not exhaustive): From is not empty; no overlaps, and nothing after an open period; From before To; at most one sick, one vacation and one holiday period per day; open period only on the current day; non-working periods have no project. Before checking a day, completely empty periods are removed and the rest are sorted by From, so ordering never fails a check.
-- **Check triggers**: leaving a day (B) checks that day, but only if it was changed in this session, so you can always browse past broken days. Ctrl+S and Ctrl+Q first sort all days and remove empty periods (which alone isn't an unsaved change), then check all days; the popup names the earliest failing day, and "Go to day" selects it, focuses the right panel and shows the problem there. On Ctrl+Q the consistency popup comes before the "Save before quitting?" popup.
-- **Check results**: messages name periods by their times (e.g. `0900–1200 overlaps 1130–1300`, `Open period 1230– on a past day`, `More than one sick period`); only the first problem is shown. The offending periods get a red background until the next key press. Every day that currently fails a check gets a day warning.
-- **Shortcut modifiers** used in the original design: (A) not available while a field is being edited; (B) runs a consistency check and cancels the action if it fails; (C) accepts the active input first.
-  - Alt+↑/↓/PgUp/PgDn in the right panel: A, B (ignored while editing; they don't accept active input). ←/→ in the right panel: previous/next field of the period, stopping at its edges; while editing they move the cursor. ↑/↓ in the right panel: A. Alt+b/v/s/h/p/n: C. Alt+←/→: A. Ctrl+Q: A, B. Ctrl+S: A, B (all days). Ctrl+Z/Y: A. Alt+Del, Alt+Enter: A.
-- **Editing**: From/To take only digits, at most 4; an empty value may be accepted. Enter with an invalid time keeps the field in edit mode and shows a message. Tab/Shift-Tab accept and move on (staying put if accepting fails). All other non-editing shortcuts are ignored while editing. Typing on a checkbox does nothing.
-- **Messages**: one-line notices in the right panel (invalid time, failed consistency check, rejected paste); a message disappears at the next key press. The right panel always reserves a row for them.
-- **Active input display**: while editing, the field shows the text around the cursor; `…` only appears outside edit mode.
-- **Adding periods**: Alt+Enter adds a period from any field or without focus, but not while the last period is open (no To yet), which includes an empty last period. Enter no longer adds periods; Space no longer toggles checkboxes.
-- **Delete popup**: Delete is the default button.
-- **Clipboard**: Ctrl+C copies the focused field's value, or the active input while editing; Ctrl+V replaces the field (also Notes) with the clipboard text as accepted input. Pasted times are accepted as `HHMM`, `HH:MM` or `H:MM` (the hour padded); anything else is rejected with a message showing the text as pasted, leaving any active input as it was. Pasted line breaks become spaces, and surrounding spaces are trimmed. Checkboxes can't be copied or pasted. An empty clipboard and a missing clipboard each give a message.
-- **Period types**: unchecking an absence empties From and To only if the period is still the day's only one and they still hold the auto-filled full day (0900 and 0900 + regular expected working time); the values decide, so hand-typed times equal to a full day are emptied too (accepted; undo covers it). Switching from one absence (or to Break) keeps From and To, without emptying or auto-fill. Alt+b/v/s/h/p/n need a focused period in the right panel; they accept active input first and do nothing if that fails.
-- **Deleting**: after deleting a period, focus moves to the same field of the period taking its place (the previous one if the last was deleted); no focus if the day becomes empty.
-- **Tab order** within a period follows the fields on screen: From, To, Project, Break, Vacation, Sick, Holiday, Notes. Duration is not focusable. Tab with nothing focused focuses From of the first period.
-- **Right panel layout**: period warning ⚠️ left of From (unusual time or 0h00m); then From, To, Duration, Project, the four checkboxes (emoji headers ☕ 🏖️ 🤒 🎄) and Notes, which takes the remaining width. An empty row separates periods; an implied break is its own row in plain text with Break checked, not focusable.
-- **Look** (Midnight Commander): light gray text on blue, single-line borders, yellow column headers, the active panel's title black on light gray. Selection: cyan bar with black text; in an inactive left panel the selected day's row is cyan text without a bar. Left panel title `Days: <year>`; the year separator shows the new year centered. Fields and checkboxes are light gray boxes (a checked box shows ✓), cyan when focused or being edited. Popups: light gray with a black shadow, a short title in the frame (`Delete period`, `Quit`, `File changed`, `Consistency`), the message inside (wrapped), solid buttons black on white, the selected one black on cyan, hotkey letter in blue.
-- **Panel focus**: the active panel's title is highlighted; in an inactive left panel the selected day's row is cyan text without a bar. Leaving and re-entering the right panel on the same day keeps the focused field; selecting another day clears it. Shift-Tab with nothing focused focuses the last field (Notes) of the last period.
-- **Right panel title**: shows the selected day without padding, e.g. `Periods: ma 2 nov`; popups use the same unpadded date.
+- **Part of day**: instead of From and To, a period can have a part of day: full day (100% of the regular expected working time), 1st half or 2nd half (50% each). Allowed for work, free, vacation, sick and holiday, not for break. A part-of-day period has no times; its duration counts like any other period's in all calculations (worked time, absences, balances, "Worked … of …", "Work until").
+- **Sort order**: full day, 1st half, from–to periods by From, 2nd half. Empty periods are removed when sorting.
+- **Implied breaks and overlaps**: only between from–to periods.
+- **Chained times**: changing a period's To also changes the next from–to period's From if that was equal to the old To. Changing a From changes nothing else.
+- **Consistency checks** (not exhaustive): a period has a From (To may be empty only today) or a part of day; no overlaps between from–to periods, and nothing after an open period; From before To; at most one sick, one vacation and one holiday period per day; open period only on the current day; non-working periods have no project; no part of day on a break; at most one full day, and at most one 1st half and one 2nd half, never a full day together with a half.
+- **Check triggers and results**: as before (leaving a changed day; Ctrl+S/Ctrl+Q check all days after sorting, which alone isn't an unsaved change; the popup names the earliest failing day; messages name periods by their times; first problem only; offending periods highlighted red until the next key).
+- **Warnings vs. consistency failures**: a period warning ❗ marks a likely mistake that is allowed: an unusual time, a duration of 0m, or a period that directly follows the previous one (next From equals To) with the same project, period type and notes (the warning goes on the second one). A consistency failure ⚠️ marks a rule violation.
+- **Period indicator** (left of From, one symbol): ⚠️ for periods involved in the day's current consistency problem (determined live), else ❗ for a period warning, else the emoji of a non-working period type (☕ break, 🆓 free, 🏖️ vacation, 🤒 sick, 🎄 holiday), else nothing.
+- **Day warning** (left panel, ⚠️ only): a day that fails the consistency check, or an empty past weekday after the first recorded day. ❗ is never shown in the left panel. An empty past day is not a consistency failure: saving and quitting don't ask about it.
+- **Absence indicator** (left panel): 🤒 > 🏖️ > 🎄; free periods have no absence indicator.
+- **"Work until"**: the time until which to work on the selected day to reach 8h worked (a fixed value for now), given the periods as they are: base + (8h − worked time) + missing break time. The base is the latest To of the from–to periods, or the From of an open last period. The missing break time is 1h minus the break time so far (explicit breaks plus implied breaks; free periods don't count) if that is under 1h, otherwise nothing. Shows `[–]` when 8h is already worked or the day has no from–to periods. Example: 0900–1200 and 1230–1500 is 5h30m worked with a 30m implied break: 1500 + 2h30m + 30m = `[18:00]`.
+- **Bottom line**: `Worked [<worked time>] of [<actual expected working time>] | Work until [<time>] for [8h]`; the bracketed parts are spans with a cyan background.
+
+### Screen and panels
+
+- **No panel focus**: the left panel only shows the selected day (cyan bar) and has no keys; focus is always in the right panel. Panel titles have no highlight. Titles: `Days: <year>` and `Periods: <unpadded date>`.
+- **Right panel**: the day note (a full-width input field) on top, then the header and the period rows, then the bottom line. A day without periods shows one empty period; it becomes a real period once something is filled in, and an empty period is never saved.
+- **Focus**: a field always has focus. Switching days focuses From of the first period. After deleting the day's only period, the empty period's From has focus.
+- **Field order** (Tab order, and the basis for arrow navigation): the day note, then per period: From, To (or the part-of-day field), Project, Break, Free, Vacation, Sick, Holiday, Notes. Duration and implied-break rows are not focusable.
+- **Part-of-day field**: replaces From and To on screen ("Full day", "1st half", "2nd half") and is one field. Enter and typing do nothing on it.
+- **Checkbox columns**: emoji headers ☕ 🆓 🏖️ 🤒 🎄; boxes are light gray, ✓ when checked, cyan when focused.
+- **Global notifications**: one-line messages (saved, invalid time, failed check, clipboard, nothing to undo/redo) centered across the screen with a cyan background, floating over the row just above the panels' bottom border, until the next key press. They replace the right panel's message row. "Saved" isn't shown when saving while quitting.
+- **Help popup**: grouped (General, Day navigation, Field navigation, Field editing, Period definition, Period management); colors as in Midnight Commander's user menu: cyan background, light text, yellow title, single-line frame, black shadow; scrolls if it doesn't fit; closed with Esc or F1.
+- **Function-key bar**: ten slots stretched evenly over the full width; F1 Help, F2 Track (more screens will follow).
+- **Other popups**: as before (light gray, short title, message, solid buttons).
+- **Look**: Midnight Commander: light gray text on blue, single-line borders, yellow column headers, cyan selection bar, light gray fields (cyan when focused or editing).
+
+### Keyboard
+
+The terminal must support the Kitty keyboard protocol (ADR-0003); the application enables disambiguated key codes on start and restores the terminal on exit and on a panic.
+
+- **General**: F1 help popup; F2 Track; Ctrl+S save; Ctrl+Q quit; Ctrl+Z/Ctrl+Y undo/redo; Esc rejects the active input or closes a popup.
+- **Day navigation**: Ctrl+↑/↓ previous/next day; Ctrl+PgUp/PgDn previous/next week; Ctrl+G go to date. Leaving a changed day runs its consistency check.
+- **Field navigation**: ←/→/↑/↓ move to the field left/right/above/below (←/→ stop at the row's edges; ↑/↓ go to the closest field in the row above/below, skipping implied-break rows; the day note is above the first period); Tab/Shift-Tab walk through all fields; Ctrl+Enter moves to the next period's From, and in the last period adds a period after it (not while the last period is open).
+- **Field editing**: Enter toggles a checkbox, starts editing an input field with its existing text (cursor at the end), or accepts the active input; typing replaces an input field's value (also Notes); Del (not editing) clears an input field, unchecks a checkbox, or switches a part of day back to from–to; Ctrl+C/Ctrl+V copy/paste. While editing: ←/→ move the cursor, Home/Ctrl+A and End/Ctrl+E jump to the start/end, Backspace/Del delete a character, Ctrl+Backspace/Ctrl+W delete the previous word, Ctrl+U deletes to the start, Ctrl+K to the end, Ctrl+←/→ move by word.
+- **Period definition**: Alt+b/f/s/v/h toggle Break/Free/Sick/Vacation/Holiday; Alt+0 switches to from–to mode (empty times); Alt+1/2/3 switch to full day / 1st half / 2nd half. They accept the active input first and do nothing if that fails.
+- **Period management**: Ctrl+Del deletes the focused period after confirming (Delete is the default button); not while editing.
+- **While editing**: Tab/Shift-Tab accept and move on (staying put if accepting fails); the period-definition keys accept first; other navigation and management keys (day navigation, Ctrl+Enter, Ctrl+Del, Ctrl+G, ↑/↓) are ignored.
+- **Go to date popup**: an input field and the buttons Go, Today and Cancel. Accepts `YYYY-MM-DD`, `DD MMM` and `DD MMM YYYY` with Dutch month abbreviations (`jan feb mrt apr mei jun jul aug sep okt nov dec`); without a year, the current year. A weekend date selects the Friday before. An invalid date shows a notification.
+- **Ghostty**: Ctrl+Enter is Ghostty's full-screen key; the README documents `keybind = ctrl+enter=unbind`. Ctrl+PgUp/PgDn and Alt+1..8 switch Ghostty tabs, but come through in a window with a single tab.
+- Removed: Alt+←/→, Alt+↑/↓, Alt+PgUp/PgDn, Alt+Enter, Alt+Del, Alt+p/n, and the left panel's own keys.
+
+### Editing details
+
+- From/To take only digits, at most 4; an empty value may be accepted. Enter with an invalid time keeps the field in edit mode and shows a notification. Typing on a checkbox does nothing.
+- While editing, the field shows the text around the cursor; `…` only appears outside edit mode.
+- **Clipboard**: Ctrl+C copies the focused field's value, or the active input while editing; Ctrl+V replaces the field with the clipboard text as accepted input. Pasted times are accepted as `HHMM`, `HH:MM` or `H:MM`; anything else is rejected with a notification. Line breaks become spaces. Checkboxes can't be copied or pasted.
+- **Period types**: checking an absence on the day's only empty period sets it to full day; unchecking empties it again only if it is still the only period and still a full day. Switching between non-working types keeps the times or part of day.
 
 ### Undo
 
-- One session-wide history covering all days. One step is one accepted change: an accepted field value, a paste, a checkbox toggle (including any From/To auto-fill it triggers), adding a period, or deleting a period.
-- The automatic sort when leaving a day is not an undo step.
-- Undoing a change on another day selects that day. Undoing on the same day keeps the focus at the same position if that period exists (after undoing a delete, that's the restored period). Undo may bring back an unsorted order, which is sorted again when leaving the day or saving; undoing back to the saved state still counts as unsaved. Undo/redo work from both panels of the Tracking screen (not on Help, while editing or with a popup open) and say "Nothing to undo/redo" when there's nothing. Undoing to another day doesn't run the consistency check on the day being left.
+- One session-wide history covering all days. One step is one accepted change: an accepted field value (including the day note and a chained From), a paste, a checkbox toggle (including any auto-fill), a part-of-day switch, adding a period, deleting a period, or clearing a field.
+- Sorting a day is not an undo step. Undoing a change on another day selects that day; on the same day, focus stays at the same position if that period exists. Undo/redo don't work on Help, while editing or with a popup open; "Nothing to undo/redo" otherwise.
+
+### Clock
+
+- "Today" comes through an injected clock and is checked every minute while the application runs (the event loop polls with a timeout). After midnight, balances and warnings update; the selected day stays.
+
+### Command line
+
+- `tijdje [PATH]`: PATH defaults to `~/Documents/timesheet.yaml`.
+- `--help` prints the usage (including the default path) and exits; `--version` prints the version and exits; any other option is an error with a non-zero exit code.
 
 ### Storage
 
-YAML file, default `~/Documents/timesheet.yaml`, overridable with a single command-line argument (path).
+YAML file, default `~/Documents/timesheet.yaml`.
 
 ```yaml
+schema_version: 1
 days:
   "2026-11-12":
     regular_expected_working_time_in_minutes: 432
+    notes: "Team day"   # day note, or null
     periods:
       - from: "12:35"
         to: null          # open period
+        part_of_day: null # full_day | first_half | second_half (then from/to are null)
         project: "otto"
         notes: null
-        type: work        # work | break | vacation | sick | holiday
+        type: work        # work | break | free | vacation | sick | holiday
 ```
 
+- `schema_version` is always written; a file without it is version 1; any other version than 1 makes the application refuse to start with a clear message. The version increases only on breaking changes; the day note, free and part of day are additions, so it stays 1.
 - A missing or empty file is an empty timesheet; the file is created on the first save.
 - Unknown keys and invalid `HH:MM` times are parse errors: the application exits without touching the file.
-- Empty To, project and notes are written as `null`. `""` is read as `null`.
+- Empty To, project, notes, day notes and part of day are written as `null`. `""` is read as `null`.
 - `type` is always written.
-- Days without periods are not written. `regular_expected_working_time_in_minutes` is written when a day gets its first period, and existing values are kept. A day in the file without it is a parse error.
-- Writes are atomic: temp file, flushed to disk, renamed over the old file, keeping its permissions. A failed save removes the temp file. Comments in the file are not preserved.
-- The first save of a session keeps the file as it was when the application started as `timesheet.yaml.bak`; later saves in the same session leave it alone.
-- If the file path is a symlink, it is followed: the file it points to is replaced, the symlink stays, and the temp file and backup go next to the target.
+- Days without periods and without a day note are not written. `regular_expected_working_time_in_minutes` is written for every written day, and existing values are kept. A day in the file without it is a parse error.
+- Writes are atomic: temp file, flushed to disk, renamed over the old file, keeping its permissions. A failed save removes the temp file. Comments are not preserved.
+- The first save of a session keeps the file as it was when the application started as `timesheet.yaml.bak`.
+- Symlinks are followed: the target is replaced, the symlink stays, and the temp file and backup go next to the target.
 - Before writing, the application detects whether the file changed on disk since it was loaded or last saved.
-- Dates, times, project and notes are always written double-quoted, so YAML 1.1 readers don't take `08:45` for a number or `2026-11-02` for a timestamp. The application writes the YAML itself for this; reading still uses the YAML library.
-- Ctrl+Q with unsaved changes asks "Save before quitting?"; choosing Save may lead to "File changed on disk", after which Overwrite quits and Cancel stays in the application. A failed save shows a message in the right panel.
+- Dates, times, project and notes are written double-quoted; the application writes the YAML itself.
 
 ### Modules
 
-- **Timesheet domain** (pure, no I/O): days, periods, period types, HHMM parsing/formatting, derived figures (worked time, actual expected working time, day balance, total balance), consistency checks, day and period indicators. The deepest module; most rules live here.
-- **Timesheet store**: loads and saves the YAML file. Interface: load a path into a timesheet (or a parse error); save a timesheet, refusing when the file changed since a given fingerprint unless overwriting is forced.
-- **Application state**: the whole interactive state (screen, panel focus, selected day, focused period/field, active input, popups, undo/redo history, dirty flag, messages). Takes key events and produces state changes plus effects (save, quit, clipboard). Today/now, clipboard and file system reach it through small injected ports so tests can fake them.
-- **Rendering**: draws the application state with Norton Commander styling. After each frame, it paints the second cell of every wide symbol with a space in that cell's background, then redraws the symbol on top of it. Otherwise Ptyxis leaves half the background of 🏖️/⚠️ unpainted (ADR-0001). This approach was proven in the prototype:
-
-  ```rust
-  // from the prototype: run after terminal.draw() on the completed buffer
-  if cell.symbol().width() == 2 {
-      queue!(out, SetBackgroundColor(bg), SetForegroundColor(fg),
-             MoveTo(x + 1, y), Print(" "), MoveTo(x, y), Print(cell.symbol()))?;
-  }
-  ```
+- **Timesheet domain** (pure, no I/O): days, periods, period types, parts of day, time parsing/formatting, derived figures (worked time, actual expected working time, balances, "Work until"), consistency checks, warnings and indicators. The deepest module; most rules live here.
+- **Timesheet store**: loads and saves the YAML file, including the schema version.
+- **Application state**: the whole interactive state (selected day, focused field, active input, popups, notifications, undo/redo history, unsaved changes). Takes key events and produces state changes plus effects. The clock, clipboard and file system reach it through small injected ports so tests can fake them.
+- **Rendering**: draws the application state in the style of Midnight Commander, including the wide-symbol background fix (ADR-0001).
+- **Terminal setup**: checks for and enables the Kitty keyboard protocol, and restores the terminal on exit and on a panic (ADR-0003).
 
 ### Technology (implementer's choice, not a decision by the user)
 
-ratatui + crossterm for the TUI, serde + serde_yaml_ng for YAML (serde_yaml is unmaintained), arboard for the clipboard (without its image support, with Wayland support via `wayland-data-control`), jiff for dates and times. The Rust toolchain is added to the existing mise configuration as `rust = "latest"`.
+ratatui + crossterm for the TUI, serde + serde_yaml_ng for YAML (serde_yaml is unmaintained), arboard for the clipboard (without its image support, with Wayland support via `wayland-data-control`), jiff for dates and times. The Rust toolchain comes from mise (`rust = "latest"`).
 
 ## Testing Decisions
 
 - Good tests check external behavior only: given input, they check what the user sees or what is persisted, never internal structure.
-- **Seam 1, Timesheet domain** (test-first, red-green-refactor): balances, actual expected working time, consistency checks, HHMM parsing, sorting and indicators, tested through the domain module's public interface.
-- **Seam 2, Application** (the highest seam; tests written alongside the code, not strictly test-first): feed key sequences into the application state with a fake clock, fake clipboard and in-memory file system, render to ratatui's TestBackend, and check the rendered buffer, the persisted YAML and clipboard contents. This covers navigation, editing, popups, undo/redo and saving end-to-end.
-- The store's YAML round-trip (null handling, type field, atomic write, `.bak`, change detection) is covered through seam 2's in-memory file system. A small set of tests uses a real temporary directory for the atomic write.
-- Emoji alignment in real terminals can't be checked with TestBackend. It is proven by the throwaway prototype (see Further Notes).
-- A sample timesheet file with realistic weeks (vacation, sick and holiday periods, an open period, an empty day) serves demos and tests, before periods can be created in the UI.
-- No prior art: the repository has no code yet.
+- **Seam 1, Timesheet domain** (test-first, red-green-refactor): balances, actual expected working time, "Work until", parts of day, consistency checks, warnings, sorting, time and date parsing, tested through the domain module's public interface.
+- **Seam 2, Application** (tests written alongside the code): feed key sequences into the application state with a fake clock, fake clipboard and in-memory file system, render to ratatui's TestBackend, and check the rendered buffer, the persisted YAML and clipboard contents.
+- A small set of tests uses a real temporary directory for the atomic write, symlinks and permissions.
+- Terminal setup (Kitty keyboard protocol detection) and emoji rendering can't be checked with TestBackend; they are checked by hand in Ghostty.
+- A sample timesheet file with realistic weeks serves demos and tests.
 
 ## Out of Scope
 
 - Moco synchronization (later milestone). Project names stay free text and will be mapped to Moco then.
 - A managed project list.
-- Screens other than Tracking and Help.
-- Weekend days, periods crossing midnight, configurable regular expected working time.
+- Screens other than Tracking (the function-key bar already reserves F2 Track for more screens).
+- Weekend days, periods crossing midnight, configurable regular expected working time, a configurable 8h target for "Work until".
 - Auto-save, mouse support.
-- Verifying emoji rendering in terminals other than Ptyxis, and installing those terminals.
+- Terminals without the Kitty keyboard protocol (ADR-0003).
 
 ## Further Notes
 
-- **Emoji prototype (done)**: in Ptyxis, ratatui aligns 🏖️/⚠️ on its own. Only the background needed fixing, which the approach above does (variant 5). Raw printing without ratatui misaligns. Prototype code: branch `prototype/emoji-alignment` (commit 383c813).
+- **Emoji prototype (done)**: ratatui aligns 🏖️/⚠️ on its own; only the background needed fixing (ADR-0001). Prototype code: branch `prototype/emoji-alignment` (commit 383c813).
+- **Second design round (2026-11-20)**: decisions Q144–Q179 reshaped panels, keys, warnings, period types (free, part of day), the bottom line, notifications, the help popup, the command line, the clock and the schema version. Tickets 12–25 implement them; ticket 09 (project autocomplete) is still open.

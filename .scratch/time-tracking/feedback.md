@@ -4,20 +4,18 @@ Running list of user feedback and known open points that aren't covered by a tic
 
 ## Open
 
-- **Tab for switching panels** (user idea, 2026-11-15, after ticket 03): with ←/→ moving between fields, Tab could switch panels instead.
-- **Drop panel focus** (user idea, 2026-11-16, after ticket 04): drop the concept of panel focus.
-- **No "0h" for durations under an hour** (user feedback, 2026-11-16, before ticket 08): show `42m` instead of `0h42m`; where columns are aligned, pad it (`  42m`).
-- **Empty field on a day without periods** (user feedback, 2026-11-17, after ticket 08): in the right panel, show an empty field (period row) when the day has no periods.
-- **Alt+1/2/3 fill a day fraction** (user feedback, 2026-11-17, after ticket 08): Alt+1 sets the focused period to 100% of the day (0900 to 0900 + regular expected working time), Alt+2 to the first half (from 0900 to 50%), Alt+3 to the second half (50% to 100%).
-- **Remaining time** (user feedback, 2026-11-17, after ticket 08): after "Actual expected" in the right panel, show how much time is left to work.
-- **`--help` argument** (user feedback, 2026-11-18): the command line should support `--help`. Today the single argument is always taken as the timesheet path.
-- **Clock port** (review of ticket 01): today is fixed at startup, so "today" doesn't change while the app runs past midnight. (The file-system port was added in ticket 05.)
-- **Other terminals unverified** (ADR-0001): emoji rendering is only checked in Ptyxis. Konsole, kitty, foot and ghostty are still to be checked.
+- **Other terminals unverified** (ADR-0001, ADR-0003): emoji rendering is only checked in Ptyxis, which ADR-0003 drops. Ghostty (now the main terminal), kitty, foot and Alacritty are still to be checked.
 - **Total balance performance** (review of ticket 02): the total balance is recalculated from the first recorded day for every visible row. Fine for now; may need caching after years of data.
-- **Repository history**: commit 73cad6f still mentions the employer in the README, and the prototype branch commit doesn't follow Conventional Commits.
 
 ## Done
 
+- **Drop panel focus**: planned in ticket 15.
+- **No "0h" for durations under an hour**: planned in ticket 22.
+- **Empty field on a day without periods**: planned in ticket 15.
+- **Alt+1/2/3 fill a day fraction**: superseded by part of day (ticket 21).
+- **Remaining time**: superseded by the new bottom line (ticket 22).
+- **`--help` argument**: planned in ticket 12.
+- **Clock port**: planned in ticket 13.
 - **Notes keeps its text when typing**: done after ticket 11. Typing in Notes adds to the text; Enter edits any field with its text; Alt+Enter/Alt+Del add/delete periods; Enter toggles checkboxes.
 - **←/→ between fields**: done after ticket 11 (stops at the period's edges).
 - **Shift+arrows change the day**: done after ticket 11, with Alt instead of Shift (Ptyxis uses Shift+PgUp/PgDn for scrollback); Alt+↑/↓/PgUp/PgDn replace Ctrl+↑/↓.
@@ -39,3 +37,8 @@ Running list of user feedback and known open points that aren't covered by a tic
 - **No new period after an empty last period**: done in ticket 04.
 - **Ctrl+Del** reaches the application in Ptyxis (checked by the user after ticket 04).
 - **Negative durations** (review of ticket 01): fixed in ticket 02.
+
+## Rejected
+
+- **Tab for switching panels** (user idea, 2026-11-15, after ticket 03): with ←/→ moving between fields, Tab could switch panels instead.
+- **Repository history**: commit 73cad6f still mentions the employer in the README, and the prototype branch commit doesn't follow Conventional Commits.
