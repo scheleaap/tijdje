@@ -16,14 +16,14 @@ Running list of user feedback and known open points that aren't covered by a tic
 - **Remaining time**: superseded by the new bottom line (ticket 22).
 - **`--help` argument**: planned in ticket 12.
 - **Clock port**: planned in ticket 13.
-- **Notes keeps its text when typing**: done after ticket 11. Typing in Notes adds to the text; Enter edits any field with its text; Alt+Enter/Alt+Del add/delete periods; Enter toggles checkboxes.
+- **Notes keeps its text when typing**: done after ticket 11. Typing in Notes adds to the text; Enter edits any field with its text; Alt+Enter/Alt+Del add/delete periods; Enter toggles checkboxes. Superseded by the second design round (see the spec).
 - **←/→ between fields**: done after ticket 11 (stops at the period's edges).
-- **Shift+arrows change the day**: done after ticket 11, with Alt instead of Shift (Ptyxis uses Shift+PgUp/PgDn for scrollback); Alt+↑/↓/PgUp/PgDn replace Ctrl+↑/↓.
+- **Shift+arrows change the day**: done after ticket 11, with Alt instead of Shift (Ptyxis uses Shift+PgUp/PgDn for scrollback); Alt+↑/↓/PgUp/PgDn replace Ctrl+↑/↓. Superseded by the second design round (see the spec).
 - **Cursor shows up in the left panel while editing**: fixed after ticket 11 (the wide-symbol repaint saves and restores the cursor).
 - **Text hard to read**: done in ticket 11 (Midnight Commander palette).
 - **Year in the year separator**: done in ticket 11.
 - **Input field background**: done in ticket 11 (light gray fields, cyan when focused).
-- **Selected day colors**: done in ticket 11 (inactive panel: cyan text, no bar).
+- **Selected day colors**: done in ticket 11 (inactive panel: cyan text, no bar). Superseded by the second design round (see the spec).
 - **Empty row between periods**: done in ticket 11.
 - **Warning for 0h00m periods**: done in ticket 11.
 - **Implied break as its own row**: done in ticket 11.

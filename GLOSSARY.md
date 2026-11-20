@@ -21,10 +21,10 @@ A remark attached to a day as a whole.
 The work a period is attributed to, e.g. a customer engagement or internal work.
 
 **Empty period**:
-A period without any values: no start or end time, project or notes, and not marked as a non-working period.
+A period without any values: no start or end time, no part of day, no project or notes, and not marked as a non-working period.
 
 **Open period**:
-A period whose end time is not yet known, because it is still running.
+A from–to period whose end time is not yet known, because it is still running. A part-of-day period is never open.
 
 **Work period**:
 A period during which the consultant works on a project.
@@ -87,7 +87,7 @@ A violation of the consistency check, shown as ⚠️.
 The ⚠️ indicator in the day list for a day with a consistency failure or an empty past weekday.
 
 **Field**:
-Anything in the right panel that can have focus: an input field or a checkbox.
+Anything in the right panel that can have focus: an input field, a checkbox or the part-of-day field.
 
 **Input field**:
 A field you type a value into, e.g. From, Project or the day note.
