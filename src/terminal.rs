@@ -18,7 +18,7 @@ use ratatui::{
     },
 };
 
-/// Terminals known to support the Kitty keyboard protocol (ADR-0003).
+/// Examples of terminals that support the Kitty keyboard protocol (ADR-0003).
 const SUPPORTED_TERMINALS: &str =
     "Ghostty, kitty, foot, Alacritty 0.13+ or WezTerm with `enable_kitty_keyboard`";
 
@@ -31,7 +31,7 @@ impl fmt::Display for UnsupportedTerminal {
         write!(
             f,
             "this terminal doesn't support the Kitty keyboard protocol.\n\
-             Use a terminal that does: {SUPPORTED_TERMINALS}."
+             Use a terminal that does, for example {SUPPORTED_TERMINALS}."
         )
     }
 }
