@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::HashMap,
     io,
     path::{Path, PathBuf},
@@ -95,10 +95,40 @@ pub fn app_with(content: &str, today: Date) -> App {
 
 /// An app on an in-memory timesheet file, and that file system.
 pub fn app_with_fs(content: &str, today: Date) -> (App, InMemoryFileSystem) {
+    app_with_clock(content, &FakeClock::new(today))
+}
+
+/// An app on an in-memory timesheet file whose "today" comes from `clock`,
+/// and that file system.
+pub fn app_with_clock(content: &str, clock: &FakeClock) -> (App, InMemoryFileSystem) {
     let fs = InMemoryFileSystem::with(TIMESHEET, content);
-    let app =
-        App::open(Box::new(fs.clone()), PathBuf::from(TIMESHEET), today).expect("valid timesheet");
+    let app = App::open(
+        Box::new(fs.clone()),
+        PathBuf::from(TIMESHEET),
+        Box::new(clock.clone()),
+    )
+    .expect("valid timesheet");
     (app, fs)
+}
+
+/// A clock whose date the test sets; clones share the same date.
+#[derive(Clone)]
+pub struct FakeClock(Rc<Cell<Date>>);
+
+impl FakeClock {
+    pub fn new(today: Date) -> Self {
+        Self(Rc::new(Cell::new(today)))
+    }
+
+    pub fn set(&self, today: Date) {
+        self.0.set(today);
+    }
+}
+
+impl tijdje::clock::Clock for FakeClock {
+    fn today(&self) -> Date {
+        self.0.get()
+    }
 }
 
 pub fn render(app: &mut App, width: u16, height: u16) -> Buffer {

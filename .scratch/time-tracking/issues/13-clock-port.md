@@ -4,11 +4,11 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Today comes from an injected clock; tests use a fake clock
-- [ ] The event loop wakes up at least once a minute, so a date change is picked up without a key press
-- [ ] After the date changes, balances and day warnings use the new today; the selected day stays
-- [ ] The "open period only today" rule uses the current today
+- [x] Today comes from an injected clock; tests use a fake clock
+- [x] The event loop wakes up at least once a minute, so a date change is picked up without a key press
+- [x] After the date changes, balances and day warnings use the new today; the selected day stays
+- [x] The "open period only today" rule uses the current today
 
 Spec: `.scratch/time-tracking/spec.md`

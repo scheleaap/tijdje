@@ -169,7 +169,7 @@ fn saving_a_new_file_creates_it_without_a_backup() {
     let mut app = App::open(
         Box::new(fs.clone()),
         PathBuf::from(TIMESHEET),
-        date(2026, 11, 2),
+        Box::new(FakeClock::new(date(2026, 11, 2))),
     )
     .unwrap();
     alt_key(&mut app, KeyCode::Right);
@@ -295,7 +295,7 @@ fn an_unparsable_file_cannot_be_opened() {
     let result = App::open(
         Box::new(fs.clone()),
         PathBuf::from(TIMESHEET),
-        date(2026, 11, 2),
+        Box::new(FakeClock::new(date(2026, 11, 2))),
     );
     assert!(result.is_err());
     assert_eq!(fs.get(TIMESHEET).as_deref(), Some("days: [unclosed"));
@@ -308,7 +308,7 @@ fn a_file_with_another_schema_version_cannot_be_opened() {
     let result = App::open(
         Box::new(fs.clone()),
         PathBuf::from(TIMESHEET),
-        date(2026, 11, 2),
+        Box::new(FakeClock::new(date(2026, 11, 2))),
     );
     let Err(err) = result else {
         panic!("a file with schema version 2 was opened");

@@ -16,6 +16,7 @@ use popup::{Popup, PopupAction};
 
 use crate::{
     clipboard::{Clipboard, NoClipboard},
+    clock::Clock,
     domain::{
         ConsistencyProblem, Day, InconsistentDay, Period, PeriodType, TimeOfDay, Timesheet,
         calendar,
@@ -182,6 +183,8 @@ pub struct App {
     has_unsaved_changes: bool,
     /// Set when "Save" was chosen in the "Save before quitting?" popup.
     quit_after_saving: bool,
+    clock: Box<dyn Clock>,
+    /// The clock's date as last read; see `refresh_today`.
     today: Date,
     screen: Screen,
     panel: Panel,
@@ -207,8 +210,12 @@ pub struct App {
 }
 
 impl App {
-    /// Loads the timesheet at `path` and starts on `today`.
-    pub fn open(fs: Box<dyn FileSystem>, path: PathBuf, today: Date) -> Result<Self, LoadError> {
+    /// Loads the timesheet at `path` and starts on the clock's today.
+    pub fn open(
+        fs: Box<dyn FileSystem>,
+        path: PathBuf,
+        clock: Box<dyn Clock>,
+    ) -> Result<Self, LoadError> {
         let (timesheet, fingerprint) = store::load(fs.as_ref(), &path)?;
         Ok(Self::new(
             timesheet,
@@ -218,17 +225,19 @@ impl App {
                 fingerprint,
                 backup_made: false,
             },
-            today,
+            clock,
         ))
     }
 
-    fn new(timesheet: Timesheet, storage: Storage, today: Date) -> Self {
+    fn new(timesheet: Timesheet, storage: Storage, clock: Box<dyn Clock>) -> Self {
+        let today = clock.today();
         Self {
             timesheet,
             storage,
             clipboard: Box::new(NoClipboard),
             has_unsaved_changes: false,
             quit_after_saving: false,
+            clock,
             today,
             screen: Screen::Tracking,
             panel: Panel::Days,
@@ -277,6 +286,12 @@ impl App {
     /// Uses `clipboard` for Ctrl+C/Ctrl+V; without one, they do nothing.
     pub fn set_clipboard(&mut self, clipboard: Box<dyn Clipboard>) {
         self.clipboard = clipboard;
+    }
+
+    /// Reads today from the clock again, so balances, warnings and checks
+    /// follow a date change; the selected day stays.
+    pub fn refresh_today(&mut self) {
+        self.today = self.clock.today();
     }
 
     pub fn has_unsaved_changes(&self) -> bool {

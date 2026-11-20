@@ -1,13 +1,17 @@
-use std::{env, path::PathBuf, process::ExitCode};
+use std::{env, path::PathBuf, process::ExitCode, time::Duration};
 
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use tijdje::{
     app::{App, Outcome},
     cli::{self, Invocation},
     clipboard::SystemClipboard,
+    clock::SystemClock,
     store::RealFileSystem,
     wide_symbols,
 };
+
+/// How long the event loop waits for an event before checking the clock again.
+const CLOCK_CHECK_INTERVAL: Duration = Duration::from_secs(60);
 
 fn default_timesheet_path() -> PathBuf {
     let home = env::var_os("HOME").map(PathBuf::from).unwrap_or_default();
@@ -30,8 +34,11 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let today = jiff::Zoned::now().date();
-    let mut app = match App::open(Box::new(RealFileSystem), path.clone(), today) {
+    let mut app = match App::open(
+        Box::new(RealFileSystem),
+        path.clone(),
+        Box::new(SystemClock),
+    ) {
         Ok(app) => app,
         Err(e) => {
             eprintln!("tijdje: {}: {e}", path.display());
@@ -42,9 +49,11 @@ fn main() -> ExitCode {
     let mut terminal = ratatui::init();
     let result = (|| -> std::io::Result<()> {
         loop {
+            app.refresh_today();
             let frame = terminal.draw(|frame| app.render(frame))?;
             wide_symbols::paint_backgrounds(frame.buffer, &mut std::io::stdout())?;
-            if let Event::Key(key) = event::read()?
+            if event::poll(CLOCK_CHECK_INTERVAL)?
+                && let Event::Key(key) = event::read()?
                 && key.kind == KeyEventKind::Press
                 && app.handle_key(key) == Outcome::Quit
             {
