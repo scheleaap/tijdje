@@ -40,16 +40,21 @@ pub fn draw<'a, B: Backend<Error = io::Error>>(
     Ok(frame)
 }
 
-/// Keeps ratatui from writing the cells covered by wide symbols.
+/// Keeps ratatui from writing the cells covered by wide symbols. It changes
+/// the frame's buffer in place, since that's how ratatui hands it out.
 fn skip_covered_cells(buffer: &mut Buffer) {
-    let area = buffer.area;
-    for y in area.top()..area.bottom() {
-        for x in area.left()..area.right().saturating_sub(1) {
-            if is_wide(buffer[(x, y)].symbol()) {
-                buffer[(x + 1, y)].set_diff_option(CellDiffOption::Skip);
-            }
-        }
+    let covered: Vec<(u16, u16)> = wide_cells(buffer).map(|(x, y)| (x + 1, y)).collect();
+    for position in covered {
+        buffer[position].set_diff_option(CellDiffOption::Skip);
     }
+}
+
+/// The positions of the wide symbols in `buffer`, except in its last column.
+pub fn wide_cells(buffer: &Buffer) -> impl Iterator<Item = (u16, u16)> + '_ {
+    let area = buffer.area;
+    (area.top()..area.bottom())
+        .flat_map(move |y| (area.left()..area.right().saturating_sub(1)).map(move |x| (x, y)))
+        .filter(|&position| is_wide(buffer[position].symbol()))
 }
 
 fn is_wide(symbol: &str) -> bool {
@@ -60,22 +65,17 @@ fn is_wide(symbol: &str) -> bool {
 /// stays where the frame put it (e.g. in the field being edited).
 pub fn paint_backgrounds(buffer: &Buffer, out: &mut impl Write) -> io::Result<()> {
     queue!(out, SavePosition)?;
-    let area = buffer.area;
-    for y in area.top()..area.bottom() {
-        for x in area.left()..area.right().saturating_sub(1) {
-            let cell = &buffer[(x, y)];
-            if is_wide(cell.symbol()) {
-                queue!(
-                    out,
-                    SetBackgroundColor(cell.bg.into_crossterm()),
-                    SetForegroundColor(cell.fg.into_crossterm()),
-                    MoveTo(x + 1, y),
-                    Print(" "),
-                    MoveTo(x, y),
-                    Print(cell.symbol()),
-                )?;
-            }
-        }
+    for (x, y) in wide_cells(buffer) {
+        let cell = &buffer[(x, y)];
+        queue!(
+            out,
+            SetBackgroundColor(cell.bg.into_crossterm()),
+            SetForegroundColor(cell.fg.into_crossterm()),
+            MoveTo(x + 1, y),
+            Print(" "),
+            MoveTo(x, y),
+            Print(cell.symbol()),
+        )?;
     }
     queue!(out, ResetColor, RestorePosition)?;
     out.flush()

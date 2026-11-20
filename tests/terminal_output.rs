@@ -14,7 +14,7 @@ use ratatui::{
     style::Style,
     text::Span,
 };
-use std::{cell::RefCell, io, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, io, rc::Rc};
 use tijdje::{app::App, wide_symbols};
 
 /// Output that the test reads back while the backend writes to it.
@@ -81,15 +81,21 @@ impl Screen {
 
     /// Applies one escape sequence and returns the text after it.
     fn apply_escape<'a>(&mut self, seq: &'a str) -> &'a str {
-        if let Some(rest) = seq.strip_prefix('7') {
-            self.saved = self.cursor;
-            return rest;
+        match seq.chars().next() {
+            Some('7') => {
+                self.saved = self.cursor;
+                &seq[1..]
+            }
+            Some('8') => {
+                self.cursor = self.saved;
+                &seq[1..]
+            }
+            _ => self.apply_csi(seq.strip_prefix('[').expect("CSI sequence")),
         }
-        if let Some(rest) = seq.strip_prefix('8') {
-            self.cursor = self.saved;
-            return rest;
-        }
-        let csi = seq.strip_prefix('[').expect("CSI sequence");
+    }
+
+    /// Applies one CSI sequence (after `ESC [`) and returns the text after it.
+    fn apply_csi<'a>(&mut self, csi: &'a str) -> &'a str {
         let end = csi
             .find(|c: char| c.is_ascii_alphabetic())
             .expect("CSI final byte");
@@ -113,50 +119,60 @@ impl Screen {
                 _ => width,
             };
             let (x, y) = self.cursor;
-            if x >= self.width {
-                continue;
-            }
-            let row = &mut self.cells[y];
-            // Overwriting either half of a wide symbol erases the whole symbol.
-            if row[x] == COVERED && x > 0 {
-                row[x - 1] = " ".to_owned();
-            }
-            if x + 1 < self.width && row[x + 1] == COVERED {
-                row[x + 1] = " ".to_owned();
-            }
-            row[x] = symbol.to_owned();
-            if advance == 2 && x + 1 < self.width {
-                if x + 2 < self.width && row[x + 2] == COVERED {
-                    row[x + 2] = " ".to_owned();
-                }
-                row[x + 1] = COVERED.to_owned();
+            if x < self.width {
+                self.put(x, y, symbol, advance);
             }
             self.cursor.0 = x + advance;
         }
     }
 
-    /// The cells that differ from `buffer`, as (x, y, expected, shown). Cells covered by a wide
-    /// symbol in the buffer are skipped.
-    fn differences(&self, buffer: &Buffer) -> Vec<(u16, u16, String, String)> {
-        let area = buffer.area;
-        let mut differences = Vec::new();
-        for y in area.top()..area.bottom() {
-            for x in area.left()..area.right() {
-                let covered = x > area.left() && buffer[(x - 1, y)].symbol().len() > 1 && {
-                    Span::raw(buffer[(x - 1, y)].symbol()).width() == 2
-                };
-                if covered {
-                    continue;
-                }
-                let expected = buffer[(x, y)].symbol();
-                let shown = &self.cells[usize::from(y)][usize::from(x)];
-                if expected != shown {
-                    differences.push((x, y, expected.to_owned(), shown.clone()));
-                }
-            }
+    /// Puts `symbol` at (x, y), covering the next cell too if it advances two cells.
+    fn put(&mut self, x: usize, y: usize, symbol: &str, advance: usize) {
+        let row = &mut self.cells[y];
+        // Overwriting either half of a wide symbol erases the whole symbol.
+        if row[x] == COVERED && x > 0 {
+            row[x - 1] = " ".to_owned();
         }
-        differences
+        if x + 1 < self.width && row[x + 1] == COVERED {
+            row[x + 1] = " ".to_owned();
+        }
+        row[x] = symbol.to_owned();
+        if advance == 2 && x + 1 < self.width {
+            if x + 2 < self.width && row[x + 2] == COVERED {
+                row[x + 2] = " ".to_owned();
+            }
+            row[x + 1] = COVERED.to_owned();
+        }
     }
+
+    /// The cells that differ from `buffer`. Cells covered by a wide symbol in the buffer are
+    /// skipped.
+    fn differences(&self, buffer: &Buffer) -> Vec<Difference> {
+        let covered: HashSet<(u16, u16)> = wide_symbols::wide_cells(buffer)
+            .map(|(x, y)| (x + 1, y))
+            .collect();
+        let area = buffer.area;
+        (area.top()..area.bottom())
+            .flat_map(|y| (area.left()..area.right()).map(move |x| (x, y)))
+            .filter(|position| !covered.contains(position))
+            .map(|(x, y)| Difference {
+                x,
+                y,
+                expected: buffer[(x, y)].symbol().to_owned(),
+                shown: self.cells[usize::from(y)][usize::from(x)].clone(),
+            })
+            .filter(|difference| difference.expected != difference.shown)
+            .collect()
+    }
+}
+
+/// A cell whose symbol on the screen differs from the one ratatui meant to show.
+#[derive(Debug, PartialEq)]
+struct Difference {
+    x: u16,
+    y: u16,
+    expected: String,
+    shown: String,
 }
 
 const WIDTH: u16 = 120;
@@ -168,7 +184,7 @@ fn differences_while(
     app: &mut App,
     advance: EmojiAdvance,
     steps: impl IntoIterator<Item = KeyEvent>,
-) -> Vec<(u16, u16, String, String)> {
+) -> Vec<Difference> {
     let output = SharedOutput::default();
     let backend = CrosstermBackend::new(output.clone());
     let viewport = Viewport::Fixed(Rect::new(0, 0, WIDTH, HEIGHT));
@@ -182,18 +198,15 @@ fn differences_while(
         screen.apply(&output.0.take());
         screen.differences(&buffer)
     };
-    let differences = draw(app);
-    if !differences.is_empty() {
-        return differences;
-    }
-    for key in steps {
+    let mut differences = draw(app);
+    let mut steps = steps.into_iter();
+    while differences.is_empty()
+        && let Some(key) = steps.next()
+    {
         app.handle_key(key);
-        let differences = draw(app);
-        if !differences.is_empty() {
-            return differences;
-        }
+        differences = draw(app);
     }
-    Vec::new()
+    differences
 }
 
 /// Scrolls the day list up one line so that the row with 🏖️ (6 Nov) lands on the line that
@@ -204,18 +217,18 @@ fn scroll_vacation_onto_separator() -> Vec<KeyEvent> {
         .to_vec()
 }
 
+fn assert_scrolling_keeps_the_screen_intact(advance: EmojiAdvance) {
+    let mut app = app_with(SAMPLE, SAMPLE_TODAY);
+    let differences = differences_while(&mut app, advance, scroll_vacation_onto_separator());
+    assert_eq!(differences, vec![]);
+}
+
 #[test]
 fn scrolling_the_days_keeps_the_panel_border_when_emoji_advance_two_cells() {
-    let mut app = app_with(SAMPLE, SAMPLE_TODAY);
-    let steps = scroll_vacation_onto_separator();
-    let differences = differences_while(&mut app, EmojiAdvance::TwoCells, steps);
-    assert_eq!(differences, vec![], "(x, y, expected, shown)");
+    assert_scrolling_keeps_the_screen_intact(EmojiAdvance::TwoCells);
 }
 
 #[test]
 fn scrolling_the_days_keeps_the_panel_border_when_emoji_advance_one_cell() {
-    let mut app = app_with(SAMPLE, SAMPLE_TODAY);
-    let steps = scroll_vacation_onto_separator();
-    let differences = differences_while(&mut app, EmojiAdvance::OneCell, steps);
-    assert_eq!(differences, vec![], "(x, y, expected, shown)");
+    assert_scrolling_keeps_the_screen_intact(EmojiAdvance::OneCell);
 }
