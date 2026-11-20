@@ -198,6 +198,15 @@ pub fn day(periods: Vec<Period>) -> Day {
     }
 }
 
+/// Focuses the last period of the selected day and adds a period after it
+/// with Ctrl+Enter.
+pub fn add_period(app: &mut App) {
+    for _ in 0..app.timesheet().day(app.selected_day()).periods.len() {
+        press(app, KeyCode::Down);
+    }
+    ctrl_key(app, KeyCode::Enter);
+}
+
 /// Types `text` key by key.
 pub fn type_text(app: &mut App, text: &str) {
     for c in text.chars() {

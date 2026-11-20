@@ -111,27 +111,43 @@ fn alt_letters_do_nothing_when_the_active_input_is_invalid() {
     let mut app = monday_with_first_period_focused();
     type_text(&mut app, "99");
     alt_key(&mut app, KeyCode::Char('b'));
-    alt_key(&mut app, KeyCode::Char('p'));
+    alt_key(&mut app, KeyCode::Char('v'));
     assert!(app.is_editing());
     assert_eq!(first_period(&app).period_type, PeriodType::Work);
     assert_eq!(app.focus().field, Field::From);
 }
 
 #[test]
-fn alt_p_and_alt_n_go_to_project_and_notes() {
+fn alt_p_and_alt_n_are_removed() {
     let mut app = monday_with_first_period_focused();
     type_text(&mut app, "0815");
     alt_key(&mut app, KeyCode::Char('p'));
+    alt_key(&mut app, KeyCode::Char('n'));
+    assert!(app.is_editing(), "ignored while editing");
     assert_eq!(
         app.focus(),
         FieldFocus {
             period: 0,
-            field: Field::Project
+            field: Field::From
         }
     );
-    assert_eq!(first_period(&app).from, TimeOfDay::new(8, 15));
+    press(&mut app, KeyCode::Esc);
+    alt_key(&mut app, KeyCode::Char('p'));
     alt_key(&mut app, KeyCode::Char('n'));
-    assert_eq!(app.focus().field, Field::Notes);
+    assert_eq!(app.focus().field, Field::From);
+}
+
+#[test]
+fn del_on_a_checked_absence_unchecks_it_like_enter() {
+    // Wed 11 Nov has no periods: checking Vacation fills in a full day.
+    let mut app = app_with(SAMPLE, date(2026, 11, 11));
+    alt_key(&mut app, KeyCode::Char('v'));
+    assert_eq!(first_period(&app).period_type, PeriodType::Vacation);
+    while app.focus().field != Field::Vacation {
+        press(&mut app, KeyCode::Tab);
+    }
+    press(&mut app, KeyCode::Delete);
+    assert!(app.timesheet().day(date(2026, 11, 11)).is_empty());
 }
 
 #[test]

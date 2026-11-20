@@ -6,7 +6,7 @@ use common::*;
 use jiff::civil::date;
 use ratatui::crossterm::event::KeyCode;
 use tijdje::{
-    app::{App, Outcome},
+    app::{App, Field, Outcome},
     domain::TimeOfDay,
     store,
 };
@@ -73,7 +73,9 @@ fn text_with_quotes_and_special_characters_survives_saving() {
     let (mut app, fs) = sample_on(date(2026, 11, 2));
     // The break (period 1) has no notes yet.
     press(&mut app, KeyCode::Down);
-    alt_key(&mut app, KeyCode::Char('n'));
+    while app.focus().field != Field::Notes {
+        press(&mut app, KeyCode::Right);
+    }
     let notes = r#"say "hi" \ # : - [x] {y} 'z' ü"#;
     type_text(&mut app, notes);
     press(&mut app, KeyCode::Enter);
@@ -88,7 +90,7 @@ fn text_with_quotes_and_special_characters_survives_saving() {
 #[test]
 fn days_without_periods_are_not_written() {
     let (mut app, fs) = sample_on(date(2026, 11, 6));
-    alt_key(&mut app, KeyCode::Delete);
+    ctrl_key(&mut app, KeyCode::Delete);
     press(&mut app, KeyCode::Char('d'));
     ctrl(&mut app, 's');
     assert!(!fs.get(TIMESHEET).unwrap().contains("2026-11-06"));
@@ -97,7 +99,6 @@ fn days_without_periods_are_not_written() {
 #[test]
 fn a_new_day_stores_the_regular_expected_working_time() {
     let (mut app, fs) = sample_on(date(2026, 11, 11));
-    alt_key(&mut app, KeyCode::Enter);
     type_text(&mut app, "0900");
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "1200");
@@ -161,7 +162,6 @@ fn saving_a_new_file_creates_it_without_a_backup() {
         Box::new(FakeClock::new(date(2026, 11, 2))),
     )
     .unwrap();
-    alt_key(&mut app, KeyCode::Enter);
     type_text(&mut app, "0900");
     press(&mut app, KeyCode::Enter);
     ctrl(&mut app, 's');

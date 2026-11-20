@@ -199,14 +199,35 @@ fn tab_follows_the_fields_on_screen_and_continues_in_the_next_period() {
 }
 
 #[test]
-fn tab_stays_at_the_very_first_and_last_field() {
+fn tab_wraps_around_within_the_day() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
     press(&mut app, KeyCode::BackTab);
-    assert_eq!(app.focus(), focus(0, Field::From));
-    for _ in 0..30 {
-        press(&mut app, KeyCode::Tab);
-    }
     assert_eq!(app.focus(), focus(2, Field::Notes));
+    press(&mut app, KeyCode::Tab);
+    assert_eq!(app.focus(), focus(0, Field::From));
+    assert_eq!(app.selected_day(), date(2026, 11, 2));
+}
+
+#[test]
+fn tab_wraps_around_on_the_empty_period_of_a_day_without_periods() {
+    let mut app = app_with(SAMPLE, date(2026, 11, 11));
+    press(&mut app, KeyCode::BackTab);
+    assert_eq!(app.focus(), focus(0, Field::Notes));
+    press(&mut app, KeyCode::Tab);
+    assert_eq!(app.focus(), focus(0, Field::From));
+}
+
+#[test]
+fn up_and_down_skip_implied_break_rows() {
+    // Tue 10 Nov: 0810–1200, an implied break 1200–1230, then 1230–.
+    let mut app = app_with(SAMPLE, date(2026, 11, 10));
+    let screen = rows(&render(&mut app, 120, 24));
+    row_containing(&screen, "1200 1230");
+    press(&mut app, KeyCode::Right);
+    press(&mut app, KeyCode::Down);
+    assert_eq!(app.focus(), focus(1, Field::To));
+    press(&mut app, KeyCode::Up);
+    assert_eq!(app.focus(), focus(0, Field::To));
 }
 
 #[test]

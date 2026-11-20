@@ -65,13 +65,13 @@ fn a_checkbox_toggle_with_its_auto_fill_is_one_step() {
 #[test]
 fn adding_and_deleting_periods_can_be_undone() {
     let mut app = monday();
-    alt_key(&mut app, KeyCode::Enter);
+    add_period(&mut app);
     assert_eq!(periods(&app, MONDAY).len(), 4);
     ctrl(&mut app, 'z');
     assert_eq!(periods(&app, MONDAY).len(), 3);
 
     press(&mut app, KeyCode::Up);
-    alt_key(&mut app, KeyCode::Delete);
+    ctrl_key(&mut app, KeyCode::Delete);
     press(&mut app, KeyCode::Char('d'));
     assert_eq!(periods(&app, MONDAY).len(), 2);
     ctrl(&mut app, 'z');
@@ -146,7 +146,7 @@ fn saving_keeps_the_history() {
 #[test]
 fn sorting_when_leaving_a_day_is_not_an_undo_step() {
     let mut app = monday();
-    alt_key(&mut app, KeyCode::Enter);
+    add_period(&mut app);
     type_text(&mut app, "0700");
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "0800");
@@ -171,4 +171,34 @@ fn undo_does_nothing_on_the_help_screen() {
     press(&mut app, KeyCode::F(1));
     ctrl(&mut app, 'z');
     assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 15));
+}
+
+#[test]
+fn clearing_a_field_is_an_undo_step() {
+    let mut app = monday();
+    press(&mut app, KeyCode::Delete);
+    assert_eq!(periods(&app, MONDAY)[0].from, None);
+    ctrl(&mut app, 'z');
+    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 45));
+    ctrl(&mut app, 'y');
+    assert_eq!(periods(&app, MONDAY)[0].from, None);
+}
+
+#[test]
+fn clearing_an_empty_field_is_not_an_undo_step() {
+    let mut app = monday();
+    // The break (period 1) has no project.
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Right);
+    press(&mut app, KeyCode::Right);
+    assert_eq!(
+        app.focus(),
+        FieldFocus {
+            period: 1,
+            field: Field::Project
+        }
+    );
+    press(&mut app, KeyCode::Delete);
+    ctrl(&mut app, 'z');
+    assert!(screen(&mut app).contains("Nothing to undo"));
 }

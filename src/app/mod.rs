@@ -133,25 +133,15 @@ impl Field {
     }
 }
 
-/// Alt shortcuts that act on the focused period (Alt+b/v/s/h/p/n).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PeriodShortcut {
-    Toggle(PeriodType),
-    Focus(Field),
-}
-
-impl PeriodShortcut {
-    fn for_key(code: KeyCode) -> Option<Self> {
-        Some(match code {
-            KeyCode::Char('b') => Self::Toggle(PeriodType::Break),
-            KeyCode::Char('v') => Self::Toggle(PeriodType::Vacation),
-            KeyCode::Char('s') => Self::Toggle(PeriodType::Sick),
-            KeyCode::Char('h') => Self::Toggle(PeriodType::Holiday),
-            KeyCode::Char('p') => Self::Focus(Field::Project),
-            KeyCode::Char('n') => Self::Focus(Field::Notes),
-            _ => return None,
-        })
-    }
+/// The period type Alt+b/v/s/h toggles on the focused period.
+fn period_type_for_alt_key(code: KeyCode) -> Option<PeriodType> {
+    Some(match code {
+        KeyCode::Char('b') => PeriodType::Break,
+        KeyCode::Char('v') => PeriodType::Vacation,
+        KeyCode::Char('s') => PeriodType::Sick,
+        KeyCode::Char('h') => PeriodType::Holiday,
+        _ => return None,
+    })
 }
 
 /// Which way focus moves.
@@ -325,11 +315,11 @@ impl App {
         }
         if alt
             && self.is_tracking()
-            && let Some(shortcut) = PeriodShortcut::for_key(key.code)
+            && let Some(period_type) = period_type_for_alt_key(key.code)
         {
             // Accept active input first; if that fails, the shortcut does nothing.
             if self.active_input.is_none() || self.accept() {
-                self.run_period_shortcut(shortcut);
+                self.toggle_period_type(period_type);
             }
             return Outcome::Continue;
         }
@@ -399,40 +389,56 @@ impl App {
             KeyCode::Right if plain => self.move_focus_within_period(Direction::Forward),
             KeyCode::Up if plain => self.move_focus_vertically(Direction::Backward),
             KeyCode::Down if plain => self.move_focus_vertically(Direction::Forward),
-            KeyCode::Tab => self.move_focus_horizontally(Direction::Forward),
-            KeyCode::BackTab => self.move_focus_horizontally(Direction::Backward),
-            KeyCode::Enter if alt => self.add_period(),
-            KeyCode::Enter => self.edit_or_toggle_focused_field(),
+            KeyCode::Tab => self.move_focus_in_tab_order(Direction::Forward),
+            KeyCode::BackTab => self.move_focus_in_tab_order(Direction::Backward),
+            KeyCode::Enter if ctrl_only => self.go_to_next_period_or_add_one(),
+            KeyCode::Enter if plain => self.edit_or_toggle_focused_field(),
             // The empty period of a day without periods can't be deleted.
-            KeyCode::Delete if alt && !self.shows_empty_period() => {
+            KeyCode::Delete if ctrl_only && !self.shows_empty_period() => {
                 let label = self.focused_period().map(Period::label).unwrap_or_default();
                 self.popup = Some(Popup::delete_period(&label));
             }
-            KeyCode::Char(c) if !ctrl && !alt => self.start_editing(c),
+            KeyCode::Delete if plain => self.clear_focused_field(),
+            KeyCode::Char(c) if plain => self.start_editing(c),
             _ => {}
         }
     }
 
-    /// While editing, only editing keys work; Enter/Tab accept, Esc rejects.
+    /// While editing, only editing keys work; Enter, Tab/Shift-Tab and
+    /// Ctrl+Enter accept, Esc rejects. Other keys are ignored silently.
     fn handle_editing_key(&mut self, key: KeyEvent) {
-        let plain = !key
-            .modifiers
-            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT);
+        let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+        let alt = key.modifiers.contains(KeyModifiers::ALT);
+        let plain = !ctrl && !alt;
+        let ctrl_only = ctrl && !alt;
         let field = self.focus.field;
         let Some(input) = &mut self.active_input else {
             return;
         };
         match key.code {
             KeyCode::Char(c) if plain && field.accepts(c, input.len()) => input.insert(c),
-            KeyCode::Backspace => input.backspace(),
-            KeyCode::Delete => input.delete(),
-            KeyCode::Left => input.left(),
-            KeyCode::Right => input.right(),
-            KeyCode::Home => input.home(),
-            KeyCode::End => input.end(),
+            KeyCode::Char('a') if ctrl_only => input.home(),
+            KeyCode::Char('e') if ctrl_only => input.end(),
+            KeyCode::Char('w') if ctrl_only => input.delete_previous_word(),
+            KeyCode::Char('u') if ctrl_only => input.delete_to_start(),
+            KeyCode::Char('k') if ctrl_only => input.delete_to_end(),
+            KeyCode::Backspace if ctrl_only => input.delete_previous_word(),
+            KeyCode::Backspace if plain => input.backspace(),
+            KeyCode::Delete if plain => input.delete(),
+            KeyCode::Left if ctrl_only => input.word_left(),
+            KeyCode::Right if ctrl_only => input.word_right(),
+            KeyCode::Left if plain => input.left(),
+            KeyCode::Right if plain => input.right(),
+            KeyCode::Home if plain => input.home(),
+            KeyCode::End if plain => input.end(),
             KeyCode::Esc => self.active_input = None,
-            KeyCode::Enter => {
+            KeyCode::Enter if plain => {
                 self.accept();
+            }
+            KeyCode::Enter if ctrl_only => {
+                if self.accept() {
+                    self.go_to_next_period_or_add_one();
+                }
             }
             KeyCode::Tab | KeyCode::BackTab => {
                 let direction = if key.code == KeyCode::Tab {
@@ -441,7 +447,7 @@ impl App {
                     Direction::Backward
                 };
                 if self.accept() {
-                    self.move_focus_horizontally(direction);
+                    self.move_focus_in_tab_order(direction);
                 }
             }
             _ => {}
@@ -526,27 +532,41 @@ impl App {
         self.edit_selected_day(|day| day.toggle_period_type(period, period_type));
     }
 
-    fn run_period_shortcut(&mut self, shortcut: PeriodShortcut) {
-        match shortcut {
-            PeriodShortcut::Toggle(period_type) => self.toggle_period_type(period_type),
-            PeriodShortcut::Focus(field) => self.focus.field = field,
-        }
-    }
-
     /// Typing in a focused text field replaces its value with active input.
     fn start_editing(&mut self, c: char) {
-        let field = self.focus.field;
-        if !field.accepts(c, 0) {
+        if !self.focus.field.accepts(c, 0) {
             return;
         }
-        // Notes keeps its text; other fields are replaced by what you type.
-        let mut input = if field == Field::Notes {
-            ActiveInput::with_text(&self.focused_text())
-        } else {
-            ActiveInput::with_text("")
-        };
+        let mut input = ActiveInput::with_text("");
         input.insert(c);
         self.active_input = Some(input);
+    }
+
+    /// Del (not editing): empties a text field or unchecks a checkbox, as an
+    /// accepted change.
+    fn clear_focused_field(&mut self) {
+        let focus = self.focus;
+        match focus.field.period_type() {
+            Some(period_type) => {
+                let checked = self
+                    .focused_period()
+                    .is_some_and(|period| period.period_type == period_type);
+                if checked {
+                    self.toggle_period_type(period_type);
+                }
+            }
+            None => self.edit_selected_day(|day| {
+                if let Some(period) = day.periods.get_mut(focus.period) {
+                    match focus.field {
+                        Field::From => period.from = None,
+                        Field::To => period.to = None,
+                        Field::Project => period.project = None,
+                        Field::Notes => period.notes = None,
+                        Field::Break | Field::Vacation | Field::Sick | Field::Holiday => {}
+                    }
+                }
+            }),
+        }
     }
 
     /// Stores the active input in the focused field. An invalid time keeps the
@@ -743,15 +763,23 @@ impl App {
         }
     }
 
-    /// Alt+Enter adds a period after the last one and focuses its From,
-    /// unless the last period is still open (which includes an empty period,
-    /// such as the one a day without periods shows).
-    fn add_period(&mut self) {
-        let last_is_open = self.shown_day().periods.last().is_some_and(Period::is_open);
-        if last_is_open {
+    /// Ctrl+Enter: focuses From of the next period. In the last period, adds
+    /// a period after it and focuses its From, unless the last period is still
+    /// open (without To, which includes an empty last period): then it only
+    /// notifies. On the empty period of a day without periods it does nothing.
+    fn go_to_next_period_or_add_one(&mut self) {
+        if self.shows_empty_period() {
             return;
         }
-        let period = self.edit_selected_day(Day::add_period);
+        let next = self.focus.period + 1;
+        let period = if next < self.period_count() {
+            next
+        } else if self.shown_day().periods.last().is_some_and(Period::is_open) {
+            self.notify("The last period is still open");
+            return;
+        } else {
+            self.edit_selected_day(Day::add_period)
+        };
         self.focus = FieldFocus {
             period,
             field: Field::From,
@@ -843,8 +871,10 @@ impl App {
         self.shown_day().periods.len()
     }
 
-    /// ↑/↓: the same field in the previous/next period, stopping at the first
-    /// and last period.
+    /// ↑/↓: the closest field in the period row above/below, stopping at the
+    /// first and last period. Implied-break rows aren't focusable, so they are
+    /// skipped. Every period row has the same fields in the same columns, so
+    /// the closest field is the same field.
     fn move_focus_vertically(&mut self, direction: Direction) {
         let period = self.focus.period;
         self.focus.period = match direction {
@@ -866,26 +896,24 @@ impl App {
     }
 
     /// Tab/Shift-Tab: the next/previous field, continuing in the next/previous
-    /// period. Focus stays put at the very first and last field.
-    fn move_focus_horizontally(&mut self, direction: Direction) {
+    /// period and wrapping around within the day.
+    fn move_focus_in_tab_order(&mut self, direction: Direction) {
         let count = self.period_count();
         let focus = self.focus;
         self.focus = match direction {
             Direction::Forward => match focus.field.next() {
                 Some(field) => FieldFocus { field, ..focus },
-                None if focus.period + 1 < count => FieldFocus {
-                    period: focus.period + 1,
+                None => FieldFocus {
+                    period: (focus.period + 1) % count,
                     field: Field::FIRST,
                 },
-                None => focus,
             },
             Direction::Backward => match focus.field.previous() {
                 Some(field) => FieldFocus { field, ..focus },
-                None if focus.period > 0 => FieldFocus {
-                    period: focus.period - 1,
+                None => FieldFocus {
+                    period: (focus.period + count - 1) % count,
                     field: Field::LAST,
                 },
-                None => focus,
             },
         };
     }

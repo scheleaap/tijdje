@@ -97,7 +97,7 @@ fn a_fixed_day_can_be_left() {
 #[test]
 fn leaving_a_day_sorts_its_periods() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
-    alt_key(&mut app, KeyCode::Enter);
+    add_period(&mut app);
     type_text(&mut app, "0700");
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "0800");
@@ -113,7 +113,7 @@ fn leaving_a_day_sorts_its_periods() {
 fn leaving_a_day_removes_empty_periods() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
     // A fourth period from 1757, whose From is then cleared.
-    alt_key(&mut app, KeyCode::Enter);
+    add_period(&mut app);
     press(&mut app, KeyCode::Enter);
     for _ in 0..4 {
         press(&mut app, KeyCode::Backspace);

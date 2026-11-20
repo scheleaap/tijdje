@@ -669,19 +669,31 @@ fn render_help(frame: &mut Frame, area: Rect) {
     let shortcuts = [
         ("Ctrl+↑/↓", "Previous/next day"),
         ("Ctrl+PgUp/PgDn", "Previous/next week"),
-        ("↑/↓", "Same field in the previous/next period"),
+        ("←/→/↑/↓", "Field left/right/above/below"),
         ("Tab/Shift-Tab", "Next/previous field"),
-        ("←/→", "Previous/next field of the period"),
-        ("Type", "Replace the field's value (Notes: add to it)"),
+        (
+            "Ctrl+Enter",
+            "From of the next period; in the last one: add a period",
+        ),
+        ("Type", "Replace the field's value"),
         (
             "Enter",
             "Edit the focused field, or toggle a checkbox; while editing: accept",
         ),
-        ("Alt+Enter", "Add a period after the last one"),
         ("Esc", "Reject input"),
-        ("Alt+Del", "Delete the focused period"),
+        ("Del", "Clear the field, or uncheck the checkbox"),
+        (
+            "Home/End, Ctrl+A/E",
+            "While editing: start/end of the input",
+        ),
+        ("Ctrl+←/→", "While editing: previous/next word"),
+        (
+            "Ctrl+Backspace/Ctrl+W",
+            "While editing: delete the previous word",
+        ),
+        ("Ctrl+U/Ctrl+K", "While editing: delete to the start/end"),
+        ("Ctrl+Del", "Delete the focused period"),
         ("Alt+b/v/s/h", "Toggle break/vacation/sick/holiday"),
-        ("Alt+p/n", "Go to Project/Notes"),
         ("F1", "Help"),
         ("F2, Esc", "Back to Tracking"),
         ("Ctrl+C/Ctrl+V", "Copy/paste the focused field"),
@@ -691,7 +703,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
     ];
     let lines: Vec<Line> = shortcuts
         .iter()
-        .map(|(key, action)| Line::raw(format!(" {key:<15}{action}")))
+        .map(|(key, action)| Line::raw(format!(" {key:<23}{action}")))
         .collect();
     frame.render_widget(
         Paragraph::new(lines)

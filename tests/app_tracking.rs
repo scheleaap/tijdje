@@ -132,7 +132,19 @@ fn f1_shows_help_and_esc_or_f2_returns_to_tracking() {
     press(&mut app, KeyCode::F(1));
     assert_eq!(app.screen(), Screen::Help);
     let screen = rows(&render(&mut app, 120, 24));
-    row_containing(&screen, "Ctrl+Q");
+    for key in [
+        "Ctrl+Q",
+        "Ctrl+Enter",
+        "Ctrl+Del",
+        "Ctrl+Backspace/Ctrl+W",
+        "Del ",
+    ] {
+        row_containing(&screen, key);
+    }
+    let text = screen.join("\n");
+    for removed in ["Alt+Enter", "Alt+Del", "Alt+p/n"] {
+        assert!(!text.contains(removed), "{removed} is gone");
+    }
     press(&mut app, KeyCode::Esc);
     assert_eq!(app.screen(), Screen::Tracking);
     press(&mut app, KeyCode::F(1));

@@ -1,5 +1,7 @@
 //! Active input: text typed into a field that hasn't been accepted or rejected yet.
 
+use crate::words;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ActiveInput {
     text: Vec<char>,
@@ -60,6 +62,34 @@ impl ActiveInput {
 
     pub fn end(&mut self) {
         self.cursor = self.text.len();
+    }
+
+    /// Moves the cursor to the start of the previous word.
+    pub fn word_left(&mut self) {
+        self.cursor = words::previous_word_start(&self.text, self.cursor);
+    }
+
+    /// Moves the cursor to the end of the next word.
+    pub fn word_right(&mut self) {
+        self.cursor = words::next_word_end(&self.text, self.cursor);
+    }
+
+    /// Deletes from the start of the previous word up to the cursor.
+    pub fn delete_previous_word(&mut self) {
+        let start = words::previous_word_start(&self.text, self.cursor);
+        self.text.drain(start..self.cursor);
+        self.cursor = start;
+    }
+
+    /// Deletes everything before the cursor.
+    pub fn delete_to_start(&mut self) {
+        self.text.drain(..self.cursor);
+        self.cursor = 0;
+    }
+
+    /// Deletes everything from the cursor on.
+    pub fn delete_to_end(&mut self) {
+        self.text.truncate(self.cursor);
     }
 
     /// The part of the text that fits in a field `width` characters wide,
