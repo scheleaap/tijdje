@@ -110,3 +110,26 @@ days:
 fn sample_file_loads() {
     load(common::SAMPLE).unwrap();
 }
+
+#[test]
+fn schema_version_1_is_read() {
+    let timesheet = load("schema_version: 1\ndays: {}\n").unwrap();
+    assert!(timesheet.days.is_empty());
+}
+
+#[test]
+fn a_file_without_schema_version_is_read_as_version_1() {
+    load("days: {}\n").unwrap();
+}
+
+#[test]
+fn another_schema_version_is_refused_with_a_clear_message() {
+    let err = load("schema_version: 2\ndays: {}\n").unwrap_err();
+    assert!(
+        matches!(err, LoadError::UnsupportedSchemaVersion(2)),
+        "{err}"
+    );
+    let message = err.to_string();
+    assert!(message.contains("schema version 2"), "{message}");
+    assert!(message.contains("version 1"), "{message}");
+}

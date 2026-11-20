@@ -32,7 +32,10 @@ fn saving_replaces_the_file_and_keeps_a_backup() {
     )
     .unwrap();
 
-    assert_eq!(fs::read_to_string(&path).unwrap(), "days: {}\n");
+    assert_eq!(
+        fs::read_to_string(&path).unwrap(),
+        "schema_version: 1\ndays: {}\n"
+    );
     assert_eq!(
         fs::read_to_string(folder.join("timesheet.yaml.bak")).unwrap(),
         common::SAMPLE
@@ -113,7 +116,10 @@ fn saving_through_a_symlink_replaces_the_target_and_keeps_the_symlink() {
             .file_type()
             .is_symlink()
     );
-    assert_eq!(fs::read_to_string(&target).unwrap(), "days: {}\n");
+    assert_eq!(
+        fs::read_to_string(&target).unwrap(),
+        "schema_version: 1\ndays: {}\n"
+    );
     assert_eq!(
         fs::read_to_string(target_folder.join("timesheet.yaml.bak")).unwrap(),
         common::SAMPLE

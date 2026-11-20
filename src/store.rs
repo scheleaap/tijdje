@@ -98,6 +98,8 @@ impl Fingerprint {
 pub enum LoadError {
     Io(io::Error),
     Parse(String),
+    /// The file has a schema version this application can't read.
+    UnsupportedSchemaVersion(u32),
 }
 
 impl fmt::Display for LoadError {
@@ -105,6 +107,11 @@ impl fmt::Display for LoadError {
         match self {
             LoadError::Io(e) => write!(f, "cannot read the timesheet file: {e}"),
             LoadError::Parse(e) => write!(f, "cannot parse the timesheet file: {e}"),
+            LoadError::UnsupportedSchemaVersion(version) => write!(
+                f,
+                "the timesheet file has schema version {version}, \
+                 but this version of tijdje only reads schema version {SCHEMA_VERSION}"
+            ),
         }
     }
 }
@@ -139,7 +146,12 @@ pub enum Backup {
     Skip,
 }
 
-/// Loads the timesheet at `path`. A missing or empty file is an empty timesheet.
+/// The schema version this application reads and writes. It increases only
+/// on breaking changes to the file format.
+const SCHEMA_VERSION: u32 = 1;
+
+/// Loads the timesheet at `path`. A missing or empty file is an empty
+/// timesheet, and a file without a schema version has version 1.
 pub fn load(fs: &dyn FileSystem, path: &Path) -> Result<(Timesheet, Fingerprint), LoadError> {
     let text = read_if_exists(fs, path).map_err(LoadError::Io)?;
     let fingerprint = Fingerprint::of(text.as_deref());
@@ -148,6 +160,10 @@ pub fn load(fs: &dyn FileSystem, path: &Path) -> Result<(Timesheet, Fingerprint)
     };
     let file: FileModel =
         serde_yaml_ng::from_str(&text).map_err(|e| LoadError::Parse(e.to_string()))?;
+    let version = file.schema_version.unwrap_or(1);
+    if version != SCHEMA_VERSION {
+        return Err(LoadError::UnsupportedSchemaVersion(version));
+    }
     Ok((
         file.into_timesheet().map_err(LoadError::Parse)?,
         fingerprint,
@@ -197,7 +213,7 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
     PathBuf::from(name)
 }
 
-/// Writes the timesheet as YAML. Dates, times and text are always
+/// Writes the timesheet as YAML, starting with the schema version. Dates, times and text are always
 /// double-quoted, so YAML 1.1 readers don't take `08:45` for a number or
 /// `2026-11-02` for a timestamp. Days with only empty periods are not written, and
 /// every written day gets its regular expected working time, so a new day
@@ -209,9 +225,9 @@ fn to_yaml(timesheet: &Timesheet) -> String {
         .filter(|(_, day)| !day.is_empty())
         .collect();
     if days.is_empty() {
-        return "days: {}\n".to_owned();
+        return format!("schema_version: {SCHEMA_VERSION}\ndays: {{}}\n");
     }
-    let mut out = String::from("days:\n");
+    let mut out = format!("schema_version: {SCHEMA_VERSION}\ndays:\n");
     for (date, day) in days {
         out += &format!(
             "  \"{date}\":\n    regular_expected_working_time_in_minutes: {}\n    periods:\n",
@@ -285,6 +301,7 @@ fn period_type_from_name(name: &str) -> Option<PeriodType> {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FileModel {
+    schema_version: Option<u32>,
     #[serde(default)]
     days: BTreeMap<Date, DayModel>,
 }

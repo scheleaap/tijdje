@@ -62,7 +62,7 @@ fn saved_yaml_follows_the_documented_schema() {
         notes: null
         type: break
 ";
-    assert!(yaml.starts_with("days:\n"), "{yaml}");
+    assert!(yaml.starts_with("schema_version: 1\ndays:\n"), "{yaml}");
     assert!(yaml.contains(monday), "{yaml}");
     assert!(
         yaml.contains("        to: null\n"),
@@ -299,4 +299,20 @@ fn an_unparsable_file_cannot_be_opened() {
     );
     assert!(result.is_err());
     assert_eq!(fs.get(TIMESHEET).as_deref(), Some("days: [unclosed"));
+}
+
+#[test]
+fn a_file_with_another_schema_version_cannot_be_opened() {
+    let yaml = "schema_version: 2\ndays: {}\n";
+    let fs = InMemoryFileSystem::with(TIMESHEET, yaml);
+    let result = App::open(
+        Box::new(fs.clone()),
+        PathBuf::from(TIMESHEET),
+        date(2026, 11, 2),
+    );
+    let Err(err) = result else {
+        panic!("a file with schema version 2 was opened");
+    };
+    assert!(err.to_string().contains("schema version 2"), "{err}");
+    assert_eq!(fs.get(TIMESHEET).as_deref(), Some(yaml));
 }
