@@ -14,7 +14,7 @@
 - [ ] Del (not editing) clears an input field or unchecks a checkbox
 - [ ] While editing: ←/→ move the cursor; Home/Ctrl+A, End/Ctrl+E; Backspace/Del; Ctrl+Backspace/Ctrl+W delete the previous word; Ctrl+U to the start; Ctrl+K to the end; Ctrl+←/→ by word
 - [ ] Ctrl+Del deletes the focused period after confirming; not while editing
-- [ ] While editing, Tab/Shift-Tab accept and move on; day navigation, Ctrl+Enter, Ctrl+Del and ↑/↓ are ignored
+- [ ] While editing, Tab/Shift-Tab and Ctrl+Enter accept and move on (staying put if accepting fails); day navigation, Ctrl+Del and ↑/↓ are ignored
 - [ ] Removed: Alt+Enter, Alt+Del, Alt+p/n
 - [ ] Clearing a field and Ctrl+Enter's added period are undo steps
 
