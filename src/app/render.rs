@@ -55,7 +55,7 @@ const HEADER: Style = Style::new().fg(Color::Yellow).bg(Color::Blue);
 const SELECTED: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 const FIELD: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const FOCUSED_FIELD: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
-const MESSAGE: Style = Style::new().fg(Color::Yellow).bg(Color::Blue);
+const NOTIFICATION: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 /// Periods that failed the consistency check.
 const HIGHLIGHTED: Style = Style::new().fg(Color::White).bg(Color::Red);
 const POPUP: Style = Style::new().fg(Color::Black).bg(Color::Gray);
@@ -80,6 +80,9 @@ impl App {
             Screen::Help => render_help(frame, main),
         }
         render_function_keys(frame, keys);
+        if let Some(text) = &self.notification {
+            render_notification(frame, main, text);
+        }
         if let Some(popup) = &self.popup {
             render_popup(frame, popup);
         }
@@ -179,10 +182,9 @@ impl App {
         let block = panel_block(&title);
         let inner = block.inner(area);
         frame.render_widget(block, area);
-        let [header, list, message, actual_expected] = Layout::vertical([
+        let [header, list, actual_expected] = Layout::vertical([
             Constraint::Length(1),
             Constraint::Fill(1),
-            Constraint::Length(1),
             Constraint::Length(1),
         ])
         .areas(inner);
@@ -246,10 +248,6 @@ impl App {
             })
             .collect();
         frame.render_widget(Paragraph::new(lines).style(PANEL), list);
-
-        if let Some(text) = &self.message {
-            frame.render_widget(Paragraph::new(format!(" {text}")).style(MESSAGE), message);
-        }
 
         frame.render_widget(
             Paragraph::new(format!(" {}", actual_expected_text(&day))).style(PANEL),
@@ -546,6 +544,22 @@ fn render_popup(frame: &mut Frame, popup: &Popup) {
     let mut lines: Vec<Line> = message.into_iter().map(Line::raw).collect();
     lines.extend([Line::raw(""), Line::from(buttons).centered()]);
     frame.render_widget(Paragraph::new(lines).style(POPUP), inner);
+}
+
+/// A global notification: `text` centered across the screen, floating over
+/// the row just above the bottom border of the panels in `main`.
+fn render_notification(frame: &mut Frame, main: Rect, text: &str) {
+    let width = (Span::raw(text).width() + 2).min(usize::from(main.width));
+    let line = format!(" {} ", fit(text, width.saturating_sub(2)));
+    let width = to_u16(width);
+    let area = Rect {
+        x: main.x + (main.width - width) / 2,
+        y: main.bottom().saturating_sub(2),
+        width,
+        height: 1,
+    };
+    frame.render_widget(Clear, area);
+    frame.render_widget(Paragraph::new(line).style(NOTIFICATION), area);
 }
 
 /// Wraps `text` at spaces into lines of at most `width` cells.

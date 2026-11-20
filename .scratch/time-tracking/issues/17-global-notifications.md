@@ -4,11 +4,11 @@
 
 **Blocked by:** 15
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Invalid time, failed consistency check, clipboard messages and "Nothing to undo/redo" are global notifications
-- [ ] The right panel's message row is gone
-- [ ] Ctrl+S shows "Saved" after a successful save; not when saving while quitting
-- [ ] A notification floats over whatever is on that row and disappears at the next key press
+- [x] Invalid time, failed consistency check, clipboard messages and "Nothing to undo/redo" are global notifications
+- [x] The right panel's message row is gone
+- [x] Ctrl+S shows "Saved" after a successful save; not when saving while quitting
+- [x] A notification floats over whatever is on that row and disappears at the next key press
 
 Spec: `.scratch/time-tracking/spec.md`

@@ -195,10 +195,11 @@ pub struct App {
     focus: FieldFocus,
     /// The focused field is being edited while this is set.
     active_input: Option<ActiveInput>,
-    /// A one-line notice in the right panel; cleared at the next key press.
-    message: Option<String>,
+    /// A global notification: a one-line message centered over the screen;
+    /// cleared at the next key press.
+    notification: Option<String>,
     /// Periods of the selected day that failed the consistency check; cleared
-    /// at the next key press, like the message.
+    /// at the next key press, like the notification.
     inconsistent_periods: Vec<usize>,
     /// Undo/redo history of accepted changes.
     history: History,
@@ -246,7 +247,7 @@ impl App {
             selected: calendar::start_day(today),
             focus: FieldFocus::START,
             active_input: None,
-            message: None,
+            notification: None,
             inconsistent_periods: Vec::new(),
             history: History::default(),
             changed_days: HashSet::new(),
@@ -313,7 +314,7 @@ impl App {
         self.refresh_today();
         let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
         let alt = key.modifiers.contains(KeyModifiers::ALT);
-        self.message = None;
+        self.notification = None;
         self.inconsistent_periods.clear();
         if let Some(popup) = &mut self.popup {
             if let Some(action) = popup.handle_key(key.code) {
@@ -474,29 +475,29 @@ impl App {
             None => self.focused_text(),
         };
         if !self.clipboard.set_text(&text) {
-            self.message = Some(NO_CLIPBOARD.to_owned());
+            self.notification = Some(NO_CLIPBOARD.to_owned());
         }
     }
 
     /// Ctrl+V: puts the clipboard text into the focused field as accepted
     /// input, replacing any active input. A time may be pasted as `HHMM`,
-    /// `HH:MM` or `H:MM`; anything else is rejected with a message.
+    /// `HH:MM` or `H:MM`; anything else is rejected with a notification.
     fn paste(&mut self) {
         let focus = self.focus;
         if !focus.field.takes_text() {
             return;
         }
         let Some(text) = self.clipboard.get_text() else {
-            self.message = Some(NO_CLIPBOARD.to_owned());
+            self.notification = Some(NO_CLIPBOARD.to_owned());
             return;
         };
         let text = text.trim();
         if text.is_empty() {
-            self.message = Some("The clipboard is empty".to_owned());
+            self.notification = Some("The clipboard is empty".to_owned());
             return;
         }
         let Some(value) = focus.field.pasted_value(text) else {
-            self.message = Some(invalid_time_message(text));
+            self.notification = Some(invalid_time_message(text));
             return;
         };
         let previous = self.active_input.replace(ActiveInput::with_text(&value));
@@ -549,7 +550,7 @@ impl App {
     }
 
     /// Stores the active input in the focused field. An invalid time keeps the
-    /// active input and shows a message. Returns whether it was accepted.
+    /// active input and shows a notification. Returns whether it was accepted.
     fn accept(&mut self) -> bool {
         let focus = self.focus;
         let Some(input) = &self.active_input else {
@@ -560,7 +561,7 @@ impl App {
             match TimeOfDay::parse_hhmm(&text) {
                 Some(time) => Some(time),
                 None => {
-                    self.message = Some(invalid_time_message(&text));
+                    self.notification = Some(invalid_time_message(&text));
                     return false;
                 }
             }
@@ -632,7 +633,7 @@ impl App {
     fn restore_or_say(&mut self, restored: Option<(Date, Day)>, nothing: &str) {
         match restored {
             Some((date, day)) => self.restore_day(date, day),
-            None => self.message = Some(nothing.to_owned()),
+            None => self.notification = Some(nothing.to_owned()),
         }
     }
 
@@ -651,7 +652,7 @@ impl App {
 
     /// Selects `date`, unless the selected day was changed in this session
     /// and fails the consistency check: then it stays selected, with a
-    /// message and its offending periods highlighted. Either way, the
+    /// notification and its offending periods highlighted. Either way, the
     /// selected day is sorted and its empty periods removed first.
     fn leave_day_for(&mut self, date: Date) {
         if self.changed_days.contains(&self.selected) {
@@ -687,7 +688,7 @@ impl App {
     }
 
     fn show_problem(&mut self, problem: ConsistencyProblem) {
-        self.message = Some(problem.message);
+        self.notification = Some(problem.message);
         self.inconsistent_periods = problem.periods;
     }
 
@@ -794,10 +795,11 @@ impl App {
                 if self.quit_after_saving {
                     return Outcome::Quit;
                 }
+                self.notification = Some("Saved".to_owned());
             }
             Err(SaveError::ChangedOnDisk) => self.popup = Some(Popup::file_changed_on_disk()),
             Err(e @ SaveError::Io(_)) => {
-                self.message = Some(e.to_string());
+                self.notification = Some(e.to_string());
                 self.quit_after_saving = false;
             }
         }
