@@ -23,7 +23,7 @@ fn monday_on_the_first_to() -> App {
 }
 
 #[test]
-fn a_needless_split_gets_a_period_warning_and_a_break_its_type() {
+fn a_needless_split_gets_a_period_warning_and_a_break_shows_its_type() {
     let yaml = r#"
 days:
   "2026-11-02":

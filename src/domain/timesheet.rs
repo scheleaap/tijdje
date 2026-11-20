@@ -125,6 +125,26 @@ static EMPTY_DAY: Day = Day {
     periods: Vec::new(),
 };
 
+/// A day sorted and without empty periods, for checks that don't depend on
+/// the order on screen.
+struct SortedDay {
+    day: Day,
+    /// For each period of `day`, the index of the same period on screen.
+    on_screen: Vec<usize>,
+}
+
+impl SortedDay {
+    /// The day's consistency problem, with the periods involved as indices
+    /// on screen.
+    fn consistency_problem(&self, date: Date, today: Date) -> Option<ConsistencyProblem> {
+        let mut problem = self.day.check(date, today)?;
+        for index in &mut problem.periods {
+            *index = self.on_screen[*index];
+        }
+        Some(problem)
+    }
+}
+
 impl Day {
     /// A day is empty when it has no periods other than empty periods.
     pub fn is_empty(&self) -> bool {
@@ -309,17 +329,6 @@ impl Day {
         indices
     }
 
-    /// The day's current consistency problem, checked on a sorted copy
-    /// without empty periods, with the periods involved as indices on screen.
-    fn live_check(&self, date: Date, today: Date) -> Option<ConsistencyProblem> {
-        let (sorted, on_screen) = self.sorted_copy();
-        let mut problem = sorted.check(date, today)?;
-        for index in &mut problem.periods {
-            *index = on_screen[*index];
-        }
-        Some(problem)
-    }
-
     /// The indicator left of From for each period on screen: a consistency
     /// failure, else a period warning, else a non-working period's type.
     /// Determined live, on a sorted copy of the day without empty periods.
@@ -331,33 +340,33 @@ impl Day {
                 (!p.period_type.is_working()).then_some(PeriodIndicator::NonWorking(p.period_type))
             })
             .collect();
-        let (sorted, on_screen) = self.sorted_copy();
-        for (index, period) in sorted.periods.iter().enumerate() {
-            let previous = index.checked_sub(1).map(|i| &sorted.periods[i]);
+        let sorted = self.sorted_copy();
+        for (index, period) in sorted.day.periods.iter().enumerate() {
+            let previous = index.checked_sub(1).map(|i| &sorted.day.periods[i]);
             if period.has_unusual_time() || previous.is_some_and(|p| period.needlessly_splits(p)) {
-                indicators[on_screen[index]] = Some(PeriodIndicator::PeriodWarning);
+                indicators[sorted.on_screen[index]] = Some(PeriodIndicator::PeriodWarning);
             }
         }
-        if let Some(problem) = sorted.check(date, today) {
+        if let Some(problem) = sorted.consistency_problem(date, today) {
             for index in problem.periods {
-                indicators[on_screen[index]] = Some(PeriodIndicator::ConsistencyFailure);
+                indicators[index] = Some(PeriodIndicator::ConsistencyFailure);
             }
         }
         indicators
     }
 
-    /// A sorted copy of the day without empty periods, and for each of its
-    /// periods the index of the same period on screen.
-    fn sorted_copy(&self) -> (Day, Vec<usize>) {
-        let mut sorted = self.clone();
-        let moved = sorted.normalize();
-        let mut on_screen = vec![0; sorted.periods.len()];
+    /// A sorted copy of the day without empty periods, remembering where
+    /// each of its periods is on screen.
+    fn sorted_copy(&self) -> SortedDay {
+        let mut day = self.clone();
+        let moved = day.normalize();
+        let mut on_screen = vec![0; day.periods.len()];
         for (old, new) in moved.into_iter().enumerate() {
             if let Some(new) = new {
                 on_screen[new] = old;
             }
         }
-        (sorted, on_screen)
+        SortedDay { day, on_screen }
     }
 
     /// Removes empty periods and sorts the rest by From. Returns, for each old
@@ -524,7 +533,7 @@ impl Timesheet {
         if day.is_empty() {
             self.is_tracked(date) && date < today
         } else {
-            day.live_check(date, today).is_some()
+            day.sorted_copy().consistency_problem(date, today).is_some()
         }
     }
 
@@ -536,7 +545,7 @@ impl Timesheet {
         })
     }
 
-    /// The earliest day with at least one period.
+    /// The earliest day with at least one period that isn't empty.
     pub fn first_recorded_day(&self) -> Option<Date> {
         self.days
             .iter()

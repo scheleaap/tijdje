@@ -118,6 +118,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Implied breaks and overlaps**: only between from–to periods.
 - **Open period**: a from–to period with a From and no To. A part-of-day period is never open.
 - **Empty period**: no times, no part of day, no project, no notes, and type work.
+- **Empty day**: a day without periods, or with only empty periods (and no day note), counts as empty everywhere: no worked time in the left panel, not a recorded day for the first recorded day, not written on save, and a day warning as an empty past weekday.
 - **Chained times**: changing a period's To also changes the next from–to period's From if that was equal to the old To. Changing a From changes nothing else.
 - **Consistency checks** (not exhaustive): a period has a From (To may be empty only today) or a part of day; no overlaps between from–to periods, and nothing after an open period; From before To; at most one sick, one vacation and one holiday period per day; open period only on the current day; non-working periods have no project; no part of day on a break; at most one full day, and at most one 1st half and one 2nd half, never a full day together with a half. These last checks come after the existing ones; their messages are `A break can't be a part of day (Full day)`, `More than one full day`, `More than one 1st half` / `More than one 2nd half` and `Full day together with a half`. Part-of-day periods are named by their label ("Full day", "1st half", "2nd half") in messages.
 - **Check triggers**: leaving a day checks it, but only if it was changed in this run of the application, so broken past days can always be browsed; if the check fails, the day stays selected. Before checking, the day is sorted and its empty periods removed. Ctrl+S and Ctrl+Q sort all days (which alone isn't an unsaved change) and check all days; for the earliest failing day, a popup offers Go to day / Save anyway (or Quit anyway) / Cancel. "Go to day" selects that day and shows the problem. On Ctrl+Q, the consistency popup comes before "Save before quitting?".
@@ -204,7 +205,7 @@ days:
 - Empty To, project, notes, day notes and part of day are written as `null`. `""` is read as `null`.
 - `type` is always written.
 - `part_of_day` together with a non-null `from` or `to` is a parse error.
-- Days without periods and without a day note are not written. `regular_expected_working_time_in_minutes` is written for every written day, and existing values are kept. A day in the file without it is a parse error.
+- Days with only empty periods (or none) and without a day note are not written. `regular_expected_working_time_in_minutes` is written for every written day, and existing values are kept. A day in the file without it is a parse error.
 - Writes are atomic: temp file, flushed to disk, renamed over the old file, keeping its permissions. A failed save removes the temp file. Comments are not preserved.
 - The first save of a session keeps the file as it was when the application started as `timesheet.yaml.bak`.
 - Symlinks are followed: the target is replaced, the symlink stays, and the temp file and backup go next to the target.

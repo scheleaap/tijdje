@@ -199,7 +199,7 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
 
 /// Writes the timesheet as YAML. Dates, times and text are always
 /// double-quoted, so YAML 1.1 readers don't take `08:45` for a number or
-/// `2026-11-02` for a timestamp. Days without periods are not written, and
+/// `2026-11-02` for a timestamp. Days with only empty periods are not written, and
 /// every written day gets its regular expected working time, so a new day
 /// stores the default.
 fn to_yaml(timesheet: &Timesheet) -> String {

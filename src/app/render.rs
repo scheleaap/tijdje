@@ -148,7 +148,7 @@ impl App {
         let absence = timesheet
             .absence_on(date)
             .map_or("  ", |absence| period_type_emoji(absence.into()));
-        let warning = warning_emoji(timesheet.has_day_warning_on(date, self.today));
+        let warning = day_warning_emoji(timesheet.has_day_warning_on(date, self.today));
         day_columns(
             &calendar::format_dutch(date),
             &worked,
@@ -407,7 +407,7 @@ fn plain_period_row(columns: [&str; 5], checkboxes: &str, notes: &str) -> String
 }
 
 /// The day warning in the left panel.
-fn warning_emoji(warn: bool) -> &'static str {
+fn day_warning_emoji(warn: bool) -> &'static str {
     if warn { "⚠️" } else { "  " }
 }
 

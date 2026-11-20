@@ -15,7 +15,7 @@ fn indicators(periods: Vec<Period>) -> Vec<Option<PeriodIndicator>> {
     day(periods).period_indicators(PAST, TODAY)
 }
 
-fn with(mut p: Period, project: Option<&str>, notes: Option<&str>) -> Period {
+fn with_project_and_notes(mut p: Period, project: Option<&str>, notes: Option<&str>) -> Period {
     p.project = project.map(Into::into);
     p.notes = notes.map(Into::into);
     p
@@ -42,8 +42,8 @@ fn an_unusual_time_gets_a_period_warning() {
 fn a_needless_split_warns_on_the_second_period() {
     assert_eq!(
         indicators(vec![
-            with(period(900, Some(1200), Work), Some("acme"), Some("x")),
-            with(period(1200, Some(1300), Work), Some("acme"), Some("x")),
+            with_project_and_notes(period(900, Some(1200), Work), Some("acme"), Some("x")),
+            with_project_and_notes(period(1200, Some(1300), Work), Some("acme"), Some("x")),
         ]),
         vec![None, Some(PeriodWarning)]
     );
@@ -62,12 +62,12 @@ fn a_needless_split_without_project_and_notes_is_warned_too() {
 
 #[test]
 fn consecutive_periods_that_differ_are_not_warned() {
-    let first = || with(period(900, Some(1200), Work), Some("acme"), Some("x"));
+    let first = || with_project_and_notes(period(900, Some(1200), Work), Some("acme"), Some("x"));
     for second in [
-        with(period(1200, Some(1300), Work), Some("other"), Some("x")),
-        with(period(1200, Some(1300), Work), Some("acme"), Some("y")),
-        with(period(1200, Some(1300), Work), Some("acme"), None),
-        with(period(1200, Some(1300), Work), None, Some("x")),
+        with_project_and_notes(period(1200, Some(1300), Work), Some("other"), Some("x")),
+        with_project_and_notes(period(1200, Some(1300), Work), Some("acme"), Some("y")),
+        with_project_and_notes(period(1200, Some(1300), Work), Some("acme"), None),
+        with_project_and_notes(period(1200, Some(1300), Work), None, Some("x")),
     ] {
         assert_eq!(
             indicators(vec![first(), second.clone()]),
@@ -169,7 +169,7 @@ fn a_zero_minute_period_is_a_consistency_failure() {
 #[test]
 fn only_the_current_problem_is_marked() {
     // Both periods lack a From; only the first problem counts.
-    let no_from = |notes: &str| with(Period::default(), None, Some(notes));
+    let no_from = |notes: &str| with_project_and_notes(Period::default(), None, Some(notes));
     assert_eq!(
         indicators(vec![no_from("a"), no_from("b")]),
         vec![Some(ConsistencyFailure), None]
@@ -191,5 +191,18 @@ fn an_open_period_is_only_a_consistency_failure_on_another_day() {
     assert_eq!(
         d.period_indicators(PAST, TODAY),
         vec![Some(ConsistencyFailure)]
+    );
+}
+
+#[test]
+fn an_open_period_can_be_a_needless_split_too() {
+    // Today, so the open period itself is allowed.
+    let d = day(vec![
+        period(900, Some(1200), Work),
+        period(1200, None, Work),
+    ]);
+    assert_eq!(
+        d.period_indicators(TODAY, TODAY),
+        vec![None, Some(PeriodWarning)]
     );
 }
