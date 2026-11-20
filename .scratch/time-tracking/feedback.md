@@ -4,12 +4,12 @@ Running list of user feedback and known open points that aren't covered by a tic
 
 ## Open
 
-- **Left panel border breaks when scrolling** (user bug report, 2026-11-20, after tickets 14/17): after scrolling the day list, the left panel's right border is missing on rows that scrolled in. Reproduced in a screen model (`tests/terminal_output.rs`) for terminals that advance two cells after an emoji with a variation selector (Ghostty, kitty, foot): ratatui writes the cell covered by 🏖️/⚠️ right after it without moving the cursor, when that cell held a separator line before, so the rest of the row shifts one cell right over the border. Fixed in `wide_symbols::draw` (branch `bugfix/left-panel-border`); still to be checked by hand in Ghostty.
 - **Other terminals unverified** (ADR-0001, ADR-0003): emoji rendering is only checked in Ptyxis, which ADR-0003 drops. Ghostty (now the main terminal), kitty, foot and Alacritty are still to be checked.
 - **Total balance performance** (review of ticket 02): the total balance is recalculated from the first recorded day for every visible row. Fine for now; may need caching after years of data.
 
 ## Done
 
+- **Left panel border breaks when scrolling** (user bug report, 2026-11-20, after tickets 14/17): after scrolling the day list, the left panel's right border is missing on rows that scrolled in. Reproduced in a screen model (`tests/terminal_output.rs`) for terminals that advance two cells after an emoji with a variation selector (Ghostty, kitty, foot): ratatui writes the cell covered by 🏖️/⚠️ right after it without moving the cursor, when that cell held a separator line before, so the rest of the row shifts one cell right over the border. Fixed in `wide_symbols::draw` by skipping the covered cells; checked by hand in Ghostty.
 - **Drop panel focus**: planned in ticket 15.
 - **No "0h" for durations under an hour**: planned in ticket 22.
 - **Empty field on a day without periods**: planned in ticket 15.
