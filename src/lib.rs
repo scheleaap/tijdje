@@ -6,3 +6,4 @@ pub mod domain;
 pub mod store;
 pub mod terminal;
 pub mod wide_symbols;
+pub mod words;
