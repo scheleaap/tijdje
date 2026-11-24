@@ -15,7 +15,7 @@
 - [x] Alt+←/→ move focus between the left and right panel
 - [x] Entering a day leaves no period and no field focused
 - [x] ↑/↓ move focus to the same field in the previous/next period; with nothing focused, to the first field of the first/last period
-- [x] Tab/Shift-Tab move through From, To, Project, Notes, Break, Vacation, Sick, Holiday (Duration is skipped)
+- [x] Tab/Shift+Tab move through From, To, Project, Notes, Break, Vacation, Sick, Holiday (Duration is skipped)
 - [x] Ctrl+↑/↓ select the previous/next day from the right panel
 - [x] The panel scrolls vertically when periods don't fit
 

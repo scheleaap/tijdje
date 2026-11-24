@@ -39,7 +39,7 @@ In the right panel, the focus can be in 0 or 1 period. By default, no period nor
 
 Right panel shortcuts:
 * Ctrl+↑/↓ selects to the previous/next day. (A) (B) (C)
-* Tab/Shift-Tab moves focus to another field in a period, from left to right or right to left.
+* Tab/Shift+Tab moves focus to another field in a period, from left to right or right to left.
 * ↑/↓ move focus to the same field in the previous/next period. If no period has focus yet, it moves focus to the first field in the first/last period. (A)
 * Enter:
   * When editing a field, accepts the active input
