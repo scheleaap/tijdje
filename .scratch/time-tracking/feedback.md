@@ -34,7 +34,7 @@ Running list of user feedback and known open points that aren't covered by a tic
 - **Checkboxes right of Project**: done in ticket 11.
 - **Yellow selection color**: decided against in ticket 11: yellow is used for column headers.
 - **Year in the left panel title**: done in ticket 11 (`Days: 2026`).
-- **No padding in the right panel title**: done in ticket 07 (popups too).
+- **No padding in the right panel title**: done in ticket 07 (dialogs too).
 - **To before From fails the check**: done in ticket 07.
 - **No new period after an open last period**: done after ticket 04.
 - **No new period after an empty last period**: done in ticket 04.

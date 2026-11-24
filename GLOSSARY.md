@@ -103,3 +103,7 @@ Text typed into an input field that has not yet been accepted or rejected.
 
 **Global notification**:
 A short message centered over the screen, shown until the next key press.
+
+**Dialog**:
+A window that asks for a decision or input, with buttons, e.g. Delete period, Quit, File changed, Consistency or Go to date. Global notifications and the Help window are not dialogs.
+_Avoid_: Popup

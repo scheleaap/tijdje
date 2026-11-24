@@ -1,6 +1,6 @@
 # 11: Visual styling in the style of Midnight Commander
 
-**What to build:** The Tracking screen and popups look like Midnight Commander, and the right panel gets a calmer, clearer layout. Picks up the visual items from the feedback log. Colors (fields and popup buttons) will likely be revisited a few times until they're settled.
+**What to build:** The Tracking screen and dialogs look like Midnight Commander, and the right panel gets a calmer, clearer layout. Picks up the visual items from the feedback log. Colors (fields and dialog buttons) will likely be revisited a few times until they're settled.
 
 **Blocked by:** 07
 
@@ -15,6 +15,6 @@
 - [x] A period of 0h00m also gets the period warning ⚠️
 - [x] An empty row between periods
 - [x] An implied break is its own row: From/To/Duration as plain text, Break checked, no fields, not focusable
-- [x] Popups: light gray background with black text, a black drop shadow, a short title in the frame in blue and the message inside (wrapped); solid buttons, black on white, the selected one black on cyan, the hotkey letter in blue
+- [x] Dialogs: light gray background with black text, a black drop shadow, a short title in the frame in blue and the message inside (wrapped); solid buttons, black on white, the selected one black on cyan, the hotkey letter in blue
 
 Spec: `.scratch/time-tracking/spec.md` ("Look" and "Right panel layout"), including the user's adjustments during implementation (no column lines, light gray fields, ✓ checkboxes, Tab order).

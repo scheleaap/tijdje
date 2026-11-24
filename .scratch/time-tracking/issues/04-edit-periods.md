@@ -12,7 +12,7 @@
 - [x] Enter (not editing) in the last period, or on a day with periods but none focused, creates a period whose From is the previous To, focused on From
 - [x] Enter on a day without periods creates the first period with an empty From
 - [x] Ctrl+Del (not editing) asks "Delete period? (Delete/Cancel)" and deletes the focused period
-- [x] Popup buttons: ←/→ + Enter, first letter, Esc cancels
+- [x] Dialog buttons: ←/→ + Enter, first letter, Esc cancels
 - [x] Shortcuts marked (A) in the spec are ignored while editing, including Ctrl+↑/↓ (decided: it does not accept active input)
 - [x] Long notes are cut off with `…` and scroll horizontally while editing
 - [x] Worked time, balances and indicators update after each accepted change
