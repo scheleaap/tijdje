@@ -46,16 +46,30 @@ fn page_down_moves_ten_periods_down_keeping_the_field() {
 }
 
 #[test]
-fn page_down_stops_at_the_day_note() {
+fn page_down_stops_at_the_last_period() {
     // Given: period 10, with only period 11 below it.
     let mut app = app_with_twelve_periods();
+    press(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::PageDown);
 
     // When
     press(&mut app, KeyCode::PageDown);
 
     // Then
-    assert_eq!(app.focus(), DAY_NOTE);
+    assert_eq!(app.focus(), focus(11, Field::To));
+}
+
+#[test]
+fn page_down_does_nothing_on_the_last_period() {
+    // Given
+    let mut app = app_with_twelve_periods();
+    press_times(&mut app, KeyCode::Down, 11);
+
+    // When
+    press(&mut app, KeyCode::PageDown);
+
+    // Then: only ↓ goes on to the day note.
+    assert_eq!(app.focus(), focus(11, Field::From));
 }
 
 #[test]
@@ -72,8 +86,8 @@ fn page_down_does_nothing_on_the_day_note() {
 }
 
 #[test]
-fn page_down_from_the_period_ten_above_the_day_note_goes_to_the_day_note() {
-    // Given: the day note counts as row 12, 10 below period 2.
+fn page_down_from_the_period_ten_above_the_day_note_goes_to_the_last_period() {
+    // Given: the day note is the row 10 below period 2.
     let mut app = app_with_twelve_periods();
     press_times(&mut app, KeyCode::Down, 2);
 
@@ -81,7 +95,7 @@ fn page_down_from_the_period_ten_above_the_day_note_goes_to_the_day_note() {
     press(&mut app, KeyCode::PageDown);
 
     // Then
-    assert_eq!(app.focus(), DAY_NOTE);
+    assert_eq!(app.focus(), focus(11, Field::From));
 }
 
 #[test]

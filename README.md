@@ -8,10 +8,11 @@ tijdje needs a terminal with the [Kitty keyboard protocol](https://sw.kovidgoyal
 
 In Ghostty:
 
-- Ctrl+Enter toggles full screen by default. Add this to Ghostty's configuration to let it through:
+- Ctrl+Enter toggles full screen and Ctrl+Shift+Enter zooms a split by default. Add this to Ghostty's configuration to let them through:
 
   ```
   keybind = ctrl+enter=unbind
+  keybind = ctrl+shift+enter=unbind
   ```
 
 - Ctrl+PgUp/PgDn switch tabs, but come through in a window with a single tab.

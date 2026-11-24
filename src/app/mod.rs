@@ -216,8 +216,8 @@ enum EditingAction {
 
 impl EditingAction {
     fn of(key: KeyEvent) -> Self {
-        let plain = Modifiers::of(key) == Modifiers::None;
-        let ctrl_only = Modifiers::of(key) == Modifiers::Ctrl;
+        let modifiers = Modifiers::of(key);
+        let plain = modifiers == Modifiers::None;
         let accept = |then| EditingAction::Accept {
             takes_suggestion: then != AfterAccepting::Stay,
             then,
@@ -225,7 +225,8 @@ impl EditingAction {
         match key.code {
             KeyCode::Esc => EditingAction::Reject,
             KeyCode::Enter if plain => accept(AfterAccepting::Stay),
-            KeyCode::Enter if ctrl_only => accept(AfterAccepting::NextPeriod),
+            KeyCode::Enter if modifiers == Modifiers::Ctrl => accept(AfterAccepting::Down),
+            KeyCode::Enter if modifiers == Modifiers::CtrlShift => accept(AfterAccepting::Up),
             KeyCode::Tab if plain => accept(AfterAccepting::Field(Direction::Forward)),
             KeyCode::BackTab if plain => accept(AfterAccepting::Field(Direction::Backward)),
             // Unlike Modifiers, Shift counts here: Shift+→ only moves the cursor.
@@ -242,8 +243,10 @@ enum AfterAccepting {
     Stay,
     /// Tab/Shift+Tab: the next/previous field.
     Field(Direction),
-    /// Ctrl+Enter: From of the next period.
-    NextPeriod,
+    /// Ctrl+Enter: the field below, or a new period after the last one.
+    Down,
+    /// Ctrl+Shift+Enter: the field above.
+    Up,
 }
 
 /// Which way focus moves.
@@ -253,23 +256,35 @@ enum Direction {
     Forward,
 }
 
-/// The Ctrl and Alt modifiers a key was pressed with; Shift doesn't count.
+/// The modifiers a key was pressed with. Shift only counts for Enter, where
+/// Ctrl+Shift+Enter differs from Ctrl+Enter and Shift+Enter from Enter;
+/// elsewhere it is part of the key (a capital letter, Shift+Tab as BackTab).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Modifiers {
     None,
+    /// Shift+Enter.
+    Shift,
     Ctrl,
-    /// Alt, or Ctrl+Alt.
+    /// Ctrl+Shift+Enter.
+    CtrlShift,
+    /// Alt, with or without Ctrl or Shift.
     Alt,
 }
 
 impl Modifiers {
     fn of(key: KeyEvent) -> Self {
-        if key.modifiers.contains(KeyModifiers::ALT) {
-            Modifiers::Alt
-        } else if key.modifiers.contains(KeyModifiers::CONTROL) {
-            Modifiers::Ctrl
-        } else {
-            Modifiers::None
+        let pressed = |modifier| key.modifiers.contains(modifier);
+        let shift = key.code == KeyCode::Enter && pressed(KeyModifiers::SHIFT);
+        match (
+            pressed(KeyModifiers::ALT),
+            pressed(KeyModifiers::CONTROL),
+            shift,
+        ) {
+            (true, _, _) => Modifiers::Alt,
+            (false, true, true) => Modifiers::CtrlShift,
+            (false, true, false) => Modifiers::Ctrl,
+            (false, false, true) => Modifiers::Shift,
+            (false, false, false) => Modifiers::None,
         }
     }
 }
@@ -601,23 +616,17 @@ impl App {
     /// right panel; the left panel has no keys of its own.
     fn handle_tracking_key(&mut self, code: KeyCode, modifiers: Modifiers) {
         let plain = modifiers == Modifiers::None;
-        let ctrl_only = modifiers == Modifiers::Ctrl;
+        let ctrl = modifiers == Modifiers::Ctrl;
         match code {
-            KeyCode::Up if ctrl_only => {
-                self.leave_day_for(calendar::previous_weekday(self.selected))
-            }
-            KeyCode::Down if ctrl_only => self.leave_day_for(calendar::next_weekday(self.selected)),
-            KeyCode::PageUp if ctrl_only => {
-                self.leave_day_for(calendar::previous_week(self.selected))
-            }
-            KeyCode::PageDown if ctrl_only => {
-                self.leave_day_for(calendar::next_week(self.selected))
-            }
-            KeyCode::Char('g') if ctrl_only => self.go_to_date = Some(GoToDate::new()),
+            KeyCode::Up if ctrl => self.leave_day_for(calendar::previous_weekday(self.selected)),
+            KeyCode::Down if ctrl => self.leave_day_for(calendar::next_weekday(self.selected)),
+            KeyCode::PageUp if ctrl => self.leave_day_for(calendar::previous_week(self.selected)),
+            KeyCode::PageDown if ctrl => self.leave_day_for(calendar::next_week(self.selected)),
+            KeyCode::Char('g') if ctrl => self.go_to_date = Some(GoToDate::new()),
             KeyCode::Left if plain => self.move_focus_within_period(Direction::Backward),
             KeyCode::Right if plain => self.move_focus_within_period(Direction::Forward),
-            KeyCode::Up if plain => self.move_focus_vertically(Direction::Backward, ARROW_PERIODS),
-            KeyCode::Down if plain => self.move_focus_vertically(Direction::Forward, ARROW_PERIODS),
+            KeyCode::Up if plain => self.move_focus_up(),
+            KeyCode::Down if plain => self.move_focus_down(),
             KeyCode::PageUp if plain => {
                 self.move_focus_vertically(Direction::Backward, PAGE_PERIODS)
             }
@@ -628,12 +637,13 @@ impl App {
             KeyCode::End if plain => self.move_focus_to_field(Field::LAST),
             KeyCode::Tab if plain => self.move_focus_in_tab_order(Direction::Forward),
             KeyCode::BackTab if plain => self.move_focus_in_tab_order(Direction::Backward),
-            KeyCode::Enter if ctrl_only => self.focus_next_period(),
+            KeyCode::Enter if ctrl => self.move_down_or_add_period(),
+            KeyCode::Enter if modifiers == Modifiers::CtrlShift => self.move_focus_up(),
             KeyCode::Enter if plain => self.edit_or_toggle_focused_field(),
             // The empty period of a day without periods can't be deleted, and
             // the day note isn't a period.
             KeyCode::Delete
-                if ctrl_only && !self.shows_empty_period() && self.focus.period().is_some() =>
+                if ctrl && !self.shows_empty_period() && self.focus.period().is_some() =>
             {
                 let label = self.focused_period().map(Period::label).unwrap_or_default();
                 self.dialog = Some(Dialog::delete_period(&label));
@@ -644,10 +654,11 @@ impl App {
         }
     }
 
-    /// While editing, only editing keys work; Enter, Tab/Shift+Tab and
-    /// Ctrl+Enter accept, Esc rejects. → at the end of the input takes the
-    /// project suggestion and keeps editing; Tab/Shift+Tab and Ctrl+Enter
-    /// take it before accepting. Other keys are ignored silently.
+    /// While editing, only editing keys work; Enter, Tab/Shift+Tab,
+    /// Ctrl+Enter and Ctrl+Shift+Enter accept, Esc rejects. → at the end of
+    /// the input takes the project suggestion and keeps editing;
+    /// Tab/Shift+Tab, Ctrl+Enter and Ctrl+Shift+Enter take it before
+    /// accepting. Other keys are ignored silently.
     fn handle_editing_key(&mut self, key: KeyEvent) {
         match EditingAction::of(key) {
             EditingAction::Reject => self.active_input = None,
@@ -689,7 +700,8 @@ impl App {
         match then {
             AfterAccepting::Stay => {}
             AfterAccepting::Field(direction) => self.move_focus_in_tab_order(direction),
-            AfterAccepting::NextPeriod => self.focus_next_period(),
+            AfterAccepting::Down => self.move_down_or_add_period(),
+            AfterAccepting::Up => self.move_focus_up(),
         }
     }
 
@@ -705,7 +717,8 @@ impl App {
 
     /// The earlier project suggested while editing Project with the cursor at
     /// the end of the active input, once something was typed or deleted in
-    /// it; shown as ghost text, taken with →, Tab/Shift+Tab and Ctrl+Enter.
+    /// it; shown as ghost text, taken with →, Tab/Shift+Tab, Ctrl+Enter and
+    /// Ctrl+Shift+Enter.
     /// Owned, so the active input can change while it is held.
     fn project_suggestion(&self) -> Option<String> {
         self.active_input
@@ -1156,35 +1169,39 @@ impl App {
         }
     }
 
-    /// Ctrl+Enter: focuses From of the next period; on the day note, which
-    /// comes after the last period, it does nothing.
-    fn focus_next_period(&mut self) {
-        if let Focus::Period(focus) = self.focus {
-            self.focus_period_after(focus.period);
+    /// Ctrl+Enter: moves down like ↓, except in the last period, where it
+    /// adds a period after it. On the day note, which is below the last
+    /// period, it does nothing.
+    fn move_down_or_add_period(&mut self) {
+        if self.focuses_last_period() {
+            self.add_period_after_the_last();
+        } else {
+            self.move_focus_vertically(Direction::Forward, ARROW_PERIODS);
         }
     }
 
-    /// Focuses From of the period after `current`. In the last period, adds
-    /// a period after it and focuses its From, unless the last period is still
-    /// open (without To, which includes an empty last period): then it only
-    /// notifies. On the empty period of a day without periods it does nothing.
-    fn focus_period_after(&mut self, current: usize) {
-        if self.shows_empty_period() {
-            return;
+    /// Adds a period after the last one and focuses its From, unless the last
+    /// period is still open (without To, which includes an empty last
+    /// period): then it only notifies. On the empty period of a day without
+    /// periods it does nothing.
+    fn add_period_after_the_last(&mut self) {
+        let last_is_open = self.shown_day().periods.last().is_some_and(Period::is_open);
+        match (self.shows_empty_period(), last_is_open) {
+            (true, _) => {}
+            (false, true) => self.notify("The last period is still open"),
+            (false, false) => {
+                let period = self.edit_selected_day(Day::add_period);
+                self.focus = Focus::Period(FieldFocus {
+                    period,
+                    field: Field::From,
+                });
+            }
         }
-        let next = current + 1;
-        let period = if next < self.period_count() {
-            next
-        } else if self.shown_day().periods.last().is_some_and(Period::is_open) {
-            self.notify("The last period is still open");
-            return;
-        } else {
-            self.edit_selected_day(Day::add_period)
-        };
-        self.focus = Focus::Period(FieldFocus {
-            period,
-            field: Field::From,
-        });
+    }
+
+    /// Whether a field of the last period has focus.
+    fn focuses_last_period(&self) -> bool {
+        self.focus.period() == Some(self.period_count() - 1)
     }
 
     fn run_dialog_action(&mut self, action: DialogAction) -> Outcome {
@@ -1273,8 +1290,8 @@ impl App {
         self.shown_day().periods.len()
     }
 
-    /// ↑/↓ and PgUp/PgDn: the closest field `periods` rows
-    /// above/below, stopping at the first period and the day note.
+    /// The closest field `periods` rows above/below, stopping at the first
+    /// and the last period; on the day note, moving down does nothing.
     /// Implied-break rows aren't focusable, so they are skipped. Every period
     /// row has the same fields in the same columns, so the closest field is
     /// the same field, except that the part-of-day field stands for both From
@@ -1293,16 +1310,27 @@ impl App {
                 period: focus.period.saturating_sub(periods),
                 ..focus
             }),
-            (Direction::Forward, Focus::Period(focus))
-                if focus.period + periods >= day_note_row =>
-            {
-                Focus::DayNote
-            }
             (Direction::Forward, Focus::Period(focus)) => Focus::Period(FieldFocus {
-                period: focus.period + periods,
+                period: (focus.period + periods).min(day_note_row - 1),
                 ..focus
             }),
         };
+    }
+
+    /// ↑ and Ctrl+Shift+Enter: the closest field in the row above; from the
+    /// day note, From of the last period.
+    fn move_focus_up(&mut self) {
+        self.move_focus_vertically(Direction::Backward, ARROW_PERIODS);
+    }
+
+    /// ↓: the closest field in the row below; from the last period, the day
+    /// note, which only ↓ goes on to.
+    fn move_focus_down(&mut self) {
+        if self.focuses_last_period() {
+            self.focus = Focus::DayNote;
+        } else {
+            self.move_focus_vertically(Direction::Forward, ARROW_PERIODS);
+        }
     }
 
     /// Home/End: `field` of the focused period, i.e. its first or last field

@@ -35,8 +35,9 @@ const GROUPS: [Group; 6] = [
             ("Home/End", "First/last field of the period"),
             (
                 "Ctrl+Enter",
-                "From of the next period; in the last one: add a period",
+                "Field below; in the last period: add a period",
             ),
+            ("Ctrl+Shift+Enter", "Field above"),
         ],
     ),
     (
@@ -68,6 +69,7 @@ const GROUPS: [Group; 6] = [
                 "Tab/Shift+Tab, Ctrl+Enter",
                 "While editing: accept and move on",
             ),
+            ("Ctrl+Shift+Enter", "While editing: accept and move up"),
             (
                 "→",
                 "Editing a project: fill in the project suggestion, keep editing",
@@ -75,6 +77,10 @@ const GROUPS: [Group; 6] = [
             (
                 "Tab/Shift+Tab, Ctrl+Enter",
                 "Editing a project: take the project suggestion, accept and move on",
+            ),
+            (
+                "Ctrl+Shift+Enter",
+                "Editing a project: take the project suggestion, accept and move up",
             ),
         ],
     ),

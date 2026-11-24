@@ -208,6 +208,32 @@ fn the_project_suggestion_keys_have_a_line_each() {
 }
 
 #[test]
+fn ctrl_enter_and_ctrl_shift_enter_have_their_own_lines() {
+    // Given
+    let mut app = app_with_help();
+
+    // When
+    let rows = screen(&mut app, TALL);
+
+    // Then
+    assert!(
+        row_containing(&rows, " Ctrl+Enter ")
+            .contains("Field below; in the last period: add a period")
+    );
+    assert!(row_containing(&rows, " Ctrl+Shift+Enter ").contains("Field above"));
+    assert!(
+        row_containing(&rows, "While editing: accept and move up").contains("Ctrl+Shift+Enter")
+    );
+    assert!(
+        row_containing(
+            &rows,
+            "Editing a project: take the project suggestion, accept and move up"
+        )
+        .contains("Ctrl+Shift+Enter")
+    );
+}
+
+#[test]
 fn the_help_window_has_midnight_commanders_user_menu_colors() {
     // Given
     let mut app = app_with_help();

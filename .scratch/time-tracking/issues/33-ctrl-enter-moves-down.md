@@ -4,12 +4,12 @@
 
 **Blocked by:** 32
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Ctrl+Enter in a period that isn't the last moves down like ↓, keeping the column; in the last period it adds a period focused on its From, or shows "The last period is still open"; on the day note it does nothing
-- [ ] Ctrl+Shift+Enter moves up like ↑, keeping the column; on the first period it does nothing; from the day note it goes to From of the last period
-- [ ] While editing, both accept first (taking a visible project suggestion), then move; if accepting fails, focus stays
-- [ ] PgDn stops at the last period; only ↓ goes on to the day note
-- [ ] The Help window and the README's Ghostty section (`keybind = ctrl+shift+enter=unbind`) are updated
+- [x] Ctrl+Enter in a period that isn't the last moves down like ↓, keeping the column; in the last period it adds a period focused on its From, or shows "The last period is still open"; on the day note it does nothing
+- [x] Ctrl+Shift+Enter moves up like ↑, keeping the column; on the first period it does nothing; from the day note it goes to From of the last period
+- [x] While editing, both accept first (taking a visible project suggestion), then move; if accepting fails, focus stays
+- [x] PgDn stops at the last period; only ↓ goes on to the day note
+- [x] The Help window and the README's Ghostty section (`keybind = ctrl+shift+enter=unbind`) are updated
 
 Spec: `.scratch/time-tracking/spec.md`

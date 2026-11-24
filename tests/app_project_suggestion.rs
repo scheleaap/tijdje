@@ -203,6 +203,37 @@ fn ctrl_enter_takes_the_suggestion_accepts_and_moves_on() {
 }
 
 #[test]
+fn ctrl_shift_enter_takes_the_suggestion_accepts_and_moves_up() {
+    // Given: Mon 2 Nov, typing in Project of its second period.
+    let mut app = app_with(TIMESHEET_WITH_PROJECTS, date(2026, 11, 2));
+    press(&mut app, KeyCode::Down);
+    tab_to(&mut app, Field::Project);
+    type_text(&mut app, "ot");
+
+    // When
+    ctrl_shift_key(&mut app, KeyCode::Enter);
+
+    // Then
+    assert_eq!(period_at(&app, 1).project.as_deref(), Some("otto"));
+    assert!(!app.is_editing());
+    assert_eq!(app.focus(), focus(0, Field::Project));
+}
+
+#[test]
+fn ctrl_shift_enter_with_the_cursor_before_the_end_accepts_only_the_typed_text() {
+    // Given
+    let mut app = app_on(Field::Project);
+    type_text(&mut app, "ot");
+    press(&mut app, KeyCode::Left);
+
+    // When
+    ctrl_shift_key(&mut app, KeyCode::Enter);
+
+    // Then
+    assert_eq!(project(&app), Some("ot"));
+}
+
+#[test]
 fn tab_takes_the_suggestion_in_the_earlier_projects_spelling() {
     // Given
     let mut app = app_on(Field::Project);

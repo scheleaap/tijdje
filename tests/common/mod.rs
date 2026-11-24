@@ -312,6 +312,27 @@ pub fn ctrl_key(app: &mut App, code: KeyCode) -> tijdje::app::Outcome {
     app.handle_key(KeyEvent::new(code, KeyModifiers::CONTROL))
 }
 
+/// Presses Shift and `code`.
+pub fn shift_key(app: &mut App, code: KeyCode) -> tijdje::app::Outcome {
+    app.handle_key(KeyEvent::new(code, KeyModifiers::SHIFT))
+}
+
+/// Presses Ctrl+Alt and `code`.
+pub fn ctrl_alt_key(app: &mut App, code: KeyCode) -> tijdje::app::Outcome {
+    app.handle_key(KeyEvent::new(
+        code,
+        KeyModifiers::CONTROL | KeyModifiers::ALT,
+    ))
+}
+
+/// Presses Ctrl+Shift and `code`, as the Kitty keyboard protocol reports it.
+pub fn ctrl_shift_key(app: &mut App, code: KeyCode) -> tijdje::app::Outcome {
+    app.handle_key(KeyEvent::new(
+        code,
+        KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+    ))
+}
+
 /// The index of the first row containing `text`, skipping the top border row.
 pub fn row_index(rows: &[String], text: &str) -> usize {
     rows.iter()

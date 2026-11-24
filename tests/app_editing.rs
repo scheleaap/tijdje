@@ -134,14 +134,14 @@ fn tab_accepts_and_moves_on() {
 }
 
 #[test]
-fn ctrl_enter_accepts_and_moves_to_from_of_the_next_period() {
+fn ctrl_enter_accepts_and_moves_down_keeping_the_field() {
     let mut app = app_on_monday();
     tab_to(&mut app, Field::Project);
     type_text(&mut app, "acme");
     ctrl_key(&mut app, KeyCode::Enter);
     assert!(!app.is_editing());
     assert_eq!(period_at(&app, 0).project.as_deref(), Some("acme"));
-    assert_eq!(app.focus(), focus(1, Field::From));
+    assert_eq!(app.focus(), focus(1, Field::Project));
 }
 
 #[test]
@@ -188,13 +188,13 @@ fn other_shortcuts_are_ignored_while_editing() {
 }
 
 #[test]
-fn ctrl_enter_moves_to_from_of_the_next_period() {
+fn ctrl_enter_moves_down_keeping_the_field() {
     let mut app = app_on_monday();
     tab_to(&mut app, Field::Notes);
     ctrl_key(&mut app, KeyCode::Enter);
-    assert_eq!(app.focus(), focus(1, Field::From));
+    assert_eq!(app.focus(), focus(1, Field::Notes));
     ctrl_key(&mut app, KeyCode::Enter);
-    assert_eq!(app.focus(), focus(2, Field::From));
+    assert_eq!(app.focus(), focus(2, Field::Notes));
     assert_eq!(app.timesheet().days[&date(2026, 11, 2)].periods.len(), 3);
 }
 

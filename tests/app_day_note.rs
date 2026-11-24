@@ -273,6 +273,22 @@ fn ctrl_enter_while_editing_the_day_note_accepts_it_and_keeps_focus() {
     assert_eq!(app.timesheet().day(MONDAY).periods.len(), 1);
 }
 
+#[test]
+fn ctrl_shift_enter_while_editing_the_day_note_accepts_it_and_goes_to_from_of_the_last_period() {
+    // Given
+    let mut app = sample_on(MONDAY).0;
+    focus_day_note(&mut app);
+    type_text(&mut app, "Offsite");
+
+    // When
+    ctrl_shift_key(&mut app, KeyCode::Enter);
+
+    // Then
+    assert!(!app.is_editing());
+    assert_eq!(day_note(&app, MONDAY), Some("Offsite"));
+    assert_eq!(app.focus(), focus(2, Field::From));
+}
+
 /// Ten hourly periods take more rows than the period list shows at 120×24.
 const TEN_PERIODS: usize = 10;
 
