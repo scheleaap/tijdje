@@ -77,15 +77,15 @@ fn new_period_starts_where_the_last_one_ended() {
 fn new_period_after_an_open_period_has_an_empty_from() {
     let mut d = day(vec![period(900, None, Work)]);
     d.add_period();
-    assert_eq!(d.periods[1].from, None);
+    assert_eq!(d.periods[1].from(), None);
 }
 
 #[test]
 fn first_period_of_an_empty_day_has_an_empty_from() {
     let mut d = day(vec![]);
     assert_eq!(d.add_period(), 0);
-    assert_eq!(d.periods[0].from, None);
-    assert_eq!(d.periods[0].to, None);
+    assert_eq!(d.periods[0].from(), None);
+    assert_eq!(d.periods[0].to(), None);
 }
 
 #[test]

@@ -17,8 +17,8 @@ use ratatui::{
 };
 use tijdje::{
     app::{App, Field, FieldFocus, Focus},
-    domain::{Day, Minutes, Period, PeriodType, TimeOfDay},
-    store::FileSystem,
+    domain::{Day, Extent, Minutes, PartOfDay, Period, PeriodType, TimeOfDay, Timesheet},
+    store::{self, Backup, FileSystem, LoadError, Overwrite},
 };
 
 pub const SAMPLE: &str = include_str!("../../sample/timesheet.yaml");
@@ -131,6 +131,44 @@ impl FileSystem for InMemoryFileSystem {
 
 pub const TIMESHEET: &str = "timesheet.yaml";
 
+/// A timesheet with one day on `date` (`YYYY-MM-DD`) with `periods`, each
+/// one period in YAML flow style, e.g.
+/// `{ from: "09:00", to: "12:00", project: acme, notes: null, type: work }`.
+pub fn one_day_yaml(date: &str, periods: &[&str]) -> String {
+    let periods: String = periods
+        .iter()
+        .map(|period| format!("      - {period}\n"))
+        .collect();
+    format!(
+        "days:\n  \"{date}\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n{periods}"
+    )
+}
+
+/// Loads a timesheet from a file with `content`.
+pub fn load_timesheet(content: &str) -> Result<Timesheet, LoadError> {
+    store::load(
+        &InMemoryFileSystem::with(TIMESHEET, content),
+        Path::new(TIMESHEET),
+    )
+    .map(|(timesheet, _)| timesheet)
+}
+
+/// Saves `timesheet` to a new file and returns the file's content.
+pub fn save_timesheet(timesheet: &Timesheet) -> String {
+    let fs = InMemoryFileSystem::default();
+    let (_, fingerprint) = store::load(&fs, Path::new(TIMESHEET)).expect("no file yet");
+    store::save(
+        &fs,
+        Path::new(TIMESHEET),
+        timesheet,
+        &fingerprint,
+        Overwrite::IfUnchanged,
+        Backup::Skip,
+    )
+    .expect("saved");
+    fs.get(TIMESHEET).expect("written")
+}
+
 pub fn app_with(content: &str, today: Date) -> App {
     app_with_fs(content, today).0
 }
@@ -221,11 +259,22 @@ pub fn ctrl(app: &mut App, c: char) -> tijdje::app::Outcome {
 pub fn period(from: u16, to: Option<u16>, period_type: PeriodType) -> Period {
     let time = |hhmm: u16| TimeOfDay::new(hhmm / 100, hhmm % 100);
     Period {
-        from: time(from),
-        to: to.and_then(time),
+        extent: Extent::FromTo {
+            from: time(from),
+            to: to.and_then(time),
+        },
         project: None,
         notes: None,
         period_type,
+    }
+}
+
+/// A period with `part` as its part of day instead of times.
+pub fn part_of_day_period(part: PartOfDay, period_type: PeriodType) -> Period {
+    Period {
+        extent: Extent::PartOfDay(part),
+        period_type,
+        ..Period::default()
     }
 }
 

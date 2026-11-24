@@ -5,7 +5,7 @@ use jiff::civil::date;
 use ratatui::crossterm::event::KeyCode;
 use tijdje::{
     app::{App, Field},
-    domain::{PeriodType, TimeOfDay},
+    domain::{PartOfDay, PeriodType, TimeOfDay},
 };
 
 /// Mon 2 Nov from the sample: 0845–1230 work, 1230–1300 break, 1300–1757 work.
@@ -77,12 +77,15 @@ fn checking_an_absence_updates_the_figures_and_indicator() {
 }
 
 #[test]
-fn an_absence_on_an_empty_day_fills_a_full_day_and_unchecking_empties_it() {
+fn an_absence_on_an_empty_day_sets_a_full_day_and_unchecking_removes_it() {
     // Wed 11 Nov has no periods: the absence goes on the empty period it shows.
     let mut app = app_with(SAMPLE, date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Char('v'));
-    assert_eq!(first_period(&app).from, TimeOfDay::new(9, 0));
-    assert_eq!(first_period(&app).to, TimeOfDay::new(16, 12));
+    assert_eq!(first_period(&app).part_of_day(), Some(PartOfDay::FullDay));
+    assert_eq!(
+        (first_period(&app).from(), first_period(&app).to()),
+        (None, None)
+    );
     let rows = screen(&mut app);
     let row = row_containing(&rows, "wo 11 nov");
     assert!(
@@ -103,7 +106,7 @@ fn alt_letters_accept_the_active_input_first() {
     type_text(&mut app, "0815");
     alt_key(&mut app, KeyCode::Char('b'));
     assert!(!app.is_editing());
-    assert_eq!(first_period(&app).from, TimeOfDay::new(8, 15));
+    assert_eq!(first_period(&app).from(), TimeOfDay::new(8, 15));
     assert_eq!(first_period(&app).period_type, PeriodType::Break);
 }
 
@@ -134,7 +137,7 @@ fn alt_p_and_alt_n_are_removed() {
 
 #[test]
 fn del_on_a_checked_absence_unchecks_it_like_enter() {
-    // Wed 11 Nov has no periods: checking Vacation fills in a full day.
+    // Wed 11 Nov has no periods: checking Vacation sets a full day.
     let mut app = app_with(SAMPLE, date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Char('v'));
     assert_eq!(first_period(&app).period_type, PeriodType::Vacation);
@@ -180,7 +183,7 @@ fn period_types_are_saved() {
     let yaml = fs.get(TIMESHEET).unwrap();
     assert!(
         yaml.contains(
-            "      - from: \"12:30\"\n        to: \"13:00\"\n        project: null\n        notes: null\n        type: sick\n"
+            "      - from: \"12:30\"\n        to: \"13:00\"\n        part_of_day: null\n        project: null\n        notes: null\n        type: sick\n"
         ),
         "{yaml}"
     );
@@ -303,7 +306,7 @@ fn a_free_period_on_an_empty_day_does_not_fill_times() {
     // Then
     assert_eq!(first_period(&app).period_type, PeriodType::Free);
     assert_eq!(
-        (first_period(&app).from, first_period(&app).to),
+        (first_period(&app).from(), first_period(&app).to()),
         (None, None)
     );
 }
@@ -319,7 +322,7 @@ fn alt_f_accepts_the_active_input_first() {
 
     // Then
     assert!(!app.is_editing());
-    assert_eq!(first_period(&app).from, TimeOfDay::new(8, 15));
+    assert_eq!(first_period(&app).from(), TimeOfDay::new(8, 15));
     assert_eq!(first_period(&app).period_type, PeriodType::Free);
 }
 
@@ -337,7 +340,7 @@ fn free_periods_are_saved() {
     let yaml = fs.get(TIMESHEET).unwrap();
     assert!(
         yaml.contains(
-            "      - from: \"12:30\"\n        to: \"13:00\"\n        project: null\n        notes: null\n        type: free\n"
+            "      - from: \"12:30\"\n        to: \"13:00\"\n        part_of_day: null\n        project: null\n        notes: null\n        type: free\n"
         ),
         "{yaml}"
     );

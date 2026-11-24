@@ -40,11 +40,11 @@ days:
     .unwrap();
     let day = &timesheet.days[&date(2026, 11, 12)];
     assert_eq!(day.regular_expected_working_time, Some(Minutes(432)));
-    assert_eq!(day.periods[0].from, TimeOfDay::new(12, 35));
-    assert_eq!(day.periods[0].to, TimeOfDay::new(14, 30));
+    assert_eq!(day.periods[0].from(), TimeOfDay::new(12, 35));
+    assert_eq!(day.periods[0].to(), TimeOfDay::new(14, 30));
     assert_eq!(day.periods[0].project.as_deref(), Some("otto"));
     assert_eq!(day.periods[0].notes.as_deref(), Some("foo! bar?"));
-    assert_eq!(day.periods[1].to, None);
+    assert_eq!(day.periods[1].to(), None);
     assert_eq!(
         day.periods[1].project, None,
         "empty string is read as empty"

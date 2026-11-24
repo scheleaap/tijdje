@@ -105,8 +105,8 @@ fn leaving_a_day_sorts_its_periods() {
     ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 3));
     let monday = &app.timesheet().days[&date(2026, 11, 2)];
-    assert_eq!(monday.periods[0].from, TimeOfDay::new(7, 0));
-    assert_eq!(monday.periods[1].from, TimeOfDay::new(8, 45));
+    assert_eq!(monday.periods[0].from(), TimeOfDay::new(7, 0));
+    assert_eq!(monday.periods[1].from(), TimeOfDay::new(8, 45));
 }
 
 #[test]

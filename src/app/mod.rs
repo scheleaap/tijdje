@@ -20,8 +20,8 @@ use crate::{
     clipboard::{Clipboard, NoClipboard},
     clock::Clock,
     domain::{
-        ConsistencyProblem, Day, InconsistentDay, Period, PeriodType, TimeOfDay, Timesheet,
-        calendar,
+        ConsistencyProblem, Day, Extent, ExtentKind, InconsistentDay, PartOfDay, Period,
+        PeriodType, TimeOfDay, Timesheet, calendar,
     },
     store::{self, Backup, FileSystem, Fingerprint, LoadError, Overwrite, SaveError},
 };
@@ -67,6 +67,8 @@ pub enum Outcome {
 pub enum Field {
     From,
     To,
+    /// Shown instead of From and To in a period with a part of day.
+    PartOfDay,
     Project,
     Notes,
     Break,
@@ -77,10 +79,12 @@ pub enum Field {
 }
 
 impl Field {
-    /// All fields in Tab order, which is their order on screen.
-    const ALL: [Field; 9] = [
+    /// All fields in Tab order, which is their order on screen; a period has
+    /// either From and To or the part-of-day field.
+    const ALL: [Field; 10] = [
         Field::From,
         Field::To,
+        Field::PartOfDay,
         Field::Project,
         Field::Break,
         Field::Free,
@@ -92,16 +96,36 @@ impl Field {
     const FIRST: Field = Field::ALL[0];
     const LAST: Field = Field::ALL[Field::ALL.len() - 1];
 
-    fn index(self) -> usize {
-        Self::ALL.iter().position(|&f| f == self).expect("listed")
+    /// The fields of a period whose extent is of `kind`, in Tab order: From
+    /// and To, or the part-of-day field instead.
+    fn of_period(kind: ExtentKind) -> Vec<Field> {
+        Self::ALL
+            .into_iter()
+            .filter(|&field| field.in_period(kind) == field)
+            .collect()
     }
 
-    fn next(self) -> Option<Field> {
-        Self::ALL.get(self.index() + 1).copied()
+    /// The field taking this one's place in a period whose extent is of
+    /// `kind`: the part-of-day field stands for both From and To, and From
+    /// for the part-of-day field.
+    fn in_period(self, kind: ExtentKind) -> Field {
+        match (self, kind) {
+            (Field::From | Field::To, ExtentKind::PartOfDay) => Field::PartOfDay,
+            (Field::PartOfDay, ExtentKind::FromTo) => Field::From,
+            _ => self,
+        }
     }
 
-    fn previous(self) -> Option<Field> {
-        self.index().checked_sub(1).map(|i| Self::ALL[i])
+    /// The next or previous field, in `direction`, of a period whose extent
+    /// is of `kind`; `None` at its last or first field.
+    fn neighbor(self, kind: ExtentKind, direction: Direction) -> Option<Field> {
+        let fields = Self::of_period(kind);
+        let index = fields.iter().position(|&f| f == self)?;
+        let neighbor = match direction {
+            Direction::Forward => Some(index + 1),
+            Direction::Backward => index.checked_sub(1),
+        };
+        neighbor.and_then(|i| fields.get(i).copied())
     }
 
     /// From and To take times typed as HHMM.
@@ -126,13 +150,14 @@ impl Field {
             Field::Vacation => Some(PeriodType::Vacation),
             Field::Sick => Some(PeriodType::Sick),
             Field::Holiday => Some(PeriodType::Holiday),
-            Field::From | Field::To | Field::Project | Field::Notes => None,
+            Field::From | Field::To | Field::PartOfDay | Field::Project | Field::Notes => None,
         }
     }
 
-    /// Fields that take typed text: every field that isn't a checkbox.
+    /// Fields that take typed text: every field that isn't a checkbox or the
+    /// part-of-day field.
     fn takes_text(self) -> bool {
-        self.period_type().is_none()
+        self.period_type().is_none() && self != Field::PartOfDay
     }
 }
 
@@ -141,16 +166,33 @@ fn one_line(text: &str) -> String {
     text.lines().map(str::trim).collect::<Vec<_>>().join(" ")
 }
 
-/// The period type Alt+b/f/s/v/h toggles on the focused period.
-fn period_type_for_alt_key(code: KeyCode) -> Option<PeriodType> {
-    Some(match code {
-        KeyCode::Char('b') => PeriodType::Break,
-        KeyCode::Char('f') => PeriodType::Free,
-        KeyCode::Char('v') => PeriodType::Vacation,
-        KeyCode::Char('s') => PeriodType::Sick,
-        KeyCode::Char('h') => PeriodType::Holiday,
-        _ => return None,
-    })
+/// What a period-definition key does to the focused period.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PeriodDefinition {
+    /// Alt+b/f/s/v/h: toggles Break/Free/Sick/Vacation/Holiday.
+    ToggleType(PeriodType),
+    /// Alt+0: from–to with empty times; Alt+1/2/3: full day, 1st half or
+    /// 2nd half.
+    SwitchExtent(Extent),
+}
+
+impl PeriodDefinition {
+    /// The period definition of Alt and `code`, if any.
+    fn of_alt_key(code: KeyCode) -> Option<Self> {
+        match code {
+            KeyCode::Char('b') => Some(Self::ToggleType(PeriodType::Break)),
+            KeyCode::Char('f') => Some(Self::ToggleType(PeriodType::Free)),
+            KeyCode::Char('v') => Some(Self::ToggleType(PeriodType::Vacation)),
+            KeyCode::Char('s') => Some(Self::ToggleType(PeriodType::Sick)),
+            KeyCode::Char('h') => Some(Self::ToggleType(PeriodType::Holiday)),
+            KeyCode::Char('0') => Some(Self::SwitchExtent(Extent::default())),
+            KeyCode::Char(digit @ '1'..='3') => {
+                let index = usize::from(digit as u8 - b'1');
+                Some(Self::SwitchExtent(Extent::PartOfDay(PartOfDay::ALL[index])))
+            }
+            _ => None,
+        }
+    }
 }
 
 /// What a key does while editing.
@@ -359,7 +401,7 @@ impl App {
 
     fn new(timesheet: Timesheet, storage: Storage, clock: Box<dyn Clock>) -> Self {
         let today = clock.today();
-        Self {
+        let mut app = Self {
             timesheet,
             storage,
             clipboard: Box::new(NoClipboard),
@@ -381,7 +423,9 @@ impl App {
             first_visible_day: None,
             last_visible_day: None,
             first_visible_period_row: 0,
-        }
+        };
+        app.fit_focus_to_period();
+        app
     }
 
     pub fn screen(&self) -> Screen {
@@ -435,7 +479,36 @@ impl App {
         self.has_unsaved_changes
     }
 
+    /// Handles a key press. Afterwards, focus is on a field the focused
+    /// period has: whatever the key changed, a part-of-day period has the
+    /// part-of-day field instead of From and To.
     pub fn handle_key(&mut self, key: KeyEvent) -> Outcome {
+        let outcome = self.dispatch_key(key);
+        self.fit_focus_to_period();
+        outcome
+    }
+
+    /// Moves focus from From or To to the part-of-day field if the focused
+    /// period has a part of day, and from the part-of-day field to From if
+    /// it hasn't.
+    fn fit_focus_to_period(&mut self) {
+        if let Focus::Period(focus) = self.focus {
+            let field = focus.field.in_period(self.extent_kind(focus.period));
+            self.focus = Focus::Period(FieldFocus { field, ..focus });
+        }
+    }
+
+    /// Whether the period at `period` of the selected day, as shown, is
+    /// from–to or a part of day.
+    fn extent_kind(&self, period: usize) -> ExtentKind {
+        self.shown_day()
+            .periods
+            .get(period)
+            .map(|p| p.extent.kind())
+            .unwrap_or_default()
+    }
+
+    fn dispatch_key(&mut self, key: KeyEvent) -> Outcome {
         // The date may have changed while waiting for this key.
         self.refresh_today();
         let modifiers = Modifiers::of(key);
@@ -454,15 +527,20 @@ impl App {
             self.handle_go_to_date_key(key);
             return Outcome::Continue;
         }
-        // The day note isn't in a period, so period types don't apply to it.
+        // The day note isn't in a period, so period definitions don't apply to it.
         if alt
             && self.is_tracking()
             && let Some(period) = self.focus.period()
-            && let Some(period_type) = period_type_for_alt_key(key.code)
+            && let Some(definition) = PeriodDefinition::of_alt_key(key.code)
         {
             // Accept active input first; if that fails, the shortcut does nothing.
             if self.active_input.is_none() || self.accept() {
-                self.toggle_period_type(period, period_type);
+                match definition {
+                    PeriodDefinition::ToggleType(period_type) => {
+                        self.toggle_period_type(period, period_type)
+                    }
+                    PeriodDefinition::SwitchExtent(extent) => self.switch_extent(period, extent),
+                }
             }
             return Outcome::Continue;
         }
@@ -643,11 +721,15 @@ impl App {
     }
 
     /// Enter (not editing): toggles a focused checkbox, or starts editing a
-    /// focused input field with its current value.
+    /// focused input field with its current value. Does nothing on the
+    /// part-of-day field.
     fn edit_or_toggle_focused_field(&mut self) {
         match self.focused_checkbox() {
             Some((period, period_type)) => self.toggle_period_type(period, period_type),
-            None => self.active_input = Some(ActiveInput::with_text(&self.focused_text())),
+            None if self.focus.takes_text() => {
+                self.active_input = Some(ActiveInput::with_text(&self.focused_text()));
+            }
+            None => {}
         }
     }
 
@@ -723,6 +805,21 @@ impl App {
         self.edit_selected_day(|day| day.toggle_period_type(period, period_type));
     }
 
+    /// Switches the period at `period` to `extent`: a part of day, or
+    /// from–to with empty times (only if it has a part of day). Focus moves
+    /// to the part-of-day field, or to From after switching to from–to.
+    fn switch_extent(&mut self, period: usize, extent: Extent) {
+        let had_part_of_day = self.extent_kind(period) == ExtentKind::PartOfDay;
+        self.edit_selected_day(|day| day.switch_extent(period, extent));
+        let field = match extent.kind() {
+            ExtentKind::PartOfDay => Some(Field::PartOfDay),
+            ExtentKind::FromTo => had_part_of_day.then_some(Field::From),
+        };
+        if let Some(field) = field {
+            self.focus = Focus::Period(FieldFocus { period, field });
+        }
+    }
+
     /// Typing in a focused input field replaces its value with active input.
     fn start_editing(&mut self, c: char) {
         if !self.focus.accepts(c, 0) {
@@ -733,11 +830,16 @@ impl App {
         self.active_input = Some(input);
     }
 
-    /// Del (not editing): empties a input field or unchecks a checkbox, as an
-    /// accepted change.
+    /// Del (not editing): empties a input field, unchecks a checkbox or
+    /// switches a part of day back to from–to, as an accepted change.
     fn clear_focused_field(&mut self) {
-        match self.focused_checkbox() {
-            Some((period, period_type)) => {
+        let part_of_day_period = match self.focus {
+            Focus::Period(focus) if focus.field == Field::PartOfDay => Some(focus.period),
+            _ => None,
+        };
+        match (part_of_day_period, self.focused_checkbox()) {
+            (Some(period), _) => self.switch_extent(period, Extent::default()),
+            (None, Some((period, period_type))) => {
                 let checked = self
                     .focused_period()
                     .is_some_and(|period| period.period_type == period_type);
@@ -745,7 +847,7 @@ impl App {
                     self.toggle_period_type(period, period_type);
                 }
             }
-            None => {
+            (None, None) => {
                 self.active_input = Some(ActiveInput::with_text(""));
                 self.accept();
             }
@@ -1161,8 +1263,10 @@ impl App {
     /// ↑/↓: the closest field in the row above/below, stopping at the first
     /// period and the day note. Implied-break rows aren't focusable, so they
     /// are skipped. Every period row has the same fields in the same columns,
-    /// so the closest field is the same field. The day note is below the last
-    /// period; above it, From of the last period is the closest field.
+    /// so the closest field is the same field, except that the part-of-day
+    /// field stands for both From and To; leaving it toward a from–to row
+    /// lands on From (see `fit_focus_to_period`). The day note is below the
+    /// last period; above it, From of the last period is the closest field.
     fn move_focus_vertically(&mut self, direction: Direction) {
         let last_period = self.period_count() - 1;
         self.focus = match (direction, self.focus) {
@@ -1188,13 +1292,10 @@ impl App {
     /// ←/→: the previous/next field of the focused period, stopping at its
     /// first and last field. The day note is alone in its row.
     fn move_focus_within_period(&mut self, direction: Direction) {
-        if let Focus::Period(focus) = &mut self.focus {
-            let field = match direction {
-                Direction::Forward => focus.field.next(),
-                Direction::Backward => focus.field.previous(),
-            };
-            if let Some(field) = field {
-                focus.field = field;
+        if let Focus::Period(focus) = self.focus {
+            let kind = self.extent_kind(focus.period);
+            if let Some(field) = focus.field.neighbor(kind, direction) {
+                self.focus = Focus::Period(FieldFocus { field, ..focus });
             }
         }
     }
@@ -1210,22 +1311,22 @@ impl App {
                 period: last_period,
                 field: Field::LAST,
             }),
-            (Direction::Forward, Focus::Period(focus)) => match focus.field.next() {
-                Some(field) => Focus::Period(FieldFocus { field, ..focus }),
-                None if focus.period == last_period => Focus::DayNote,
-                None => Focus::Period(FieldFocus {
-                    period: focus.period + 1,
-                    field: Field::FIRST,
-                }),
-            },
-            (Direction::Backward, Focus::Period(focus)) => match focus.field.previous() {
-                Some(field) => Focus::Period(FieldFocus { field, ..focus }),
-                None if focus.period == 0 => Focus::DayNote,
-                None => Focus::Period(FieldFocus {
-                    period: focus.period - 1,
-                    field: Field::LAST,
-                }),
-            },
+            (direction, Focus::Period(focus)) => {
+                let kind = self.extent_kind(focus.period);
+                match (direction, focus.field.neighbor(kind, direction)) {
+                    (_, Some(field)) => Focus::Period(FieldFocus { field, ..focus }),
+                    (Direction::Forward, None) if focus.period == last_period => Focus::DayNote,
+                    (Direction::Forward, None) => Focus::Period(FieldFocus {
+                        period: focus.period + 1,
+                        field: Field::FIRST,
+                    }),
+                    (Direction::Backward, None) if focus.period == 0 => Focus::DayNote,
+                    (Direction::Backward, None) => Focus::Period(FieldFocus {
+                        period: focus.period - 1,
+                        field: Field::LAST,
+                    }),
+                }
+            }
         };
     }
 }
@@ -1234,10 +1335,15 @@ impl App {
 /// and empty values.
 fn field_text(period: &Period, field: Field) -> Option<String> {
     match field {
-        Field::From => period.from.map(TimeOfDay::format_hhmm),
-        Field::To => period.to.map(TimeOfDay::format_hhmm),
+        Field::From => period.from().map(TimeOfDay::format_hhmm),
+        Field::To => period.to().map(TimeOfDay::format_hhmm),
         Field::Project => period.project.clone(),
         Field::Notes => period.notes.clone(),
-        Field::Break | Field::Free | Field::Vacation | Field::Sick | Field::Holiday => None,
+        Field::PartOfDay
+        | Field::Break
+        | Field::Free
+        | Field::Vacation
+        | Field::Sick
+        | Field::Holiday => None,
     }
 }

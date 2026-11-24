@@ -12,7 +12,7 @@ use std::{
 use jiff::civil::Date;
 use serde::{Deserialize, Deserializer};
 
-use crate::domain::{Day, Minutes, Period, PeriodType, TimeOfDay, Timesheet};
+use crate::domain::{Day, Extent, Minutes, PartOfDay, Period, PeriodType, TimeOfDay, Timesheet};
 
 /// File access, injected so tests can use an in-memory file system.
 pub trait FileSystem {
@@ -270,9 +270,10 @@ fn to_yaml(timesheet: &Timesheet) -> String {
         );
         for period in &day.periods {
             out += &format!(
-                "      - from: {}\n        to: {}\n        project: {}\n        notes: {}\n        type: {}\n",
-                yaml_time(period.from),
-                yaml_time(period.to),
+                "      - from: {}\n        to: {}\n        part_of_day: {}\n        project: {}\n        notes: {}\n        type: {}\n",
+                yaml_time(period.from()),
+                yaml_time(period.to()),
+                period.part_of_day().map_or("null", part_of_day_name),
                 yaml_text(period.project.as_deref()),
                 yaml_text(period.notes.as_deref()),
                 period_type_name(period.period_type),
@@ -334,6 +335,28 @@ fn period_type_from_name(name: &str) -> Option<PeriodType> {
         .map(|(t, _)| *t)
 }
 
+/// The stored name of each part of day.
+const PART_OF_DAY_NAMES: [(PartOfDay, &str); 3] = [
+    (PartOfDay::FullDay, "full_day"),
+    (PartOfDay::FirstHalf, "first_half"),
+    (PartOfDay::SecondHalf, "second_half"),
+];
+
+fn part_of_day_name(part_of_day: PartOfDay) -> &'static str {
+    PART_OF_DAY_NAMES
+        .iter()
+        .find(|(p, _)| *p == part_of_day)
+        .map(|(_, name)| *name)
+        .expect("every part of day has a name")
+}
+
+fn part_of_day_from_name(name: &str) -> Option<PartOfDay> {
+    PART_OF_DAY_NAMES
+        .iter()
+        .find(|(_, n)| *n == name)
+        .map(|(p, _)| *p)
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct FileModel {
@@ -361,6 +384,8 @@ struct PeriodModel {
     from: Option<String>,
     #[serde(default, deserialize_with = "empty_as_none")]
     to: Option<String>,
+    #[serde(default, deserialize_with = "empty_as_none")]
+    part_of_day: Option<String>,
     #[serde(default, deserialize_with = "empty_as_none")]
     project: Option<String>,
     #[serde(default, deserialize_with = "empty_as_none")]
@@ -420,9 +445,22 @@ impl PeriodModel {
                 .map(Some)
                 .ok_or_else(|| format!("invalid time {s:?}, expected HH:MM")),
         };
+        let part_of_day = self
+            .part_of_day
+            .map(|name| {
+                part_of_day_from_name(&name).ok_or_else(|| format!("unknown part of day {name:?}"))
+            })
+            .transpose()?;
+        let extent = match (part_of_day, self.from, self.to) {
+            (None, from, to) => Extent::FromTo {
+                from: time(from)?,
+                to: time(to)?,
+            },
+            (Some(part), None, None) => Extent::PartOfDay(part),
+            (Some(_), _, _) => Err("a period with a part of day has no from and to")?,
+        };
         Ok(Period {
-            from: time(self.from)?,
-            to: time(self.to)?,
+            extent,
             project: self.project,
             notes: self.notes,
             period_type: period_type_from_name(&self.period_type)

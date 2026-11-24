@@ -7,7 +7,7 @@ const MONDAY: jiff::civil::Date = date(2026, 11, 2);
 
 use tijdje::{
     app::{App, Field},
-    domain::TimeOfDay,
+    domain::{PartOfDay, TimeOfDay},
 };
 
 /// Mon 2 Nov (0845–1230 work, 1230–1300 break, 1300–1757 work), right panel,
@@ -34,9 +34,9 @@ fn ctrl_z_undoes_and_ctrl_y_redoes_an_accepted_value() {
     let mut app = monday();
     change_first_from(&mut app, "0815");
     ctrl(&mut app, 'z');
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 45));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 45));
     ctrl(&mut app, 'y');
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 15));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 15));
 }
 
 #[test]
@@ -45,18 +45,18 @@ fn several_changes_are_undone_one_at_a_time() {
     change_first_from(&mut app, "0815");
     change_first_from(&mut app, "0800");
     ctrl(&mut app, 'z');
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 15));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 15));
     ctrl(&mut app, 'z');
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 45));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 45));
 }
 
 #[test]
-fn a_checkbox_toggle_with_its_auto_fill_is_one_step() {
+fn a_checkbox_toggle_with_its_full_day_is_one_step() {
     let (mut app, _fs) = sample_on(date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Char('v'));
     assert_eq!(
-        periods(&app, date(2026, 11, 11))[0].from,
-        TimeOfDay::new(9, 0)
+        periods(&app, date(2026, 11, 11))[0].part_of_day(),
+        Some(PartOfDay::FullDay)
     );
     ctrl(&mut app, 'z');
     assert!(periods(&app, date(2026, 11, 11)).is_empty());
@@ -76,7 +76,7 @@ fn adding_and_deleting_periods_can_be_undone() {
     assert_eq!(periods(&app, MONDAY).len(), 2);
     ctrl(&mut app, 'z');
     assert_eq!(periods(&app, MONDAY).len(), 3);
-    assert_eq!(periods(&app, MONDAY)[2].from, TimeOfDay::new(13, 0));
+    assert_eq!(periods(&app, MONDAY)[2].from(), TimeOfDay::new(13, 0));
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn undoing_a_change_on_another_day_selects_that_day() {
     assert_eq!(app.selected_day(), date(2026, 11, 3));
     ctrl(&mut app, 'z');
     assert_eq!(app.selected_day(), MONDAY);
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 45));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 45));
 }
 
 #[test]
@@ -105,7 +105,7 @@ fn a_new_change_clears_what_can_be_redone() {
     ctrl(&mut app, 'z');
     change_first_from(&mut app, "0800");
     ctrl(&mut app, 'y');
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 0));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 0));
     assert!(screen(&mut app).contains("Nothing to redo"));
 }
 
@@ -123,7 +123,7 @@ fn undo_and_redo_are_ignored_while_editing() {
     type_text(&mut app, "07");
     ctrl(&mut app, 'z');
     assert!(app.is_editing());
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 15));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 15));
 }
 
 #[test]
@@ -133,7 +133,7 @@ fn saving_keeps_the_history() {
     ctrl(&mut app, 's');
     assert!(!app.has_unsaved_changes());
     ctrl(&mut app, 'z');
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 45));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 45));
     assert!(app.has_unsaved_changes());
 }
 
@@ -147,15 +147,15 @@ fn sorting_when_leaving_a_day_is_not_an_undo_step() {
     press(&mut app, KeyCode::Enter);
     ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(
-        periods(&app, MONDAY)[0].from,
+        periods(&app, MONDAY)[0].from(),
         TimeOfDay::new(7, 0),
         "sorted"
     );
     // The first undo takes back the last accepted change (To), not the sort.
     ctrl(&mut app, 'z');
     let periods_now = periods(&app, MONDAY);
-    assert_eq!(periods_now[3].from, TimeOfDay::new(7, 0));
-    assert_eq!(periods_now[3].to, None);
+    assert_eq!(periods_now[3].from(), TimeOfDay::new(7, 0));
+    assert_eq!(periods_now[3].to(), None);
 }
 
 #[test]
@@ -164,18 +164,18 @@ fn undo_does_nothing_on_the_help_screen() {
     change_first_from(&mut app, "0815");
     press(&mut app, KeyCode::F(1));
     ctrl(&mut app, 'z');
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 15));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 15));
 }
 
 #[test]
 fn clearing_a_field_is_an_undo_step() {
     let mut app = monday();
     press(&mut app, KeyCode::Delete);
-    assert_eq!(periods(&app, MONDAY)[0].from, None);
+    assert_eq!(periods(&app, MONDAY)[0].from(), None);
     ctrl(&mut app, 'z');
-    assert_eq!(periods(&app, MONDAY)[0].from, TimeOfDay::new(8, 45));
+    assert_eq!(periods(&app, MONDAY)[0].from(), TimeOfDay::new(8, 45));
     ctrl(&mut app, 'y');
-    assert_eq!(periods(&app, MONDAY)[0].from, None);
+    assert_eq!(periods(&app, MONDAY)[0].from(), None);
 }
 
 #[test]

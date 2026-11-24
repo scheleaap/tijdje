@@ -79,7 +79,7 @@ fn a_pasted_time_may_contain_a_colon() {
     let clipboard = FakeClipboard::with(" 12:35\n");
     let mut app = monday_with(&clipboard);
     ctrl(&mut app, 'v');
-    assert_eq!(first_period(&app).from, TimeOfDay::new(12, 35));
+    assert_eq!(first_period(&app).from(), TimeOfDay::new(12, 35));
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn an_invalid_pasted_time_is_rejected_with_a_message() {
     let clipboard = FakeClipboard::with("half past nine");
     let mut app = monday_with(&clipboard);
     ctrl(&mut app, 'v');
-    assert_eq!(first_period(&app).from, TimeOfDay::new(8, 45));
+    assert_eq!(first_period(&app).from(), TimeOfDay::new(8, 45));
     assert!(!app.is_editing());
     assert!(screen(&mut app).contains("half past nine is not a valid time"));
 }
@@ -103,7 +103,7 @@ fn an_invalid_pasted_time_keeps_the_active_input() {
     press(&mut app, KeyCode::Char('1'));
     press(&mut app, KeyCode::Char('5'));
     press(&mut app, KeyCode::Enter);
-    assert_eq!(first_period(&app).from, TimeOfDay::new(7, 15));
+    assert_eq!(first_period(&app).from(), TimeOfDay::new(7, 15));
 }
 
 #[test]
@@ -152,7 +152,7 @@ fn a_one_digit_hour_is_padded() {
     let clipboard = FakeClipboard::with("9:35");
     let mut app = monday_with(&clipboard);
     ctrl(&mut app, 'v');
-    assert_eq!(first_period(&app).from, TimeOfDay::new(9, 35));
+    assert_eq!(first_period(&app).from(), TimeOfDay::new(9, 35));
 }
 
 #[test]
@@ -168,6 +168,6 @@ fn an_empty_clipboard_says_so_and_changes_nothing() {
     let clipboard = FakeClipboard::with("   ");
     let mut app = monday_with(&clipboard);
     ctrl(&mut app, 'v');
-    assert_eq!(first_period(&app).from, TimeOfDay::new(8, 45));
+    assert_eq!(first_period(&app).from(), TimeOfDay::new(8, 45));
     assert!(screen(&mut app).contains("The clipboard is empty"));
 }

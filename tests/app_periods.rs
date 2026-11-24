@@ -386,7 +386,7 @@ fn the_empty_period_becomes_a_real_period_once_something_is_filled_in() {
     press(&mut app, KeyCode::Enter);
     let periods = &app.timesheet().day(DAY_WITHOUT_PERIODS).periods;
     assert_eq!(periods.len(), 1);
-    assert_eq!(periods[0].from, tijdje::domain::TimeOfDay::new(9, 0));
+    assert_eq!(periods[0].from(), tijdje::domain::TimeOfDay::new(9, 0));
     assert!(app.has_unsaved_changes());
 }
 
@@ -445,7 +445,7 @@ fn emptying_every_period_keeps_them_until_the_day_is_left_and_focus_keeps_workin
     type_text(&mut app, "1200");
     press(&mut app, KeyCode::Enter);
     let periods = &app.timesheet().day(date(2026, 11, 2)).periods;
-    assert_eq!(periods[1].from, tijdje::domain::TimeOfDay::new(12, 0));
+    assert_eq!(periods[1].from(), tijdje::domain::TimeOfDay::new(12, 0));
 }
 
 #[test]

@@ -35,16 +35,6 @@ pub struct InconsistentDay {
     pub problem: ConsistencyProblem,
 }
 
-/// A From–To pair with both times set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct TimeSpan {
-    from: TimeOfDay,
-    to: TimeOfDay,
-}
-
-/// Where an auto-filled full day of absence starts.
-const FULL_DAY_START: TimeOfDay = TimeOfDay::new(9, 0).expect("valid time");
-
 /// 7h12m.
 pub const DEFAULT_REGULAR_EXPECTED_WORKING_TIME: Minutes = Minutes(432);
 
@@ -106,10 +96,104 @@ impl PeriodType {
     }
 }
 
+/// A period's extent as a share of the regular expected working time,
+/// instead of From and To.
+/// Ordered as sorted within a day.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum PartOfDay {
+    FullDay,
+    FirstHalf,
+    SecondHalf,
+}
+
+impl PartOfDay {
+    /// All parts of day, in the order of their Alt+1/2/3 keys.
+    pub const ALL: [PartOfDay; 3] = [Self::FullDay, Self::FirstHalf, Self::SecondHalf];
+
+    /// The label shown instead of From and To, and used in messages.
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::FullDay => "Full day",
+            Self::FirstHalf => "1st half",
+            Self::SecondHalf => "2nd half",
+        }
+    }
+
+    /// The duration on a day with `regular` as its regular expected working
+    /// time: all of it for a full day; half of it, rounded down to the
+    /// minute, for the 1st half, and the rest for the 2nd half, so both
+    /// halves add up to a full day.
+    pub fn duration(self, regular: Minutes) -> Minutes {
+        let first_half = Minutes(regular.0.div_euclid(2));
+        match self {
+            Self::FullDay => regular,
+            Self::FirstHalf => first_half,
+            Self::SecondHalf => regular - first_half,
+        }
+    }
+
+    /// Where a period with this part of day goes when its day is sorted: the
+    /// 2nd half after the from–to periods, the others before them.
+    fn sort_key(self) -> SortKey {
+        match self {
+            Self::SecondHalf => SortKey::Trailing(self),
+            Self::FullDay | Self::FirstHalf => SortKey::Leading(self),
+        }
+    }
+}
+
+/// Where a period goes when a day is sorted: full day, 1st half, from–to
+/// periods by From, 2nd half.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum SortKey {
+    Leading(PartOfDay),
+    FromToPeriod(Option<TimeOfDay>),
+    Trailing(PartOfDay),
+}
+
+/// How a period spans its day: from a start time to an end time, or as a
+/// part of day. A period never has both.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Extent {
+    /// From and To, either of which may still be empty.
+    FromTo {
+        from: Option<TimeOfDay>,
+        to: Option<TimeOfDay>,
+    },
+    PartOfDay(PartOfDay),
+}
+
+impl Default for Extent {
+    /// From–to with empty times.
+    fn default() -> Self {
+        Self::FromTo {
+            from: None,
+            to: None,
+        }
+    }
+}
+
+/// Whether a period has From and To or a part of day, regardless of values.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ExtentKind {
+    #[default]
+    FromTo,
+    PartOfDay,
+}
+
+impl Extent {
+    /// Whether this is from–to or a part of day.
+    pub fn kind(self) -> ExtentKind {
+        match self {
+            Self::FromTo { .. } => ExtentKind::FromTo,
+            Self::PartOfDay(_) => ExtentKind::PartOfDay,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Period {
-    pub from: Option<TimeOfDay>,
-    pub to: Option<TimeOfDay>,
+    pub extent: Extent,
     pub project: Option<String>,
     pub notes: Option<String>,
     pub period_type: PeriodType,
@@ -192,8 +276,14 @@ impl Day {
         self.periods
             .iter()
             .filter(|p| p.period_type == PeriodType::Work)
-            .filter_map(Period::duration)
+            .filter_map(|p| self.duration_of(p))
             .sum()
+    }
+
+    /// The duration of `period` on this day: a part of day depends on the
+    /// day's regular expected working time.
+    pub fn duration_of(&self, period: &Period) -> Option<Minutes> {
+        period.duration(self.regular_expected_working_time())
     }
 
     /// The stored regular expected working time, or the default.
@@ -207,7 +297,7 @@ impl Day {
         self.periods
             .iter()
             .filter(|p| p.period_type.absence().is_some())
-            .filter_map(Period::duration)
+            .filter_map(|p| self.duration_of(p))
             .sum()
     }
 
@@ -223,75 +313,99 @@ impl Day {
             .min()
     }
 
-    /// Adds an empty work period at the end whose From is the last period's To.
-    /// Returns its index.
+    /// Adds an empty work period at the end whose From is the last period's
+    /// To (empty after a part-of-day period). Returns its index.
     pub fn add_period(&mut self) -> usize {
-        let from = self.periods.last().and_then(|last| last.to);
+        let from = self.periods.last().and_then(Period::to);
         self.periods.push(Period {
-            from,
+            extent: Extent::FromTo { from, to: None },
             ..Period::default()
         });
         self.periods.len() - 1
     }
 
-    /// Sets the From of the period at `index`, if there is one. Changes
-    /// nothing else.
+    /// Sets the From of the period at `index`, if there is one, making it a
+    /// from–to period. Changes nothing else.
     pub fn set_from(&mut self, index: usize, from: Option<TimeOfDay>) {
         if let Some(period) = self.periods.get_mut(index) {
-            period.from = from;
+            period.extent = Extent::FromTo {
+                from,
+                to: period.to(),
+            };
         }
     }
 
-    /// Sets the To of the period at `index`, if there is one. If the next
-    /// period's From was equal to the old To, it moves along, so consecutive
-    /// periods stay connected. Clearing a To, or filling in the To of an open
-    /// period, leaves the next From alone.
+    /// Sets the To of the period at `index`, if there is one, making it a
+    /// from–to period. If the next from–to period's From was equal to the old
+    /// To, it moves along, so consecutive periods stay connected; part-of-day
+    /// and empty periods in between are skipped. Clearing a To, or filling in
+    /// the To of an open period, leaves the next From alone.
     pub fn set_to(&mut self, index: usize, to: Option<TimeOfDay>) {
-        let old_to = self
-            .periods
-            .get_mut(index)
-            .and_then(|period| std::mem::replace(&mut period.to, to));
-        if let (Some(old_to), Some(_), Some(next)) = (old_to, to, self.periods.get_mut(index + 1))
-            && next.from == Some(old_to)
+        let old_to = self.periods.get_mut(index).and_then(|period| {
+            let old_to = period.to();
+            period.extent = Extent::FromTo {
+                from: period.from(),
+                to,
+            };
+            old_to
+        });
+        let next = self
+            .next_from_to_period(index)
+            .and_then(|next| self.periods.get_mut(next));
+        if let (Some(old_to), Some(_), Some(next)) = (old_to, to, next)
+            && next.from() == Some(old_to)
         {
-            next.from = to;
+            next.extent = Extent::FromTo {
+                from: to,
+                to: next.to(),
+            };
+        }
+    }
+
+    /// The index of the first from–to period after the period at `index`
+    /// that isn't empty.
+    fn next_from_to_period(&self, index: usize) -> Option<usize> {
+        (index + 1..self.periods.len()).find(|&i| {
+            let period = &self.periods[i];
+            period.extent.kind() == ExtentKind::FromTo && !period.is_empty()
+        })
+    }
+
+    /// Switches the period at `index`, if there is one, to `extent`. A part
+    /// of day replaces the times; switching to from–to only applies to a
+    /// part-of-day period, and a from–to period keeps its times.
+    pub fn switch_extent(&mut self, index: usize, extent: Extent) {
+        if let Some(period) = self.periods.get_mut(index)
+            && (extent.kind() == ExtentKind::PartOfDay
+                || period.extent.kind() == ExtentKind::PartOfDay)
+        {
+            period.extent = extent;
         }
     }
 
     /// Checks `period_type` on the period at `index`, or unchecks it (back to
     /// work) if it was already checked. Checking an absence on the day's only
-    /// period, while its From and To are empty, fills a full day from 09:00.
-    /// Unchecking an absence empties those times again, if they're unchanged.
+    /// period, while it has no times, part of day or project, makes it a full day.
+    /// Unchecking an absence removes the full day while it is still the only
+    /// period and still a full day, even one set by hand. Times are never
+    /// filled in or cleared.
     pub fn toggle_period_type(&mut self, index: usize, period_type: PeriodType) {
-        let full_day = self.full_day();
         let is_only_period = self.periods.len() == 1;
-        let Some(period) = self.periods.get_mut(index) else {
-            return;
-        };
-        let previous = period.period_type;
-        if previous == period_type {
-            period.period_type = PeriodType::Work;
-            if is_only_period && period_type.absence().is_some() {
-                period.empty_times_if(full_day);
-            }
-        } else {
-            period.period_type = period_type;
-            let checking_an_absence =
-                period_type.absence().is_some() && previous.absence().is_none();
-            if is_only_period && checking_an_absence {
-                period.fill_times_if_empty(full_day);
+        if let Some(period) = self.periods.get_mut(index) {
+            let unchecking = period.period_type == period_type;
+            let full_day = Extent::PartOfDay(PartOfDay::FullDay);
+            period.period_type = if unchecking {
+                PeriodType::Work
+            } else {
+                period_type
+            };
+            let full_day_applies = is_only_period && period_type.absence().is_some();
+            if full_day_applies && unchecking && period.extent == full_day {
+                period.extent = Extent::default();
+            } else if full_day_applies && !unchecking && period.has_no_extent_or_project() {
+                period.extent = full_day;
             }
         }
-    }
-
-    /// A full day of absence: from 09:00 for the regular expected working time.
-    fn full_day(&self) -> Option<TimeSpan> {
-        let end = FULL_DAY_START.minutes_since_midnight()
-            + u16::try_from(self.regular_expected_working_time().0).ok()?;
-        Some(TimeSpan {
-            from: FULL_DAY_START,
-            to: TimeOfDay::new(end / 60, end % 60)?,
-        })
     }
 
     /// The first consistency problem of the day on `date`, if any.
@@ -302,26 +416,39 @@ impl Day {
             .or_else(|| self.check_open_period(date, today))
             .or_else(|| self.check_one_period_per_absence())
             .or_else(|| self.check_no_project_on_non_working_periods())
+            .or_else(|| self.check_no_part_of_day_on_breaks())
+            .or_else(|| {
+                PartOfDay::ALL
+                    .into_iter()
+                    .find_map(|part| self.check_at_most_one(part))
+            })
+            .or_else(|| self.check_no_full_day_with_a_half())
     }
 
     fn check_from_is_set(&self) -> Option<ConsistencyProblem> {
         self.first_period_where(
-            |p| p.from.is_none(),
-            |p| format!("Period {} has no From", p.label()),
+            |p| matches!(p.extent, Extent::FromTo { from: None, .. }),
+            |p| format!("Period {} has no From or part of day", p.label()),
         )
     }
 
     fn check_from_before_to(&self) -> Option<ConsistencyProblem> {
         self.first_period_where(
-            |p| matches!((p.from, p.to), (Some(from), Some(to)) if from >= to),
+            |p| matches!((p.from(), p.to()), (Some(from), Some(to)) if from >= to),
             |p| format!("Period {}: From is not before To", p.label()),
         )
     }
 
+    /// Only from–to periods can overlap.
     fn check_no_overlaps(&self) -> Option<ConsistencyProblem> {
-        self.indices_by_from().windows(2).find_map(|pair| {
+        let from_to_periods: Vec<usize> = self
+            .sorted_indices()
+            .into_iter()
+            .filter(|&i| self.periods[i].extent.kind() == ExtentKind::FromTo)
+            .collect();
+        from_to_periods.windows(2).find_map(|pair| {
             let (earlier, later) = (&self.periods[pair[0]], &self.periods[pair[1]]);
-            let message = match (earlier.to, later.from) {
+            let message = match (earlier.to(), later.from()) {
                 (Some(to), Some(from)) if from < to => {
                     format!("{} overlaps {}", earlier.label(), later.label())
                 }
@@ -370,6 +497,43 @@ impl Day {
         )
     }
 
+    fn check_no_part_of_day_on_breaks(&self) -> Option<ConsistencyProblem> {
+        self.first_period_where(
+            |p| p.period_type == PeriodType::Break && p.part_of_day().is_some(),
+            |p| format!("A break can't be a part of day ({})", p.label()),
+        )
+    }
+
+    /// A problem when more than one period has `part` as its part of day,
+    /// e.g. "More than one 1st half".
+    fn check_at_most_one(&self, part: PartOfDay) -> Option<ConsistencyProblem> {
+        let periods = self.indices_where(|p| p.part_of_day() == Some(part));
+        (periods.len() > 1).then(|| ConsistencyProblem {
+            message: format!("More than one {}", part.label().to_lowercase()),
+            periods,
+        })
+    }
+
+    fn check_no_full_day_with_a_half(&self) -> Option<ConsistencyProblem> {
+        let has_full_day = self
+            .periods
+            .iter()
+            .any(|p| p.part_of_day() == Some(PartOfDay::FullDay));
+        // The full day and the halves.
+        let periods = self.indices_where(|p| p.part_of_day().is_some());
+        (has_full_day && periods.len() > 1).then(|| ConsistencyProblem {
+            message: "Full day together with a half".to_owned(),
+            periods,
+        })
+    }
+
+    /// The indices of the periods matching `matches`.
+    fn indices_where(&self, matches: impl Fn(&Period) -> bool) -> Vec<usize> {
+        (0..self.periods.len())
+            .filter(|&i| matches(&self.periods[i]))
+            .collect()
+    }
+
     /// A problem for the first period matching `fails`, described by `message`.
     fn first_period_where(
         &self,
@@ -383,10 +547,11 @@ impl Day {
         })
     }
 
-    /// Period indices ordered by From; periods with the same From keep their order.
-    fn indices_by_from(&self) -> Vec<usize> {
+    /// Period indices in sort order (full day, 1st half, from–to periods by
+    /// From, 2nd half); periods in the same place keep their order.
+    fn sorted_indices(&self) -> Vec<usize> {
         let mut indices: Vec<usize> = (0..self.periods.len()).collect();
-        indices.sort_by_key(|&i| self.periods[i].from);
+        indices.sort_by_key(|&i| self.periods[i].sort_key());
         indices
     }
 
@@ -430,11 +595,12 @@ impl Day {
         SortedDay { day, on_screen }
     }
 
-    /// Removes empty periods and sorts the rest by From. Returns, for each old
-    /// period index, its new index (`None` if it was removed).
+    /// Removes empty periods and sorts the rest: full day, 1st half, from–to
+    /// periods by From, 2nd half. Returns, for each old period index, its new
+    /// index (`None` if it was removed).
     pub fn normalize(&mut self) -> Vec<Option<usize>> {
         let kept: Vec<usize> = self
-            .indices_by_from()
+            .sorted_indices()
             .into_iter()
             .filter(|&i| !self.periods[i].is_empty())
             .collect();
@@ -455,19 +621,24 @@ impl Day {
         }
     }
 
-    /// Whether there is a gap between the period at `index` and the next one.
+    /// Whether there is a gap between the from–to period at `index` and the
+    /// next from–to period.
     pub fn has_implied_break_after(&self, index: usize) -> bool {
         self.implied_break_after(index).is_some()
     }
 
-    /// The implied break after the period at `index`, as a break period from
-    /// its end to the start of the next period, if there is a gap.
+    /// The implied break after the from–to period at `index`, as a break
+    /// period from its end to the start of the next from–to period, if there
+    /// is a gap. Part-of-day and empty periods in between are skipped.
     pub fn implied_break_after(&self, index: usize) -> Option<Period> {
-        let (period, next) = (self.periods.get(index)?, self.periods.get(index + 1)?);
-        match (period.to, next.from) {
+        let period = self.periods.get(index)?;
+        let next = &self.periods[self.next_from_to_period(index)?];
+        match (period.to(), next.from()) {
             (Some(to), Some(from)) if from > to => Some(Period {
-                from: Some(to),
-                to: Some(from),
+                extent: Extent::FromTo {
+                    from: Some(to),
+                    to: Some(from),
+                },
                 period_type: PeriodType::Break,
                 ..Period::default()
             }),
@@ -481,43 +652,71 @@ impl Day {
 }
 
 impl Period {
-    /// An empty period has no values: no times, project or notes, and type work.
+    /// An empty period has no values: no times, part of day, project or
+    /// notes, and type work.
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
     }
 
-    /// The period's times as a label, e.g. `0900–1200`, `1230–` or `–1200`.
+    /// The period's times as a label, e.g. `0900–1200`, `1230–` or `–1200`;
+    /// for a part-of-day period its part of day, e.g. `Full day`.
     pub fn label(&self) -> String {
         let time = |t: Option<TimeOfDay>| t.map(TimeOfDay::format_hhmm).unwrap_or_default();
-        format!("{}–{}", time(self.from), time(self.to))
-    }
-
-    /// Sets From and To to `span` if both are empty.
-    fn fill_times_if_empty(&mut self, span: Option<TimeSpan>) {
-        if let (None, None, Some(span)) = (self.from, self.to, span) {
-            self.from = Some(span.from);
-            self.to = Some(span.to);
+        match self.extent {
+            Extent::FromTo { from, to } => format!("{}–{}", time(from), time(to)),
+            Extent::PartOfDay(part) => part.label().to_owned(),
         }
     }
 
-    /// Empties From and To if they hold exactly `span`.
-    fn empty_times_if(&mut self, span: Option<TimeSpan>) {
-        if span.is_some_and(|span| self.from == Some(span.from) && self.to == Some(span.to)) {
-            self.from = None;
-            self.to = None;
+    /// The period's From; `None` while empty, and for a part-of-day period.
+    pub fn from(&self) -> Option<TimeOfDay> {
+        match self.extent {
+            Extent::FromTo { from, .. } => from,
+            Extent::PartOfDay(_) => None,
         }
     }
 
-    /// An open period has no To yet, because it is still running.
+    /// The period's To; `None` while empty, and for a part-of-day period.
+    pub fn to(&self) -> Option<TimeOfDay> {
+        match self.extent {
+            Extent::FromTo { to, .. } => to,
+            Extent::PartOfDay(_) => None,
+        }
+    }
+
+    /// The period's part of day; `None` for a from–to period.
+    pub fn part_of_day(&self) -> Option<PartOfDay> {
+        match self.extent {
+            Extent::FromTo { .. } => None,
+            Extent::PartOfDay(part) => Some(part),
+        }
+    }
+
+    /// Whether the period has no times, no part of day and no project; notes
+    /// don't count. Only then may checking an absence make it a full day.
+    fn has_no_extent_or_project(&self) -> bool {
+        self.extent == Extent::default() && self.project.is_none()
+    }
+
+    /// Where the period goes when its day is sorted.
+    fn sort_key(&self) -> SortKey {
+        match self.extent {
+            Extent::FromTo { from, .. } => SortKey::FromToPeriod(from),
+            Extent::PartOfDay(part) => part.sort_key(),
+        }
+    }
+
+    /// An open period has no To yet, because it is still running. A
+    /// part-of-day period is never open.
     pub fn is_open(&self) -> bool {
-        self.to.is_none()
+        matches!(self.extent, Extent::FromTo { to: None, .. })
     }
 
     /// Whether the period directly follows `previous` (its From is that
     /// period's To) with the same project, period type and notes.
     fn needlessly_splits(&self, previous: &Period) -> bool {
-        previous.to.is_some()
-            && previous.to == self.from
+        previous.to().is_some()
+            && previous.to() == self.from()
             && previous.project == self.project
             && previous.period_type == self.period_type
             && previous.notes == self.notes
@@ -525,14 +724,17 @@ impl Period {
 
     /// Whether the period starts before 06:00 or ends after 20:00.
     pub fn has_unusual_time(&self) -> bool {
-        self.from.is_some_and(|from| from < EARLIEST_USUAL_START)
-            || self.to.is_some_and(|to| to > LATEST_USUAL_END)
+        self.from().is_some_and(|from| from < EARLIEST_USUAL_START)
+            || self.to().is_some_and(|to| to > LATEST_USUAL_END)
     }
 
-    /// The period's duration, or `None` while From or To is empty.
-    pub fn duration(&self) -> Option<Minutes> {
-        let (from, to) = (self.from?, self.to?);
-        Some(to - from)
+    /// The period's duration on a day with `regular` as its regular expected
+    /// working time, or `None` while From or To of a from–to period is empty.
+    pub fn duration(&self, regular: Minutes) -> Option<Minutes> {
+        match self.extent {
+            Extent::FromTo { from, to } => Some(to? - from?),
+            Extent::PartOfDay(part) => Some(part.duration(regular)),
+        }
     }
 }
 

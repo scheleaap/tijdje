@@ -11,7 +11,7 @@ use ratatui::{
 
 use super::{App, Dialog, Field, FieldFocus, Focus, Screen, active_input::ActiveInput};
 use crate::domain::{
-    Day, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay,
+    Day, Extent, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay,
     calendar::{self, Separator},
 };
 
@@ -29,6 +29,8 @@ const TOTAL_BALANCE_WIDTH: usize = 8;
 const GAP: usize = 1;
 const WARNING_WIDTH: usize = 2;
 const TIME_WIDTH: usize = 4;
+/// The part-of-day field covers From, the gap and To.
+const PART_OF_DAY_WIDTH: usize = TIME_WIDTH + GAP + TIME_WIDTH;
 const DURATION_WIDTH: usize = 8;
 const PROJECT_WIDTH: usize = 10;
 const CHECKBOX_WIDTH: usize = 3;
@@ -291,8 +293,8 @@ impl App {
                 PeriodRow::ImpliedBreak(after) => implied_break_line(day, after),
                 PeriodRow::Period(index) => {
                     let mut line = self.period_line(
+                        day,
                         index,
-                        &day.periods[index],
                         indicators[index],
                         areas.notes_width,
                         active_input_text,
@@ -308,14 +310,16 @@ impl App {
             .collect()
     }
 
+    /// The row of the period at `index` of `day`.
     fn period_line<'a>(
         &self,
+        day: &'a Day,
         index: usize,
-        period: &'a Period,
         indicator: Option<PeriodIndicator>,
         notes_width: usize,
         active_input_text: Option<&ActiveInputText>,
     ) -> Line<'a> {
+        let period = &day.periods[index];
         let text_field = |field: Field, text: &str, width: usize| match (
             self.is_focused(index, field),
             active_input_text,
@@ -326,16 +330,21 @@ impl App {
         };
         let gap = || Span::raw(" ");
         let mut spans = vec![Span::raw(indicator_emoji(indicator)), gap()];
-        spans.extend(text_field(
-            Field::From,
-            &format_time(period.from),
-            TIME_WIDTH,
-        ));
-        spans.push(gap());
-        spans.extend(text_field(Field::To, &format_time(period.to), TIME_WIDTH));
+        match period.extent {
+            Extent::PartOfDay(part_of_day) => spans.extend(text_field(
+                Field::PartOfDay,
+                part_of_day.label(),
+                PART_OF_DAY_WIDTH,
+            )),
+            Extent::FromTo { from, to } => {
+                spans.extend(text_field(Field::From, &format_time(from), TIME_WIDTH));
+                spans.push(gap());
+                spans.extend(text_field(Field::To, &format_time(to), TIME_WIDTH));
+            }
+        }
         spans.extend([
             gap(),
-            Span::raw(format!("{:<DURATION_WIDTH$}", format_duration(period))),
+            Span::raw(format!("{:<DURATION_WIDTH$}", format_duration(day, period))),
             gap(),
         ]);
         spans.extend(text_field(
@@ -515,9 +524,9 @@ fn implied_break_line(day: &Day, after: usize) -> Line<'static> {
     Line::raw(plain_period_row(
         Some(PeriodIndicator::NonWorking(implied.period_type)),
         [
-            &format_time(implied.from),
-            &format_time(implied.to),
-            &format_duration(&implied),
+            &format_time(implied.from()),
+            &format_time(implied.to()),
+            &format_duration(day, &implied),
             "",
         ],
         &checkboxes,
@@ -569,9 +578,9 @@ fn format_time(time: Option<TimeOfDay>) -> String {
     time.map(TimeOfDay::format_hhmm).unwrap_or_default()
 }
 
-fn format_duration(period: &Period) -> String {
-    period
-        .duration()
+/// The duration of `period` on `day`; empty while it has no duration.
+fn format_duration(day: &Day, period: &Period) -> String {
+    day.duration_of(period)
         .map(Minutes::format_duration)
         .unwrap_or_default()
 }
@@ -627,7 +636,12 @@ fn text_field_geometry(field: Field, notes_width: usize) -> Option<(usize, usize
         Field::To => Some((TO_X, TIME_WIDTH)),
         Field::Project => Some((PROJECT_X, PROJECT_WIDTH)),
         Field::Notes => Some((NOTES_X, notes_width)),
-        Field::Break | Field::Free | Field::Vacation | Field::Sick | Field::Holiday => None,
+        Field::PartOfDay
+        | Field::Break
+        | Field::Free
+        | Field::Vacation
+        | Field::Sick
+        | Field::Holiday => None,
     }
 }
 
@@ -898,7 +912,10 @@ fn render_help(frame: &mut Frame, area: Rect) {
             "Edit the focused field, or toggle a checkbox; while editing: accept",
         ),
         ("Esc", "Reject input"),
-        ("Del", "Clear the field, or uncheck the checkbox"),
+        (
+            "Del",
+            "Clear the field, uncheck the checkbox, or switch a part of day to from–to",
+        ),
         (
             "Home/End, Ctrl+A/E",
             "While editing: start/end of the input",
@@ -911,8 +928,12 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ("Ctrl+U/Ctrl+K", "While editing: delete to the start/end"),
         ("Ctrl+Del", "Delete the focused period"),
         ("Alt+b/f/s/v/h", "Toggle break/free/sick/vacation/holiday"),
-        ("F1", "Help"),
-        ("F2, Esc", "Back to Tracking"),
+        (
+            "Alt+0/1/2/3",
+            "Switch to from–to/full day/1st half/2nd half",
+        ),
+        // One line for F1 and F2, so the list still fits a 24-row terminal.
+        ("F1; F2, Esc", "Help; back to Tracking"),
         ("Ctrl+C/Ctrl+V", "Copy/paste the focused field"),
         ("Ctrl+Z/Ctrl+Y", "Undo/redo"),
         // One line, so the list still fits a 24-row terminal until the help

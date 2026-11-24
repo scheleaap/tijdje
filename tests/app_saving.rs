@@ -35,7 +35,7 @@ fn ctrl_s_saves_the_timesheet() {
     assert!(!app.has_unsaved_changes());
     let saved = reload(&fs);
     assert_eq!(
-        saved.days[&date(2026, 11, 2)].periods[0].from,
+        saved.days[&date(2026, 11, 2)].periods[0].from(),
         TimeOfDay::new(8, 15)
     );
     assert_eq!(&saved, app.timesheet());
@@ -52,11 +52,13 @@ fn saved_yaml_follows_the_documented_schema() {
     periods:
       - from: \"08:15\"
         to: \"12:30\"
+        part_of_day: null
         project: \"internal\"
         notes: \"Onboarding\"
         type: work
       - from: \"12:30\"
         to: \"13:00\"
+        part_of_day: null
         project: null
         notes: null
         type: break
@@ -192,7 +194,7 @@ fn a_file_changed_on_disk_asks_before_overwriting() {
     ctrl(&mut app, 's');
     press(&mut app, KeyCode::Char('o'));
     assert_eq!(
-        reload(&fs).days[&date(2026, 11, 2)].periods[0].from,
+        reload(&fs).days[&date(2026, 11, 2)].periods[0].from(),
         TimeOfDay::new(8, 15)
     );
     assert!(!app.has_unsaved_changes());
@@ -219,7 +221,7 @@ fn save_before_quitting_saves_and_quits() {
     ctrl(&mut app, 'q');
     assert_eq!(press(&mut app, KeyCode::Char('s')), Outcome::Quit);
     assert_eq!(
-        reload(&fs).days[&date(2026, 11, 2)].periods[0].from,
+        reload(&fs).days[&date(2026, 11, 2)].periods[0].from(),
         TimeOfDay::new(8, 15)
     );
 }

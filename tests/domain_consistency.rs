@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use common::{day, period};
 use jiff::civil::{Date, date};
 use tijdje::domain::{
-    Period,
+    Extent, Period,
     PeriodType::{Break, Free, Holiday, Sick, Vacation, Work},
     Timesheet,
 };
@@ -88,10 +88,13 @@ fn non_consecutive_periods_are_allowed() {
 #[test]
 fn a_period_needs_a_from() {
     let mut p = period(900, Some(1200), Work);
-    p.from = None;
+    p.extent = Extent::FromTo {
+        from: None,
+        to: p.to(),
+    };
     assert_eq!(
         problem(vec![p], PAST),
-        Some(("Period –1200 has no From".into(), vec![0]))
+        Some(("Period –1200 has no From or part of day".into(), vec![0]))
     );
 }
 

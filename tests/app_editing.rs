@@ -15,7 +15,7 @@ fn typing_replaces_the_value_and_enter_accepts_it() {
     assert!(app.is_editing());
     press(&mut app, KeyCode::Enter);
     assert!(!app.is_editing());
-    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(8, 15));
+    assert_eq!(period_at(&app, 0).from(), TimeOfDay::new(8, 15));
     let screen = rows(&render(&mut app, 120, 24));
     // 0815–1230 (4h15m) + 1300–1757 (4h57m)
     assert!(row_containing(&screen, "ma  2 nov").contains("9h12m"));
@@ -39,7 +39,7 @@ fn esc_rejects_the_active_input() {
     type_text(&mut app, "07");
     press(&mut app, KeyCode::Esc);
     assert!(!app.is_editing());
-    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(8, 45));
+    assert_eq!(period_at(&app, 0).from(), TimeOfDay::new(8, 45));
 }
 
 #[test]
@@ -66,7 +66,7 @@ fn time_fields_take_at_most_four_digits() {
     let mut app = app_on_monday();
     type_text(&mut app, "1a2:345");
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(12, 34));
+    assert_eq!(period_at(&app, 0).from(), TimeOfDay::new(12, 34));
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn invalid_time_keeps_editing_and_shows_a_message() {
         "message disappears at the next key"
     );
     press(&mut app, KeyCode::Esc);
-    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(8, 45));
+    assert_eq!(period_at(&app, 0).from(), TimeOfDay::new(8, 45));
 }
 
 #[test]
@@ -108,7 +108,7 @@ fn an_empty_value_can_be_accepted() {
     type_text(&mut app, "1");
     press(&mut app, KeyCode::Backspace);
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period_at(&app, 0).from, None);
+    assert_eq!(period_at(&app, 0).from(), None);
 
     tab_to(&mut app, Field::Project);
     type_text(&mut app, "x");
@@ -206,8 +206,8 @@ fn ctrl_enter_in_the_last_period_adds_a_period_starting_where_it_ends() {
     tab_to(&mut app, Field::Notes);
     ctrl_key(&mut app, KeyCode::Enter);
     assert_eq!(app.timesheet().days[&date(2026, 11, 2)].periods.len(), 4);
-    assert_eq!(period_at(&app, 3).from, TimeOfDay::new(17, 57));
-    assert_eq!(period_at(&app, 3).to, None);
+    assert_eq!(period_at(&app, 3).from(), TimeOfDay::new(17, 57));
+    assert_eq!(period_at(&app, 3).to(), None);
     assert_eq!(app.focus(), focus(3, Field::From));
 }
 
@@ -246,7 +246,7 @@ fn enter_starts_editing_with_the_existing_text() {
     press(&mut app, KeyCode::Backspace);
     type_text(&mut app, "0");
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(8, 40));
+    assert_eq!(period_at(&app, 0).from(), TimeOfDay::new(8, 40));
 }
 
 #[test]
@@ -281,7 +281,7 @@ fn filling_in_the_empty_period_of_a_day_without_periods_adds_its_first_period() 
     press(&mut app, KeyCode::Enter);
     let day = &app.timesheet().days[&date(2026, 11, 11)];
     assert_eq!(day.periods.len(), 1);
-    assert_eq!(day.periods[0].from, TimeOfDay::new(9, 0));
+    assert_eq!(day.periods[0].from(), TimeOfDay::new(9, 0));
     assert_eq!(day.regular_expected_working_time(), Minutes(432));
     assert_eq!(app.focus(), focus(0, Field::From));
 }
@@ -301,7 +301,7 @@ fn ctrl_del_deletes_the_focused_period_after_confirming() {
     let periods = &app.timesheet().days[&date(2026, 11, 2)].periods;
     assert_eq!(periods.len(), 2);
     assert_eq!(
-        periods[0].from,
+        periods[0].from(),
         TimeOfDay::new(12, 30),
         "the break took its place"
     );
@@ -477,7 +477,7 @@ fn left_and_right_move_the_cursor_while_editing() {
 fn del_clears_an_input_field() {
     let mut app = app_on_monday();
     press(&mut app, KeyCode::Delete);
-    assert_eq!(period_at(&app, 0).from, None);
+    assert_eq!(period_at(&app, 0).from(), None);
     tab_to(&mut app, Field::Project);
     press(&mut app, KeyCode::Delete);
     assert_eq!(period_at(&app, 0).project, None);
@@ -594,7 +594,7 @@ fn ctrl_enter_while_editing_the_empty_period_accepts_and_says_it_is_still_open()
     assert!(!app.is_editing());
     let periods = &app.timesheet().days[&date(2026, 11, 11)].periods;
     assert_eq!(periods.len(), 1);
-    assert_eq!(periods[0].from, TimeOfDay::new(9, 0));
+    assert_eq!(periods[0].from(), TimeOfDay::new(9, 0));
     assert_eq!(app.focus(), focus(0, Field::From));
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(screen.contains("The last period is still open"), "{screen}");

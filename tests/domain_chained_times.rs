@@ -14,8 +14,8 @@ fn changing_a_to_changes_the_next_from_that_was_equal_to_it() {
         period(1200, Some(1300), Work),
     ]);
     d.set_to(0, time(1215));
-    assert_eq!(d.periods[0].to, time(1215));
-    assert_eq!(d.periods[1].from, time(1215));
+    assert_eq!(d.periods[0].to(), time(1215));
+    assert_eq!(d.periods[1].from(), time(1215));
 }
 
 #[test]
@@ -25,7 +25,7 @@ fn changing_a_to_leaves_a_next_from_that_was_different() {
         period(1230, Some(1300), Work),
     ]);
     d.set_to(0, time(1215));
-    assert_eq!(d.periods[1].from, time(1230));
+    assert_eq!(d.periods[1].from(), time(1230));
 }
 
 #[test]
@@ -36,8 +36,8 @@ fn only_the_next_period_is_chained() {
         period(1100, Some(1200), Work),
     ]);
     d.set_to(0, time(1030));
-    assert_eq!(d.periods[1].to, time(1100));
-    assert_eq!(d.periods[2].from, time(1100));
+    assert_eq!(d.periods[1].to(), time(1100));
+    assert_eq!(d.periods[2].from(), time(1100));
 }
 
 #[test]
@@ -48,7 +48,7 @@ fn changing_the_last_periods_to_changes_nothing_else() {
     ]);
     d.set_to(1, time(1330));
     assert_eq!(d.periods[0], period(900, Some(1200), Work));
-    assert_eq!(d.periods[1].to, time(1330));
+    assert_eq!(d.periods[1].to(), time(1330));
 }
 
 #[test]
@@ -57,7 +57,7 @@ fn filling_in_the_to_of_an_open_period_leaves_an_empty_next_from() {
     // compares them as optional values would wrongly fill in that From.
     let mut d = day(vec![period(900, None, Work), Period::default()]);
     d.set_to(0, time(1200));
-    assert_eq!(d.periods[1].from, None);
+    assert_eq!(d.periods[1].from(), None);
 }
 
 #[test]
@@ -67,7 +67,7 @@ fn moving_a_to_past_the_next_periods_to_still_chains() {
         period(1200, Some(1300), Work),
     ]);
     d.set_to(0, time(1400));
-    assert_eq!(d.periods[1].from, time(1400));
+    assert_eq!(d.periods[1].from(), time(1400));
 }
 
 #[test]
@@ -77,8 +77,8 @@ fn clearing_a_to_leaves_the_next_from() {
         period(1200, Some(1300), Work),
     ]);
     d.set_to(0, None);
-    assert_eq!(d.periods[0].to, None);
-    assert_eq!(d.periods[1].from, time(1200));
+    assert_eq!(d.periods[0].to(), None);
+    assert_eq!(d.periods[1].from(), time(1200));
 }
 
 #[test]
@@ -89,7 +89,7 @@ fn changing_a_from_changes_nothing_else() {
     ]);
     d.set_from(1, time(1215));
     assert_eq!(d.periods[0], period(900, Some(1200), Work));
-    assert_eq!(d.periods[1].from, time(1215));
+    assert_eq!(d.periods[1].from(), time(1215));
 }
 
 #[test]
