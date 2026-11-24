@@ -118,12 +118,15 @@ pub struct Period {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Day {
     pub regular_expected_working_time: Option<Minutes>,
+    /// The day note: a remark attached to the day as a whole.
+    pub day_note: Option<String>,
     pub periods: Vec<Period>,
 }
 
 /// Stands in for days that aren't in the timesheet.
 static EMPTY_DAY: Day = Day {
     regular_expected_working_time: None,
+    day_note: None,
     periods: Vec::new(),
 };
 
@@ -168,8 +171,21 @@ impl Day {
         }
     }
 
+    /// An empty day has no periods other than empty periods. Its day note
+    /// doesn't count: a day with only a day note is empty too.
     pub fn is_empty(&self) -> bool {
         self.periods.iter().all(Period::is_empty)
+    }
+
+    /// Sets the day note to `text`; empty text or only spaces is no day note.
+    pub fn set_day_note(&mut self, text: &str) {
+        self.day_note = (!text.trim().is_empty()).then(|| text.to_owned());
+    }
+
+    /// Whether the day has a day note or a period that isn't empty; only
+    /// such days are saved.
+    pub fn has_content(&self) -> bool {
+        self.day_note.is_some() || !self.is_empty()
     }
 
     pub fn worked_time(&self) -> Minutes {

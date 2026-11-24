@@ -3,7 +3,7 @@ mod common;
 use common::*;
 use jiff::civil::date;
 use ratatui::{buffer::Buffer, crossterm::event::KeyCode, style::Modifier};
-use tijdje::app::{App, Field, FieldFocus};
+use tijdje::app::{App, Field};
 
 /// Mon 2 Nov uses "otto" twice and three other projects once; Tue 3 Nov
 /// (today) has one period without a project.
@@ -29,7 +29,7 @@ const TODAY_ROW: &str = "0900 1000";
 /// Today's first period, focused on `field`.
 fn app_on(field: Field) -> App {
     let mut app = app_with(TIMESHEET_WITH_PROJECTS, date(2026, 11, 3));
-    while app.focus().field != field {
+    while app.focus().field() != Some(field) {
         press(&mut app, KeyCode::Tab);
     }
     app
@@ -259,11 +259,5 @@ fn right_moves_focus_when_not_editing() {
     press(&mut app, KeyCode::Right);
 
     // Then
-    assert_eq!(
-        app.focus(),
-        FieldFocus {
-            period: 0,
-            field: Field::Break
-        }
-    );
+    assert_eq!(app.focus(), focus(0, Field::Break));
 }

@@ -19,7 +19,7 @@ fn monday_with(clipboard: &FakeClipboard) -> App {
 }
 
 fn tab_to(app: &mut App, field: Field) {
-    while app.focus().field != field {
+    while app.focus().field() != Some(field) {
         press(app, KeyCode::Tab);
     }
 }

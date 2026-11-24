@@ -48,6 +48,7 @@ fn saved_yaml_follows_the_documented_schema() {
     let yaml = fs.get(TIMESHEET).unwrap();
     let monday = "  \"2026-11-02\":
     regular_expected_working_time_in_minutes: 432
+    notes: null
     periods:
       - from: \"08:15\"
         to: \"12:30\"
@@ -73,7 +74,7 @@ fn text_with_quotes_and_special_characters_survives_saving() {
     let (mut app, fs) = sample_on(date(2026, 11, 2));
     // The break (period 1) has no notes yet.
     press(&mut app, KeyCode::Down);
-    while app.focus().field != Field::Notes {
+    while app.focus().field() != Some(Field::Notes) {
         press(&mut app, KeyCode::Right);
     }
     let notes = r#"say "hi" \ # : - [x] {y} 'z' ü"#;

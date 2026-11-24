@@ -16,7 +16,7 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
 };
 use tijdje::{
-    app::{App, Field},
+    app::{App, Field, FieldFocus, Focus},
     domain::{Day, Minutes, Period, PeriodType, TimeOfDay},
     store::FileSystem,
 };
@@ -208,6 +208,7 @@ pub fn day(periods: Vec<Period>) -> Day {
     Day {
         regular_expected_working_time: Some(Minutes(432)),
         periods,
+        ..Day::default()
     }
 }
 
@@ -280,7 +281,20 @@ pub fn period_at(app: &App, index: usize) -> &Period {
 
 /// Moves focus with Tab until `field` of some period has focus.
 pub fn tab_to(app: &mut App, field: Field) {
-    while app.focus().field != field {
+    while app.focus().field() != Some(field) {
         press(app, KeyCode::Tab);
     }
+}
+
+/// Focus on `field` of the period at index `period`.
+pub fn focus(period: usize, field: Field) -> Focus {
+    Focus::Period(FieldFocus { period, field })
+}
+
+/// Focus on the day note.
+pub const DAY_NOTE: Focus = Focus::DayNote;
+
+/// Moves focus from a field of the first period up to the day note.
+pub fn focus_day_note(app: &mut App) {
+    press(app, KeyCode::Up);
 }

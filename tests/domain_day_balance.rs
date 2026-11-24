@@ -45,6 +45,7 @@ fn regular_expected_defaults_to_7h12m() {
     let d = Day {
         regular_expected_working_time: None,
         periods: vec![],
+        ..Day::default()
     };
     assert_eq!(d.actual_expected_working_time(), Minutes(432));
 }

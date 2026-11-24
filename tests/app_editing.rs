@@ -4,13 +4,9 @@ use common::*;
 use jiff::civil::date;
 use ratatui::crossterm::event::KeyCode;
 use tijdje::{
-    app::{App, Field, FieldFocus, Outcome},
+    app::{App, Field, Outcome},
     domain::{Minutes, TimeOfDay},
 };
-
-fn focus(period: usize, field: Field) -> FieldFocus {
-    FieldFocus { period, field }
-}
 
 #[test]
 fn typing_replaces_the_value_and_enter_accepts_it() {

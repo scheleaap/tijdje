@@ -171,8 +171,13 @@ fn the_period_list_uses_the_former_message_row() {
         "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n{periods}"
     );
     let mut app = app_with(&yaml, date(2026, 11, 2));
+    // The day note is on row 1 and the header on row 2, so the list starts on
+    // row 3 and the 19 rows don't fit; focusing the last period scrolls it
+    // into view at the bottom of the list.
+    for _ in 0..9 {
+        press(&mut app, KeyCode::Down);
+    }
     let rows = rows(&render(&mut app, WIDTH, HEIGHT));
-    // The panel's header is on row 1, so the list starts on row 2.
     let last_period = &rows[usize::from(NOTIFICATION_ROW) - 1];
     assert!(last_period.contains("1700 1800"), "{last_period}");
     let below = &rows[usize::from(NOTIFICATION_ROW)];

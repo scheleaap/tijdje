@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Paragraph},
 };
 
-use super::{App, Field, Popup, Screen};
+use super::{App, Field, FieldFocus, Focus, Popup, Screen};
 use crate::domain::{
     Day, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay,
     calendar::{self, Separator},
@@ -58,6 +58,9 @@ const FIELD: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const FOCUSED_FIELD: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 /// The rest of a suggested project after the active input.
 const GHOST_TEXT: Style = FOCUSED_FIELD.add_modifier(Modifier::DIM);
+/// A hint in an empty input field, such as the day note's.
+const PLACEHOLDER: Style = Style::new().fg(Color::DarkGray).bg(Color::Gray);
+const DAY_NOTE_PLACEHOLDER: &str = "Day note";
 /// Global notifications: black on cyan, like the selection bar.
 const NOTIFICATION: Style = SELECTED;
 /// Periods that failed the consistency check.
@@ -186,7 +189,8 @@ impl App {
         let block = panel_block(&title);
         let inner = block.inner(area);
         frame.render_widget(block, area);
-        let [header, list, actual_expected] = Layout::vertical([
+        let [day_note, header, list, actual_expected] = Layout::vertical([
+            Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Fill(1),
             Constraint::Length(1),
@@ -209,10 +213,20 @@ impl App {
         let rows = period_rows(&self.shown_day());
         let height = usize::from(list.height);
         let first = self.scroll_to_focused_period(&rows, height);
-        let focus = self.focus;
         let suggestion = self.project_suggestion();
-        let active_input_text = match self.active_input.as_mut() {
-            Some(input) => {
+        let day_note_width = usize::from(day_note.width);
+        let active_input_text = match (self.active_input.as_mut(), self.focus) {
+            (Some(input), Focus::DayNote) => {
+                let (text, column) = input.visible(day_note_width);
+                frame.set_cursor_position((day_note.x + to_u16(column), day_note.y));
+                Some(ActiveInputText::new(
+                    text,
+                    input.len(),
+                    None,
+                    day_note_width,
+                ))
+            }
+            (Some(input), Focus::Period(focus)) => {
                 let (x, width) = text_field_geometry(focus.field, notes_width).unwrap_or_default();
                 let (text, column) = input.visible(width);
                 let row = row_of(&rows, focus.period)
@@ -223,10 +237,14 @@ impl App {
                 }
                 Some(ActiveInputText::new(text, input.len(), suggestion, width))
             }
-            None => None,
+            (None, _) => None,
         };
         // Looked up only now: the active input above needed `self` mutably.
         let day = self.shown_day();
+        frame.render_widget(
+            self.day_note_text(&day, day_note_width, active_input_text.as_ref()),
+            day_note,
+        );
         let indicators = day.period_indicators(self.selected, self.today);
         let lines: Vec<Line> = rows
             .iter()
@@ -315,8 +333,28 @@ impl App {
         Line::from(spans)
     }
 
+    /// The day note as a full-width input field, showing the active input
+    /// while it is being edited, and a dimmed placeholder while it is empty
+    /// and doesn't have focus.
+    fn day_note_text(
+        &self,
+        day: &Day,
+        width: usize,
+        active_input_text: Option<&ActiveInputText>,
+    ) -> Span<'static> {
+        let focused = self.focus == Focus::DayNote;
+        let (text, style) = match (active_input_text.filter(|_| focused), &day.day_note) {
+            (Some(active_input), _) => (active_input.text.as_str(), FOCUSED_FIELD),
+            (None, Some(day_note)) if focused => (day_note.as_str(), FOCUSED_FIELD),
+            (None, Some(day_note)) => (day_note.as_str(), FIELD),
+            (None, None) if focused => ("", FOCUSED_FIELD),
+            (None, None) => (DAY_NOTE_PLACEHOLDER, PLACEHOLDER),
+        };
+        Span::styled(fit(text, width), style)
+    }
+
     fn is_focused(&self, period: usize, field: Field) -> bool {
-        self.focus.period == period && self.focus.field == field
+        self.focus == Focus::Period(FieldFocus { period, field })
     }
 
     /// Adjusts the first visible row so the first period that failed the
@@ -327,7 +365,9 @@ impl App {
             .iter()
             .min()
             .copied()
-            .unwrap_or(self.focus.period);
+            .or(self.focus.period())
+            // The day note is above the first period.
+            .unwrap_or(0);
         let target = row_of(rows, target);
         if let Some(row) = target {
             if row < self.first_visible_period_row {

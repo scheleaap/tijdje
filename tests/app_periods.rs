@@ -3,11 +3,7 @@ mod common;
 use common::*;
 use jiff::civil::date;
 use ratatui::{crossterm::event::KeyCode, style::Color};
-use tijdje::app::{Field, FieldFocus};
-
-fn focus(period: usize, field: Field) -> FieldFocus {
-    FieldFocus { period, field }
-}
+use tijdje::app::Field;
 
 #[test]
 fn right_panel_shows_the_periods_of_the_selected_day() {
@@ -161,8 +157,10 @@ fn up_and_down_keep_the_field_and_stop_at_the_edges() {
     assert_eq!(app.focus(), focus(2, Field::To));
     press(&mut app, KeyCode::Up);
     press(&mut app, KeyCode::Up);
-    press(&mut app, KeyCode::Up);
     assert_eq!(app.focus(), focus(0, Field::To));
+    press(&mut app, KeyCode::Up);
+    press(&mut app, KeyCode::Up);
+    assert_eq!(app.focus(), DAY_NOTE, "the day note is the top edge");
     assert_eq!(
         app.selected_day(),
         date(2026, 11, 2),
@@ -196,7 +194,11 @@ fn tab_follows_the_fields_on_screen_and_continues_in_the_next_period() {
 fn tab_wraps_around_within_the_day() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
     press(&mut app, KeyCode::BackTab);
+    assert_eq!(app.focus(), DAY_NOTE);
+    press(&mut app, KeyCode::BackTab);
     assert_eq!(app.focus(), focus(2, Field::Notes));
+    press(&mut app, KeyCode::Tab);
+    assert_eq!(app.focus(), DAY_NOTE);
     press(&mut app, KeyCode::Tab);
     assert_eq!(app.focus(), focus(0, Field::From));
     assert_eq!(app.selected_day(), date(2026, 11, 2));
@@ -206,7 +208,11 @@ fn tab_wraps_around_within_the_day() {
 fn tab_wraps_around_on_the_empty_period_of_a_day_without_periods() {
     let mut app = app_with(SAMPLE, date(2026, 11, 11));
     press(&mut app, KeyCode::BackTab);
+    assert_eq!(app.focus(), DAY_NOTE);
+    press(&mut app, KeyCode::BackTab);
     assert_eq!(app.focus(), focus(0, Field::Notes));
+    press(&mut app, KeyCode::Tab);
+    assert_eq!(app.focus(), DAY_NOTE);
     press(&mut app, KeyCode::Tab);
     assert_eq!(app.focus(), focus(0, Field::From));
 }

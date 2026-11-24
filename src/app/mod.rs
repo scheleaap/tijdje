@@ -124,22 +124,6 @@ impl Field {
     fn takes_text(self) -> bool {
         self.period_type().is_none()
     }
-
-    /// The value a pasted text gives this input field: a time becomes `HHMM`,
-    /// other fields get the text on one line. `None` for an invalid time.
-    fn pasted_value(self, text: &str) -> Option<String> {
-        if self.is_time() {
-            TimeOfDay::parse_pasted(text).map(TimeOfDay::format_hhmm)
-        } else {
-            Some(text.lines().map(str::trim).collect::<Vec<_>>().join(" "))
-        }
-    }
-
-    /// Whether typing `c` adds it to an active input of `len` characters:
-    /// time fields take at most four digits, other input fields anything.
-    fn accepts(self, c: char, len: usize) -> bool {
-        self.takes_text() && (!self.is_time() || (c.is_ascii_digit() && len < 4))
-    }
 }
 
 /// The period type Alt+b/f/s/v/h toggles on the focused period.
@@ -189,12 +173,63 @@ pub struct FieldFocus {
     pub field: Field,
 }
 
-impl FieldFocus {
+/// What has focus in the right panel: the day note or a field of a period.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Focus {
+    /// The day note, above the first period.
+    DayNote,
+    Period(FieldFocus),
+}
+
+impl Focus {
     /// From of the first period: the focus after switching days.
-    const START: FieldFocus = FieldFocus {
+    const START: Focus = Focus::Period(FieldFocus {
         period: 0,
         field: Field::FIRST,
-    };
+    });
+
+    /// The focused field of a period; `None` on the day note.
+    pub fn field(self) -> Option<Field> {
+        match self {
+            Focus::DayNote => None,
+            Focus::Period(focus) => Some(focus.field),
+        }
+    }
+
+    /// The index of the focused period; `None` on the day note.
+    pub fn period(self) -> Option<usize> {
+        match self {
+            Focus::DayNote => None,
+            Focus::Period(focus) => Some(focus.period),
+        }
+    }
+
+    /// From and To take times typed as HHMM.
+    fn is_time(self) -> bool {
+        self.field().is_some_and(Field::is_time)
+    }
+
+    /// Whether the focus is on an input field: the day note or a period
+    /// field that isn't a checkbox.
+    fn takes_text(self) -> bool {
+        self.field().is_none_or(Field::takes_text)
+    }
+
+    /// The value a pasted text gives this input field: a time becomes `HHMM`,
+    /// other fields get the text on one line. `None` for an invalid time.
+    fn pasted_value(self, text: &str) -> Option<String> {
+        if self.is_time() {
+            TimeOfDay::parse_pasted(text).map(TimeOfDay::format_hhmm)
+        } else {
+            Some(text.lines().map(str::trim).collect::<Vec<_>>().join(" "))
+        }
+    }
+
+    /// Whether typing `c` adds it to an active input of `len` characters:
+    /// time fields take at most four digits, other input fields anything.
+    fn accepts(self, c: char, len: usize) -> bool {
+        self.takes_text() && (!self.is_time() || (c.is_ascii_digit() && len < 4))
+    }
 }
 
 pub struct App {
@@ -213,7 +248,7 @@ pub struct App {
     screen: Screen,
     selected: Date,
     /// A field of the right panel always has focus.
-    focus: FieldFocus,
+    focus: Focus,
     /// The focused field is being edited while this is set.
     active_input: Option<ActiveInput>,
     /// A global notification: a one-line message centered over the screen;
@@ -266,7 +301,7 @@ impl App {
             today,
             screen: Screen::Tracking,
             selected: calendar::start_day(today),
-            focus: FieldFocus::START,
+            focus: Focus::START,
             active_input: None,
             notification: None,
             inconsistent_periods: Vec::new(),
@@ -287,7 +322,7 @@ impl App {
         self.selected
     }
 
-    pub fn focus(&self) -> FieldFocus {
+    pub fn focus(&self) -> Focus {
         self.focus
     }
 
@@ -345,13 +380,15 @@ impl App {
             }
             return Outcome::Continue;
         }
+        // The day note isn't in a period, so period types don't apply to it.
         if alt
             && self.is_tracking()
+            && let Some(period) = self.focus.period()
             && let Some(period_type) = period_type_for_alt_key(key.code)
         {
             // Accept active input first; if that fails, the shortcut does nothing.
             if self.active_input.is_none() || self.accept() {
-                self.toggle_period_type(period_type);
+                self.toggle_period_type(period, period_type);
             }
             return Outcome::Continue;
         }
@@ -425,8 +462,11 @@ impl App {
             KeyCode::BackTab if plain => self.move_focus_in_tab_order(Direction::Backward),
             KeyCode::Enter if ctrl_only => self.focus_next_period(),
             KeyCode::Enter if plain => self.edit_or_toggle_focused_field(),
-            // The empty period of a day without periods can't be deleted.
-            KeyCode::Delete if ctrl_only && !self.shows_empty_period() => {
+            // The empty period of a day without periods can't be deleted, and
+            // the day note isn't a period.
+            KeyCode::Delete
+                if ctrl_only && !self.shows_empty_period() && self.focus.period().is_some() =>
+            {
                 let label = self.focused_period().map(Period::label).unwrap_or_default();
                 self.popup = Some(Popup::delete_period(&label));
             }
@@ -443,13 +483,13 @@ impl App {
         let modifiers = Modifiers::of(key);
         let plain = modifiers == Modifiers::None;
         let ctrl_only = modifiers == Modifiers::Ctrl;
-        let field = self.focus.field;
+        let focus = self.focus;
         let suggestion = self.project_suggestion();
         let Some(input) = &mut self.active_input else {
             return;
         };
         match key.code {
-            KeyCode::Char(c) if plain && field.accepts(c, input.len()) => input.insert(c),
+            KeyCode::Char(c) if plain && focus.accepts(c, input.len()) => input.insert(c),
             KeyCode::Char('a') if ctrl_only => input.home(),
             KeyCode::Char('e') if ctrl_only => input.end(),
             KeyCode::Char('w') if ctrl_only => input.delete_previous_word(),
@@ -496,24 +536,32 @@ impl App {
     fn project_suggestion(&self) -> Option<String> {
         self.active_input
             .as_ref()
-            .filter(|input| self.focus.field == Field::Project && input.is_cursor_at_end())
+            .filter(|input| self.focus.field() == Some(Field::Project) && input.is_cursor_at_end())
             .and_then(|input| self.timesheet.project_suggestion(&input.text()))
             .map(str::to_owned)
     }
 
-    /// The focused period: `None` on the empty period of a day without periods.
+    /// The focused period: `None` on the empty period of a day without
+    /// periods and on the day note.
     fn focused_period(&self) -> Option<&Period> {
-        self.timesheet
-            .day(self.selected)
-            .periods
-            .get(self.focus.period)
+        let periods = &self.timesheet.day(self.selected).periods;
+        self.focus.period().and_then(|period| periods.get(period))
+    }
+
+    /// The focused checkbox, as its period and period type; `None` on input
+    /// fields.
+    fn focused_checkbox(&self) -> Option<(usize, PeriodType)> {
+        match self.focus {
+            Focus::Period(focus) => focus.field.period_type().map(|t| (focus.period, t)),
+            Focus::DayNote => None,
+        }
     }
 
     /// Enter (not editing): toggles a focused checkbox, or starts editing a
     /// focused input field with its current value.
     fn edit_or_toggle_focused_field(&mut self) {
-        match self.focus.field.period_type() {
-            Some(period_type) => self.toggle_period_type(period_type),
+        match self.focused_checkbox() {
+            Some((period, period_type)) => self.toggle_period_type(period, period_type),
             None => self.active_input = Some(ActiveInput::with_text(&self.focused_text())),
         }
     }
@@ -521,7 +569,7 @@ impl App {
     /// Ctrl+C: copies the focused field's value, or the active input while
     /// editing. Checkboxes can't be copied.
     fn copy(&mut self) {
-        if !self.focus.field.takes_text() {
+        if !self.focus.takes_text() {
             return;
         }
         let text = match &self.active_input {
@@ -538,19 +586,21 @@ impl App {
     /// `HH:MM` or `H:MM`; anything else is rejected with a notification.
     fn paste(&mut self) {
         let focus = self.focus;
-        if !focus.field.takes_text() {
+        if !focus.takes_text() {
             return;
         }
-        let Some(text) = self.clipboard.get_text() else {
+        let Some(clipboard_text) = self.clipboard.get_text() else {
             self.notify(NO_CLIPBOARD);
             return;
         };
-        let text = text.trim();
-        if text.is_empty() {
+        let text = clipboard_text.trim();
+        // Only spaces paste as no day note, as when typed; other fields take
+        // them for an empty clipboard.
+        if clipboard_text.is_empty() || (text.is_empty() && focus != Focus::DayNote) {
             self.notify("The clipboard is empty");
             return;
         }
-        let Some(value) = focus.field.pasted_value(text) else {
+        let Some(value) = focus.pasted_value(text) else {
             self.notify(invalid_time_message(text));
             return;
         };
@@ -562,29 +612,23 @@ impl App {
 
     /// The focused input field's current value, as it is shown.
     fn focused_text(&self) -> String {
-        let Some(period) = self.focused_period() else {
-            return String::new();
-        };
-        let time = |t: Option<TimeOfDay>| t.map(TimeOfDay::format_hhmm).unwrap_or_default();
-        match self.focus.field {
-            Field::From => time(period.from),
-            Field::To => time(period.to),
-            Field::Project => period.project.clone().unwrap_or_default(),
-            Field::Notes => period.notes.clone().unwrap_or_default(),
-            Field::Break | Field::Free | Field::Vacation | Field::Sick | Field::Holiday => {
-                String::new()
-            }
+        match self.focus {
+            Focus::DayNote => self.timesheet.day(self.selected).day_note.clone(),
+            Focus::Period(focus) => self
+                .focused_period()
+                .and_then(|period| field_text(period, focus.field)),
         }
+        .unwrap_or_default()
     }
 
-    fn toggle_period_type(&mut self, period_type: PeriodType) {
-        let period = self.focus.period;
+    /// Checks or unchecks `period_type` on the period at `period`.
+    fn toggle_period_type(&mut self, period: usize, period_type: PeriodType) {
         self.edit_selected_day(|day| day.toggle_period_type(period, period_type));
     }
 
     /// Typing in a focused input field replaces its value with active input.
     fn start_editing(&mut self, c: char) {
-        if !self.focus.field.accepts(c, 0) {
+        if !self.focus.accepts(c, 0) {
             return;
         }
         let mut input = ActiveInput::with_text("");
@@ -595,14 +639,13 @@ impl App {
     /// Del (not editing): empties a input field or unchecks a checkbox, as an
     /// accepted change.
     fn clear_focused_field(&mut self) {
-        let focus = self.focus;
-        match focus.field.period_type() {
-            Some(period_type) => {
+        match self.focused_checkbox() {
+            Some((period, period_type)) => {
                 let checked = self
                     .focused_period()
                     .is_some_and(|period| period.period_type == period_type);
                 if checked {
-                    self.toggle_period_type(period_type);
+                    self.toggle_period_type(period, period_type);
                 }
             }
             None => {
@@ -620,7 +663,7 @@ impl App {
             return false;
         };
         let text = input.text();
-        let time = if focus.field.is_time() && !text.is_empty() {
+        let time = if focus.is_time() && !text.is_empty() {
             match TimeOfDay::parse_hhmm(&text) {
                 Some(time) => Some(time),
                 None => {
@@ -631,21 +674,26 @@ impl App {
         } else {
             None
         };
-        let value = (!text.is_empty()).then_some(text);
-        self.edit_selected_day(|day| match focus.field {
-            Field::From => day.set_from(focus.period, time),
-            Field::To => day.set_to(focus.period, time),
-            Field::Project => {
-                if let Some(period) = day.periods.get_mut(focus.period) {
-                    period.project = value;
+        self.edit_selected_day(|day| match focus {
+            Focus::DayNote => day.set_day_note(&text),
+            Focus::Period(focus) => {
+                let value = (!text.is_empty()).then_some(text);
+                match focus.field {
+                    Field::From => day.set_from(focus.period, time),
+                    Field::To => day.set_to(focus.period, time),
+                    Field::Project => {
+                        if let Some(period) = day.periods.get_mut(focus.period) {
+                            period.project = value;
+                        }
+                    }
+                    Field::Notes => {
+                        if let Some(period) = day.periods.get_mut(focus.period) {
+                            period.notes = value;
+                        }
+                    }
+                    _ => {}
                 }
             }
-            Field::Notes => {
-                if let Some(period) = day.periods.get_mut(focus.period) {
-                    period.notes = value;
-                }
-            }
-            _ => {}
         });
         self.active_input = None;
         true
@@ -717,7 +765,10 @@ impl App {
         self.timesheet.set_day(date, day);
         self.mark_changed(date);
         if date == self.selected {
-            self.focus.period = self.focus.period.min(self.period_count() - 1);
+            let last_period = self.period_count() - 1;
+            if let Focus::Period(focus) = &mut self.focus {
+                focus.period = focus.period.min(last_period);
+            }
         } else {
             self.select_day(date);
         }
@@ -749,14 +800,15 @@ impl App {
     }
 
     /// Keeps focus on the same period after the selected day was sorted. If
-    /// that period was removed, focus moves to From of the first period.
+    /// that period was removed, focus moves to From of the first period. The
+    /// day note keeps focus.
     fn follow_moved_periods(&mut self, moved: &[Option<usize>]) {
-        self.focus = match moved.get(self.focus.period).copied().flatten() {
-            Some(period) => FieldFocus {
-                period,
-                ..self.focus
+        self.focus = match self.focus {
+            Focus::DayNote => Focus::DayNote,
+            Focus::Period(focus) => match moved.get(focus.period).copied().flatten() {
+                Some(period) => Focus::Period(FieldFocus { period, ..focus }),
+                None => Focus::START,
             },
-            None => FieldFocus::START,
         };
     }
 
@@ -810,15 +862,24 @@ impl App {
         }
     }
 
-    /// Ctrl+Enter: focuses From of the next period. In the last period, adds
+    /// Ctrl+Enter: focuses From of the next period; on the day note, the
+    /// next period is the first one.
+    fn focus_next_period(&mut self) {
+        match self.focus {
+            Focus::DayNote => self.focus = Focus::START,
+            Focus::Period(focus) => self.focus_period_after(focus.period),
+        }
+    }
+
+    /// Focuses From of the period after `current`. In the last period, adds
     /// a period after it and focuses its From, unless the last period is still
     /// open (without To, which includes an empty last period): then it only
     /// notifies. On the empty period of a day without periods it does nothing.
-    fn focus_next_period(&mut self) {
+    fn focus_period_after(&mut self, current: usize) {
         if self.shows_empty_period() {
             return;
         }
-        let next = self.focus.period + 1;
+        let next = current + 1;
         let period = if next < self.period_count() {
             next
         } else if self.shown_day().periods.last().is_some_and(Period::is_open) {
@@ -827,10 +888,10 @@ impl App {
         } else {
             self.edit_selected_day(Day::add_period)
         };
-        self.focus = FieldFocus {
+        self.focus = Focus::Period(FieldFocus {
             period,
             field: Field::From,
-        };
+        });
     }
 
     fn run_popup_action(&mut self, action: PopupAction) -> Outcome {
@@ -891,25 +952,26 @@ impl App {
     /// After deleting the only period, the day shows an empty period, with
     /// focus on its From.
     fn delete_focused_period(&mut self) {
-        let focus = self.focus;
-        let count = self.edit_selected_day(|day| {
-            day.remove_period(focus.period);
-            day.periods.len()
-        });
-        self.focus = if count == 0 {
-            FieldFocus::START
-        } else {
-            FieldFocus {
-                period: focus.period.min(count - 1),
-                ..focus
-            }
-        };
+        if let Focus::Period(focus) = self.focus {
+            let count = self.edit_selected_day(|day| {
+                day.remove_period(focus.period);
+                day.periods.len()
+            });
+            self.focus = if count == 0 {
+                Focus::START
+            } else {
+                Focus::Period(FieldFocus {
+                    period: focus.period.min(count - 1),
+                    ..focus
+                })
+            };
+        }
     }
 
     /// Selects another day, focusing From of its first period.
     fn select_day(&mut self, date: Date) {
         self.selected = date;
-        self.focus = FieldFocus::START;
+        self.focus = Focus::START;
         self.first_visible_period_row = 0;
     }
 
@@ -918,50 +980,80 @@ impl App {
         self.shown_day().periods.len()
     }
 
-    /// ↑/↓: the closest field in the period row above/below, stopping at the
-    /// first and last period. Implied-break rows aren't focusable, so they are
-    /// skipped. Every period row has the same fields in the same columns, so
-    /// the closest field is the same field.
+    /// ↑/↓: the closest field in the row above/below, stopping at the day
+    /// note and the last period. Implied-break rows aren't focusable, so they
+    /// are skipped. Every period row has the same fields in the same columns,
+    /// so the closest field is the same field. The day note is above the
+    /// first period; below it, From of the first period is the closest field.
     fn move_focus_vertically(&mut self, direction: Direction) {
-        let period = self.focus.period;
-        self.focus.period = match direction {
-            Direction::Forward => (period + 1).min(self.period_count() - 1),
-            Direction::Backward => period.saturating_sub(1),
+        self.focus = match (direction, self.focus) {
+            (Direction::Forward, Focus::DayNote) => Focus::START,
+            (Direction::Backward, Focus::DayNote) => Focus::DayNote,
+            (Direction::Backward, Focus::Period(focus)) if focus.period == 0 => Focus::DayNote,
+            (Direction::Backward, Focus::Period(focus)) => Focus::Period(FieldFocus {
+                period: focus.period - 1,
+                ..focus
+            }),
+            (Direction::Forward, Focus::Period(focus)) => Focus::Period(FieldFocus {
+                period: (focus.period + 1).min(self.period_count() - 1),
+                ..focus
+            }),
         };
     }
 
     /// ←/→: the previous/next field of the focused period, stopping at its
-    /// first and last field.
+    /// first and last field. The day note is alone in its row.
     fn move_focus_within_period(&mut self, direction: Direction) {
-        let field = match direction {
-            Direction::Forward => self.focus.field.next(),
-            Direction::Backward => self.focus.field.previous(),
-        };
-        if let Some(field) = field {
-            self.focus.field = field;
+        if let Focus::Period(focus) = &mut self.focus {
+            let field = match direction {
+                Direction::Forward => focus.field.next(),
+                Direction::Backward => focus.field.previous(),
+            };
+            if let Some(field) = field {
+                focus.field = field;
+            }
         }
     }
 
     /// Tab/Shift-Tab: the next/previous field, continuing in the next/previous
-    /// period and wrapping around within the day.
+    /// period and wrapping around within the day. The day note comes first:
+    /// after the last field of the last period, and before the first period.
     fn move_focus_in_tab_order(&mut self, direction: Direction) {
-        let count = self.period_count();
-        let focus = self.focus;
-        self.focus = match direction {
-            Direction::Forward => match focus.field.next() {
-                Some(field) => FieldFocus { field, ..focus },
-                None => FieldFocus {
-                    period: (focus.period + 1) % count,
+        let last_period = self.period_count() - 1;
+        self.focus = match (direction, self.focus) {
+            (Direction::Forward, Focus::DayNote) => Focus::START,
+            (Direction::Backward, Focus::DayNote) => Focus::Period(FieldFocus {
+                period: last_period,
+                field: Field::LAST,
+            }),
+            (Direction::Forward, Focus::Period(focus)) => match focus.field.next() {
+                Some(field) => Focus::Period(FieldFocus { field, ..focus }),
+                None if focus.period == last_period => Focus::DayNote,
+                None => Focus::Period(FieldFocus {
+                    period: focus.period + 1,
                     field: Field::FIRST,
-                },
+                }),
             },
-            Direction::Backward => match focus.field.previous() {
-                Some(field) => FieldFocus { field, ..focus },
-                None => FieldFocus {
-                    period: (focus.period + count - 1) % count,
+            (Direction::Backward, Focus::Period(focus)) => match focus.field.previous() {
+                Some(field) => Focus::Period(FieldFocus { field, ..focus }),
+                None if focus.period == 0 => Focus::DayNote,
+                None => Focus::Period(FieldFocus {
+                    period: focus.period - 1,
                     field: Field::LAST,
-                },
+                }),
             },
         };
+    }
+}
+
+/// An input field's value in `period`, as it is shown; `None` for checkboxes
+/// and empty values.
+fn field_text(period: &Period, field: Field) -> Option<String> {
+    match field {
+        Field::From => period.from.map(TimeOfDay::format_hhmm),
+        Field::To => period.to.map(TimeOfDay::format_hhmm),
+        Field::Project => period.project.clone(),
+        Field::Notes => period.notes.clone(),
+        Field::Break | Field::Free | Field::Vacation | Field::Sick | Field::Holiday => None,
     }
 }

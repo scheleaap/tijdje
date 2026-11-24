@@ -4,7 +4,7 @@ use common::*;
 use jiff::civil::date;
 use ratatui::crossterm::event::KeyCode;
 use tijdje::{
-    app::{App, Field, FieldFocus},
+    app::{App, Field},
     domain::{PeriodType, TimeOfDay},
 };
 
@@ -22,7 +22,7 @@ fn screen(app: &mut App) -> Vec<String> {
 }
 
 fn tab_to(app: &mut App, field: Field) {
-    while app.focus().field != field {
+    while app.focus().field() != Some(field) {
         press(app, KeyCode::Tab);
     }
 }
@@ -115,7 +115,7 @@ fn alt_letters_do_nothing_when_the_active_input_is_invalid() {
     alt_key(&mut app, KeyCode::Char('v'));
     assert!(app.is_editing());
     assert_eq!(first_period(&app).period_type, PeriodType::Work);
-    assert_eq!(app.focus().field, Field::From);
+    assert_eq!(app.focus().field(), Some(Field::From));
 }
 
 #[test]
@@ -125,17 +125,11 @@ fn alt_p_and_alt_n_are_removed() {
     alt_key(&mut app, KeyCode::Char('p'));
     alt_key(&mut app, KeyCode::Char('n'));
     assert!(app.is_editing(), "ignored while editing");
-    assert_eq!(
-        app.focus(),
-        FieldFocus {
-            period: 0,
-            field: Field::From
-        }
-    );
+    assert_eq!(app.focus(), focus(0, Field::From));
     press(&mut app, KeyCode::Esc);
     alt_key(&mut app, KeyCode::Char('p'));
     alt_key(&mut app, KeyCode::Char('n'));
-    assert_eq!(app.focus().field, Field::From);
+    assert_eq!(app.focus().field(), Some(Field::From));
 }
 
 #[test]
@@ -144,7 +138,7 @@ fn del_on_a_checked_absence_unchecks_it_like_enter() {
     let mut app = app_with(SAMPLE, date(2026, 11, 11));
     alt_key(&mut app, KeyCode::Char('v'));
     assert_eq!(first_period(&app).period_type, PeriodType::Vacation);
-    while app.focus().field != Field::Vacation {
+    while app.focus().field() != Some(Field::Vacation) {
         press(&mut app, KeyCode::Tab);
     }
     press(&mut app, KeyCode::Delete);

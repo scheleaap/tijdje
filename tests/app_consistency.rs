@@ -168,7 +168,7 @@ fn go_to_day_selects_the_day_and_shows_the_problem() {
     );
     press(&mut app, KeyCode::Enter);
     assert_eq!(app.selected_day(), date(2026, 11, 10));
-    assert_eq!(app.focus().period, 0);
+    assert_eq!(app.focus().period(), Some(0));
     let buffer = render(&mut app, 120, 24);
     let rows = rows(&buffer);
     assert!(rows.join("\n").contains("Open period 1230– on a past day"));

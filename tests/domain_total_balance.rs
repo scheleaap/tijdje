@@ -11,6 +11,7 @@ fn timesheet() -> Timesheet {
     let day = |p: Period| Day {
         regular_expected_working_time: Some(Minutes(432)),
         periods: vec![p],
+        ..Day::default()
     };
     Timesheet {
         days: BTreeMap::from([
@@ -97,6 +98,7 @@ fn free_time_beyond_the_overtime_makes_the_total_balance_negative() {
         Day {
             regular_expected_working_time: Some(Minutes(432)),
             periods: vec![period(900, Some(1612), PeriodType::Free)],
+            ..Day::default()
         },
     );
 
@@ -117,6 +119,7 @@ fn total_balance_skips_weekends() {
         Day {
             regular_expected_working_time: Some(Minutes(432)),
             periods: vec![period(900, Some(1612), PeriodType::Work)],
+            ..Day::default()
         },
     );
     // Fri 6 Nov: 0; Mon 9 Nov: empty, -7h12m. The weekend doesn't count.

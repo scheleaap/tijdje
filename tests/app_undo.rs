@@ -6,7 +6,7 @@ use ratatui::crossterm::event::KeyCode;
 const MONDAY: jiff::civil::Date = date(2026, 11, 2);
 
 use tijdje::{
-    app::{App, Field, FieldFocus},
+    app::{App, Field},
     domain::TimeOfDay,
 };
 
@@ -95,13 +95,7 @@ fn undo_on_the_same_day_keeps_the_focus() {
     let mut app = monday();
     change_first_from(&mut app, "0815");
     ctrl(&mut app, 'z');
-    assert_eq!(
-        app.focus(),
-        FieldFocus {
-            period: 0,
-            field: Field::From
-        }
-    );
+    assert_eq!(app.focus(), focus(0, Field::From));
 }
 
 #[test]
@@ -191,13 +185,7 @@ fn clearing_an_empty_field_is_not_an_undo_step() {
     press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Right);
-    assert_eq!(
-        app.focus(),
-        FieldFocus {
-            period: 1,
-            field: Field::Project
-        }
-    );
+    assert_eq!(app.focus(), focus(1, Field::Project));
     press(&mut app, KeyCode::Delete);
     ctrl(&mut app, 'z');
     assert!(screen(&mut app).contains("Nothing to undo"));

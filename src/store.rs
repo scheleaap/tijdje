@@ -247,23 +247,26 @@ fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
 /// Writes the timesheet as YAML, starting with the schema version. Dates,
 /// times and text are always double-quoted, so YAML 1.1 readers don't take
 /// `08:45` for a number or `2026-11-02` for a timestamp. Days with only empty
-/// periods are not written, and every written day gets its regular expected
-/// working time, so a new day stores the default.
+/// periods and without a day note are not written, and every written day gets
+/// its regular expected working time, so a new day stores the default.
 fn to_yaml(timesheet: &Timesheet) -> String {
     let header = format!("schema_version: {SCHEMA_VERSION}\n");
     let days: Vec<_> = timesheet
         .days
         .iter()
-        .filter(|(_, day)| !day.is_empty())
+        .filter(|(_, day)| day.has_content())
         .collect();
     if days.is_empty() {
         return format!("{header}days: {{}}\n");
     }
     let mut out = format!("{header}days:\n");
     for (date, day) in days {
+        // A day with only a day note has no periods; a bare `periods:` would be null.
+        let periods = if day.periods.is_empty() { " []" } else { "" };
         out += &format!(
-            "  \"{date}\":\n    regular_expected_working_time_in_minutes: {}\n    periods:\n",
-            day.regular_expected_working_time().0
+            "  \"{date}\":\n    regular_expected_working_time_in_minutes: {}\n    notes: {}\n    periods:{periods}\n",
+            day.regular_expected_working_time().0,
+            yaml_text(day.day_note.as_deref()),
         );
         for period in &day.periods {
             out += &format!(
@@ -345,6 +348,8 @@ struct FileModel {
 #[serde(deny_unknown_fields)]
 struct DayModel {
     regular_expected_working_time_in_minutes: i32,
+    #[serde(default, rename = "notes", deserialize_with = "empty_as_none")]
+    day_note: Option<String>,
     #[serde(default)]
     periods: Vec<PeriodModel>,
 }
@@ -398,6 +403,7 @@ impl FileModel {
                     regular_expected_working_time: Some(Minutes(
                         day.regular_expected_working_time_in_minutes,
                     )),
+                    day_note: day.day_note,
                     periods,
                 },
             );
