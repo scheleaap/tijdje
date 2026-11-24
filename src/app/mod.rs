@@ -240,7 +240,7 @@ pub struct FieldFocus {
 /// What has focus in the right panel: the day note or a field of a period.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Focus {
-    /// The day note, above the first period.
+    /// The day note, below the last period.
     DayNote,
     Period(FieldFocus),
 }
@@ -1041,12 +1041,11 @@ impl App {
         }
     }
 
-    /// Ctrl+Enter: focuses From of the next period; on the day note, the
-    /// next period is the first one.
+    /// Ctrl+Enter: focuses From of the next period; on the day note, which
+    /// comes after the last period, it does nothing.
     fn focus_next_period(&mut self) {
-        match self.focus {
-            Focus::DayNote => self.focus = Focus::START,
-            Focus::Period(focus) => self.focus_period_after(focus.period),
+        if let Focus::Period(focus) = self.focus {
+            self.focus_period_after(focus.period);
         }
     }
 
@@ -1159,22 +1158,28 @@ impl App {
         self.shown_day().periods.len()
     }
 
-    /// ↑/↓: the closest field in the row above/below, stopping at the day
-    /// note and the last period. Implied-break rows aren't focusable, so they
+    /// ↑/↓: the closest field in the row above/below, stopping at the first
+    /// period and the day note. Implied-break rows aren't focusable, so they
     /// are skipped. Every period row has the same fields in the same columns,
-    /// so the closest field is the same field. The day note is above the
-    /// first period; below it, From of the first period is the closest field.
+    /// so the closest field is the same field. The day note is below the last
+    /// period; above it, From of the last period is the closest field.
     fn move_focus_vertically(&mut self, direction: Direction) {
+        let last_period = self.period_count() - 1;
         self.focus = match (direction, self.focus) {
-            (Direction::Forward, Focus::DayNote) => Focus::START,
-            (Direction::Backward, Focus::DayNote) => Focus::DayNote,
-            (Direction::Backward, Focus::Period(focus)) if focus.period == 0 => Focus::DayNote,
+            (Direction::Forward, Focus::DayNote) => Focus::DayNote,
+            (Direction::Backward, Focus::DayNote) => Focus::Period(FieldFocus {
+                period: last_period,
+                field: Field::FIRST,
+            }),
             (Direction::Backward, Focus::Period(focus)) => Focus::Period(FieldFocus {
-                period: focus.period - 1,
+                period: focus.period.saturating_sub(1),
                 ..focus
             }),
+            (Direction::Forward, Focus::Period(focus)) if focus.period == last_period => {
+                Focus::DayNote
+            }
             (Direction::Forward, Focus::Period(focus)) => Focus::Period(FieldFocus {
-                period: (focus.period + 1).min(self.period_count() - 1),
+                period: focus.period + 1,
                 ..focus
             }),
         };
@@ -1195,7 +1200,7 @@ impl App {
     }
 
     /// Tab/Shift-Tab: the next/previous field, continuing in the next/previous
-    /// period and wrapping around within the day. The day note comes first:
+    /// period and wrapping around within the day. The day note comes last:
     /// after the last field of the last period, and before the first period.
     fn move_focus_in_tab_order(&mut self, direction: Direction) {
         let last_period = self.period_count() - 1;

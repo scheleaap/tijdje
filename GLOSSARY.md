@@ -101,6 +101,9 @@ A field you type a value into, e.g. From, Project or the day note.
 **Active input**:
 Text typed into an input field that has not yet been accepted or rejected.
 
+**Bottom line**:
+The last line of the right panel, showing the selected day's worked time against its actual expected working time and the time to work until.
+
 **Global notification**:
 A short message centered over the screen, shown until the next key press.
 

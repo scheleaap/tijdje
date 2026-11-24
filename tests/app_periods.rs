@@ -153,14 +153,22 @@ fn up_and_down_keep_the_field_and_stop_at_the_edges() {
     press(&mut app, KeyCode::Down);
     assert_eq!(app.focus(), focus(1, Field::To));
     press(&mut app, KeyCode::Down);
-    press(&mut app, KeyCode::Down);
     assert_eq!(app.focus(), focus(2, Field::To));
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Down);
+    assert_eq!(app.focus(), DAY_NOTE, "the day note is the bottom edge");
+    press(&mut app, KeyCode::Up);
+    assert_eq!(app.focus(), focus(2, Field::From));
+    press(&mut app, KeyCode::Right);
     press(&mut app, KeyCode::Up);
     press(&mut app, KeyCode::Up);
     assert_eq!(app.focus(), focus(0, Field::To));
     press(&mut app, KeyCode::Up);
-    press(&mut app, KeyCode::Up);
-    assert_eq!(app.focus(), DAY_NOTE, "the day note is the top edge");
+    assert_eq!(
+        app.focus(),
+        focus(0, Field::To),
+        "the first period is the top edge"
+    );
     assert_eq!(
         app.selected_day(),
         date(2026, 11, 2),
@@ -336,6 +344,20 @@ fn left_and_right_move_between_fields_and_stop_at_the_period_edges() {
     );
 }
 
+#[test]
+fn the_notes_field_ends_one_cell_before_the_right_frame() {
+    // Given
+    let mut app = app_with(SAMPLE, date(2026, 11, 2));
+
+    // When
+    let buffer = render(&mut app, 120, 24);
+
+    // Then
+    let y = u16::try_from(row_index(&rows(&buffer), "0845")).unwrap();
+    assert_eq!(buffer[(RIGHT_PADDING_X - 1, y)].bg, Color::Gray, "Notes");
+    assert_eq!(buffer[(RIGHT_PADDING_X, y)].bg, Color::Blue, "padding");
+}
+
 /// The sample has no periods on Wed 11 Nov.
 const DAY_WITHOUT_PERIODS: jiff::civil::Date = date(2026, 11, 11);
 
@@ -352,7 +374,7 @@ fn a_day_without_periods_shows_one_empty_period_with_focus_on_from() {
     assert_eq!(buffer[(from_x, y)].bg, Color::Cyan, "focused From");
     assert_eq!(buffer[(from_x + 5, y)].bg, Color::Gray, "To field");
     // Moving around stays within the one empty period.
-    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Up);
     press(&mut app, KeyCode::Tab);
     assert_eq!(app.focus(), focus(0, Field::To));
 }

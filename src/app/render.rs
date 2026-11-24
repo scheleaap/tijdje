@@ -58,9 +58,6 @@ const FIELD: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const FOCUSED_FIELD: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 /// The rest of a suggested project after the active input.
 const GHOST_TEXT: Style = FOCUSED_FIELD.add_modifier(Modifier::DIM);
-/// A hint in an empty input field, such as the day note's.
-const PLACEHOLDER: Style = Style::new().fg(Color::DarkGray).bg(Color::Gray);
-const DAY_NOTE_PLACEHOLDER: &str = "Day note";
 /// Global notifications: black on cyan, like the selection bar.
 const NOTIFICATION: Style = SELECTED;
 /// Periods that failed the consistency check.
@@ -72,6 +69,9 @@ const BUTTON: Style = Style::new().fg(Color::Black).bg(Color::White);
 const SELECTED_BUTTON: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 const KEY_NUMBER: Style = Style::new().fg(Color::White).bg(Color::Black);
 const KEY_LABEL: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
+/// The right panel's padding inside its frame for the day note and the
+/// bottom line; the Notes field keeps the same right padding.
+const PANEL_PADDING: Padding = Padding::horizontal(1);
 
 impl App {
     pub fn render(&mut self, frame: &mut Frame) {
@@ -200,80 +200,102 @@ impl App {
     fn render_periods(&mut self, frame: &mut Frame, area: Rect) {
         let title = format!(" Periods: {} ", calendar::format_dutch_short(self.selected));
         let block = panel_block(&title);
-        let inner = block.inner(area);
+        let areas = PeriodPanelAreas::of(block.inner(area));
         frame.render_widget(block, area);
-        let [day_note, header, list, actual_expected] = Layout::vertical([
-            Constraint::Length(1),
-            Constraint::Length(1),
-            Constraint::Fill(1),
-            Constraint::Length(1),
-        ])
-        .areas(inner);
-        let notes_width = usize::from(inner.width).saturating_sub(NOTES_X);
-
-        let checkbox_headers: String = Field::CHECKBOXES
-            .iter()
-            .filter_map(|field| field.period_type())
-            .map(|period_type| format!(" {} ", period_type_emoji(period_type)))
-            .collect();
-        let header_text = plain_period_row(
-            None,
-            ["From", "To", "Duration", "Project"],
-            &checkbox_headers,
-            "Notes",
+        render_period_header(frame, areas.header);
+        frame.render_widget(
+            Paragraph::new("Day note").style(HEADER),
+            areas.day_note_header,
         );
-        frame.render_widget(Paragraph::new(header_text).style(HEADER), header);
 
         let rows = period_rows(&self.shown_day());
-        let height = usize::from(list.height);
-        let first = self.scroll_to_focused_period(&rows, height);
-        let suggestion = self.project_suggestion();
-        let day_note_width = usize::from(day_note.width);
-        let active_input_text = match (self.active_input.as_mut(), self.focus) {
-            (Some(input), Focus::DayNote) => {
-                let (text, column) = input.visible(day_note_width);
-                frame.set_cursor_position((day_note.x + to_u16(column), day_note.y));
-                Some(ActiveInputText::new(
-                    text,
-                    input.len(),
-                    None,
-                    day_note_width,
-                ))
-            }
-            (Some(input), Focus::Period(focus)) => {
-                let (x, width) = text_field_geometry(focus.field, notes_width).unwrap_or_default();
-                let (text, column) = input.visible(width);
-                let row = row_of(&rows, focus.period)
-                    .and_then(|row| row.checked_sub(first))
-                    .filter(|&row| row < height);
-                if let Some(row) = row {
-                    frame.set_cursor_position((list.x + to_u16(x + column), list.y + to_u16(row)));
-                }
-                Some(ActiveInputText::new(text, input.len(), suggestion, width))
-            }
-            (None, _) => None,
-        };
+        let first = self.scroll_to_focused_period(&rows, usize::from(areas.list.height));
+        let active_input_text = self.place_active_input(frame, &areas, &rows, first);
         // Looked up only now: the active input above needed `self` mutably.
         let day = self.shown_day();
         frame.render_widget(
-            self.day_note_text(&day, day_note_width, active_input_text.as_ref()),
-            day_note,
+            self.day_note_text(
+                &day,
+                usize::from(areas.day_note.width),
+                active_input_text.as_ref(),
+            ),
+            areas.day_note,
         );
+        let lines = self.period_list_lines(&day, &rows, first, &areas, active_input_text.as_ref());
+        frame.render_widget(Paragraph::new(lines).style(PANEL), areas.list);
+        frame.render_widget(
+            Paragraph::new(actual_expected_text(&day))
+                .block(padded_block())
+                .style(PANEL),
+            areas.bottom_line,
+        );
+    }
+
+    /// The active input as it is shown in the focused input field, with the
+    /// terminal cursor placed in it; `None` while not editing.
+    fn place_active_input(
+        &mut self,
+        frame: &mut Frame,
+        areas: &PeriodPanelAreas,
+        rows: &[PeriodRow],
+        first: usize,
+    ) -> Option<ActiveInputText> {
+        let suggestion = self.project_suggestion();
+        let focus = self.focus;
+        let input = self.active_input.as_mut()?;
+        let (x, y, width, suggestion) = match focus {
+            Focus::DayNote => (
+                areas.day_note.x,
+                Some(areas.day_note.y),
+                usize::from(areas.day_note.width),
+                None,
+            ),
+            Focus::Period(focus) => {
+                let (x, width) =
+                    text_field_geometry(focus.field, areas.notes_width).unwrap_or_default();
+                let height = usize::from(areas.list.height);
+                let row = row_of(rows, focus.period)
+                    .and_then(|row| row.checked_sub(first))
+                    .filter(|&row| row < height);
+                (
+                    areas.list.x + to_u16(x),
+                    row.map(|row| areas.list.y + to_u16(row)),
+                    width,
+                    suggestion,
+                )
+            }
+        };
+        let (text, column) = input.visible(width);
+        if let Some(y) = y {
+            frame.set_cursor_position((x + to_u16(column), y));
+        }
+        Some(ActiveInputText::new(text, input.len(), suggestion, width))
+    }
+
+    /// The visible rows of the period list, from row `first` on: periods,
+    /// implied breaks and the empty rows between them.
+    fn period_list_lines<'a>(
+        &self,
+        day: &'a Day,
+        rows: &[PeriodRow],
+        first: usize,
+        areas: &PeriodPanelAreas,
+        active_input_text: Option<&ActiveInputText>,
+    ) -> Vec<Line<'a>> {
         let indicators = day.period_indicators(self.selected, self.today);
-        let lines: Vec<Line> = rows
-            .iter()
+        rows.iter()
             .skip(first)
-            .take(height)
+            .take(usize::from(areas.list.height))
             .map(|&row| match row {
                 PeriodRow::Blank => Line::raw(""),
-                PeriodRow::ImpliedBreak(after) => implied_break_line(&day, after),
+                PeriodRow::ImpliedBreak(after) => implied_break_line(day, after),
                 PeriodRow::Period(index) => {
                     let mut line = self.period_line(
                         index,
                         &day.periods[index],
                         indicators[index],
-                        notes_width,
-                        active_input_text.as_ref(),
+                        areas.notes_width,
+                        active_input_text,
                     );
                     if self.inconsistent_periods.contains(&index) {
                         for span in &mut line.spans {
@@ -283,13 +305,7 @@ impl App {
                     line
                 }
             })
-            .collect();
-        frame.render_widget(Paragraph::new(lines).style(PANEL), list);
-
-        frame.render_widget(
-            Paragraph::new(format!(" {}", actual_expected_text(&day))).style(PANEL),
-            actual_expected,
-        );
+            .collect()
     }
 
     fn period_line<'a>(
@@ -348,8 +364,7 @@ impl App {
     }
 
     /// The day note as a full-width input field, showing the active input
-    /// while it is being edited, and a dimmed placeholder while it is empty
-    /// and doesn't have focus.
+    /// while it is being edited.
     fn day_note_text(
         &self,
         day: &Day,
@@ -359,10 +374,10 @@ impl App {
         let focused = self.focus == Focus::DayNote;
         let (text, style) = match (active_input_text.filter(|_| focused), &day.day_note) {
             (Some(active_input), _) => (active_input.text.as_str(), FOCUSED_FIELD),
-            (None, Some(day_note)) if focused => (day_note.as_str(), FOCUSED_FIELD),
-            (None, Some(day_note)) => (day_note.as_str(), FIELD),
-            (None, None) if focused => ("", FOCUSED_FIELD),
-            (None, None) => (DAY_NOTE_PLACEHOLDER, PLACEHOLDER),
+            (None, day_note) => (
+                day_note.as_deref().unwrap_or_default(),
+                if focused { FOCUSED_FIELD } else { FIELD },
+            ),
         };
         Span::styled(fit(text, width), style)
     }
@@ -379,11 +394,10 @@ impl App {
             .iter()
             .min()
             .copied()
-            .or(self.focus.period())
-            // The day note is above the first period.
-            .unwrap_or(0);
-        let target = row_of(rows, target);
-        if let Some(row) = target {
+            // The day note is always visible below the list, so focusing it
+            // doesn't scroll.
+            .or(self.focus.period());
+        if let Some(row) = target.and_then(|target| row_of(rows, target)) {
             if row < self.first_visible_period_row {
                 self.first_visible_period_row = row;
             } else if height > 0 && row >= self.first_visible_period_row + height {
@@ -395,6 +409,66 @@ impl App {
             .min(rows.len().saturating_sub(1));
         self.first_visible_period_row
     }
+}
+
+/// The parts of the right panel inside its frame, from top to bottom.
+struct PeriodPanelAreas {
+    header: Rect,
+    list: Rect,
+    day_note_header: Rect,
+    day_note: Rect,
+    bottom_line: Rect,
+    /// The width of the Notes input field, which ends at the right padding.
+    notes_width: usize,
+}
+
+impl PeriodPanelAreas {
+    /// Lays out the panel's `inner` area: the period header and list, then
+    /// the day note's header and input field, an empty line and the bottom
+    /// line. The day note lines up with the bottom line's padding.
+    fn of(inner: Rect) -> Self {
+        let [header, list, day_note_header, day_note, _, bottom_line] = Layout::vertical([
+            Constraint::Length(1),
+            Constraint::Fill(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .areas(inner);
+        Self {
+            header,
+            list,
+            day_note_header: padded_block().inner(day_note_header),
+            day_note: padded_block().inner(day_note),
+            bottom_line,
+            notes_width: usize::from(inner.width)
+                .saturating_sub(NOTES_X + usize::from(PANEL_PADDING.right)),
+        }
+    }
+}
+
+/// A frameless block with the right panel's padding, shared by the day note
+/// and the bottom line.
+fn padded_block() -> Block<'static> {
+    Block::new().padding(PANEL_PADDING)
+}
+
+/// The period column headers: From, To, Duration, Project, the checkbox
+/// emoji and Notes.
+fn render_period_header(frame: &mut Frame, area: Rect) {
+    let checkbox_headers: String = Field::CHECKBOXES
+        .iter()
+        .filter_map(|field| field.period_type())
+        .map(|period_type| format!(" {} ", period_type_emoji(period_type)))
+        .collect();
+    let header_text = plain_period_row(
+        None,
+        ["From", "To", "Duration", "Project"],
+        &checkbox_headers,
+        "Notes",
+    );
+    frame.render_widget(Paragraph::new(header_text).style(HEADER), area);
 }
 
 /// A row in the right panel.

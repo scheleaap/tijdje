@@ -12,3 +12,7 @@
 - [ ] The Help screen lists the new keys
 
 Spec: `.scratch/time-tracking/spec.md`
+
+## Comments
+
+- From ticket 28: Home/End must do nothing on the day note. Outside editing they are not handled yet, so keep the day note out of the new Home/End handling.

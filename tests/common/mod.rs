@@ -36,6 +36,35 @@ pub fn right(row: &str) -> String {
     row.chars().skip(LEFT_PANEL_WIDTH).collect()
 }
 
+/// The right panel's left padding at a screen width of 120: the first cell
+/// inside its frame, before the day note and the bottom line.
+pub const LEFT_PADDING_X: u16 = 47;
+/// The right panel's right padding at a screen width of 120: the last cell
+/// inside its frame, after the day note and the Notes field.
+pub const RIGHT_PADDING_X: u16 = 118;
+
+/// A right-panel row without its frame and the spaces next to it.
+pub fn inside_frame(row: &str) -> &str {
+    row.trim_matches(['│', ' '])
+}
+
+/// A day on `date` with `count` consecutive hourly periods from 08:00 on,
+/// as timesheet YAML.
+pub fn hourly_periods_yaml(date: &str, count: u16) -> String {
+    let periods: String = (0..count)
+        .map(|i| {
+            format!(
+                "      - {{ from: \"{:02}:00\", to: \"{:02}:00\", project: null, notes: null, type: work }}\n",
+                8 + i,
+                9 + i
+            )
+        })
+        .collect();
+    format!(
+        "days:\n  \"{date}\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n{periods}"
+    )
+}
+
 /// An in-memory file system; clones share the same files.
 #[derive(Default, Clone)]
 pub struct InMemoryFileSystem {
@@ -226,10 +255,11 @@ pub fn day(periods: Vec<Period>) -> Day {
     }
 }
 
-/// Focuses the last period of the selected day and adds a period after it
-/// with Ctrl+Enter.
+/// Focuses the last period of the selected day, starting from the first
+/// period, and adds a period after it with Ctrl+Enter.
 pub fn add_period(app: &mut App) {
-    for _ in 0..app.timesheet().day(app.selected_day()).periods.len() {
+    let periods = app.timesheet().day(app.selected_day()).periods.len();
+    for _ in 1..periods {
         press(app, KeyCode::Down);
     }
     ctrl_key(app, KeyCode::Enter);
@@ -308,7 +338,12 @@ pub fn focus(period: usize, field: Field) -> Focus {
 /// Focus on the day note.
 pub const DAY_NOTE: Focus = Focus::DayNote;
 
-/// Moves focus from a field of the first period up to the day note.
+/// Moves focus from From of the first period to the day note with Shift-Tab.
 pub fn focus_day_note(app: &mut App) {
-    press(app, KeyCode::Up);
+    press(app, KeyCode::BackTab);
+    assert_eq!(
+        app.focus(),
+        DAY_NOTE,
+        "focus_day_note starts on From of the first period"
+    );
 }
