@@ -526,7 +526,7 @@ fn the_help_window_explains_taking_the_suggestion() {
     let screen = rows(&render(&mut app, 120, 24));
     assert!(
         row_containing(&screen, "take the project suggestion, accept and move on")
-            .contains("Tab/Shift-Tab, Ctrl+Enter"),
+            .contains("Tab/Shift+Tab, Ctrl+Enter"),
         "{screen:#?}"
     );
 }

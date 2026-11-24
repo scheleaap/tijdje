@@ -176,6 +176,18 @@ fn ctrl_s_and_ctrl_q_have_a_line_each() {
 }
 
 #[test]
+fn typing_replaces_the_fields_value() {
+    // Given
+    let mut app = app_with_help();
+
+    // When
+    let rows = screen(&mut app, TALL);
+
+    // Then
+    assert!(row_containing(&rows, "[Typing] ").contains("Replace the field's value"));
+}
+
+#[test]
 fn the_project_suggestion_keys_have_a_line_each() {
     // Given
     let mut app = app_with_help();
@@ -187,11 +199,11 @@ fn the_project_suggestion_keys_have_a_line_each() {
     assert!(row_containing(&rows, " → ").contains("fill in the project suggestion, keep editing"));
     assert!(
         row_containing(&rows, "take the project suggestion, accept and move on")
-            .contains("Tab/Shift-Tab, Ctrl+Enter")
+            .contains("Tab/Shift+Tab, Ctrl+Enter")
     );
     assert!(
         row_containing(&rows, "While editing: accept and move on")
-            .contains("Tab/Shift-Tab, Ctrl+Enter")
+            .contains("Tab/Shift+Tab, Ctrl+Enter")
     );
 }
 

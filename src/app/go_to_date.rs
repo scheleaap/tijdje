@@ -59,7 +59,7 @@ impl GoToDate {
         }
     }
 
-    /// Handles a key as in Midnight Commander's dialogs: Tab/Shift-Tab move
+    /// Handles a key as in Midnight Commander's dialogs: Tab/Shift+Tab move
     /// focus between the input field and the buttons; typing goes to the
     /// focused input field; Alt and a button's first letter choose that
     /// button, and so does the plain letter while a button has focus; ←/→

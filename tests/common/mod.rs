@@ -420,7 +420,7 @@ pub fn focus(period: usize, field: Field) -> Focus {
 /// Focus on the day note.
 pub const DAY_NOTE: Focus = Focus::DayNote;
 
-/// Moves focus from From of the first period to the day note with Shift-Tab.
+/// Moves focus from From of the first period to the day note with Shift+Tab.
 pub fn focus_day_note(app: &mut App) {
     press(app, KeyCode::BackTab);
     assert_eq!(

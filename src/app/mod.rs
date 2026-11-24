@@ -240,7 +240,7 @@ impl EditingAction {
 enum AfterAccepting {
     /// Enter: stays on the field.
     Stay,
-    /// Tab/Shift-Tab: the next/previous field.
+    /// Tab/Shift+Tab: the next/previous field.
     Field(Direction),
     /// Ctrl+Enter: From of the next period.
     NextPeriod,
@@ -644,9 +644,9 @@ impl App {
         }
     }
 
-    /// While editing, only editing keys work; Enter, Tab/Shift-Tab and
+    /// While editing, only editing keys work; Enter, Tab/Shift+Tab and
     /// Ctrl+Enter accept, Esc rejects. → at the end of the input takes the
-    /// project suggestion and keeps editing; Tab/Shift-Tab and Ctrl+Enter
+    /// project suggestion and keeps editing; Tab/Shift+Tab and Ctrl+Enter
     /// take it before accepting. Other keys are ignored silently.
     fn handle_editing_key(&mut self, key: KeyEvent) {
         match EditingAction::of(key) {
@@ -705,7 +705,7 @@ impl App {
 
     /// The earlier project suggested while editing Project with the cursor at
     /// the end of the active input, once something was typed or deleted in
-    /// it; shown as ghost text, taken with →, Tab/Shift-Tab and Ctrl+Enter.
+    /// it; shown as ghost text, taken with →, Tab/Shift+Tab and Ctrl+Enter.
     /// Owned, so the active input can change while it is held.
     fn project_suggestion(&self) -> Option<String> {
         self.active_input
@@ -1325,7 +1325,7 @@ impl App {
         }
     }
 
-    /// Tab/Shift-Tab: the next/previous field, continuing in the next/previous
+    /// Tab/Shift+Tab: the next/previous field, continuing in the next/previous
     /// period and wrapping around within the day. The day note comes last:
     /// after the last field of the last period, and before the first period.
     fn move_focus_in_tab_order(&mut self, direction: Direction) {

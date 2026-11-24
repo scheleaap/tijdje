@@ -30,7 +30,7 @@ const GROUPS: [Group; 6] = [
         "Field navigation",
         &[
             ("←/→/↑/↓", "Field left/right/above/below"),
-            ("Tab/Shift-Tab", "Next/previous field"),
+            ("Tab/Shift+Tab", "Next/previous field"),
             ("PgUp/PgDn", "10 periods up/down"),
             ("Home/End", "First/last field of the period"),
             (
@@ -46,7 +46,7 @@ const GROUPS: [Group; 6] = [
                 "Enter",
                 "Edit the field or toggle the checkbox; while editing: accept",
             ),
-            ("Type", "Replace the field's value"),
+            ("[Typing]", "Replace the field's value"),
             (
                 "Del",
                 "Clear the field, uncheck the checkbox, or switch a part of day to from–to",
@@ -65,7 +65,7 @@ const GROUPS: [Group; 6] = [
             ),
             ("Ctrl+U/Ctrl+K", "While editing: delete to the start/end"),
             (
-                "Tab/Shift-Tab, Ctrl+Enter",
+                "Tab/Shift+Tab, Ctrl+Enter",
                 "While editing: accept and move on",
             ),
             (
@@ -73,7 +73,7 @@ const GROUPS: [Group; 6] = [
                 "Editing a project: fill in the project suggestion, keep editing",
             ),
             (
-                "Tab/Shift-Tab, Ctrl+Enter",
+                "Tab/Shift+Tab, Ctrl+Enter",
                 "Editing a project: take the project suggestion, accept and move on",
             ),
         ],

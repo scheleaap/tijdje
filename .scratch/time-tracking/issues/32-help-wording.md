@@ -4,9 +4,9 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The Help window says "[Typing]" instead of "Type"
-- [ ] Shift+Tab is written with a plus sign everywhere: Help window, comments, test names and messages
+- [x] The Help window says "[Typing]" instead of "Type"
+- [x] Shift+Tab is written with a plus sign everywhere: Help window, comments, test names and messages
 
 Spec: `.scratch/time-tracking/spec.md`
