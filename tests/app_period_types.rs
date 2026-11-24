@@ -68,10 +68,7 @@ fn checking_an_absence_updates_the_figures_and_indicator() {
         "{monday:?}"
     );
     // 7h12m − 3h45m vacation
-    assert!(
-        rows.join("\n")
-            .contains("Actual expected: 3h27m (regular 7h12m − 3h45m absence)")
-    );
+    assert!(rows.join("\n").contains("Worked 4h57m of 3h27m |"));
     let row = row_containing(&rows, "0845 1230");
     assert_eq!(row.matches('✓').count(), 1, "{row:?}");
 }
@@ -89,8 +86,8 @@ fn an_absence_on_an_empty_day_sets_a_full_day_and_unchecking_removes_it() {
     let rows = screen(&mut app);
     let row = row_containing(&rows, "wo 11 nov");
     assert!(
-        row.split_whitespace().any(|c| c == "0h00m"),
-        "day balance 0h00m: {row:?}"
+        row.split_whitespace().any(|c| c == "0m"),
+        "day balance 0m: {row:?}"
     );
 
     alt_key(&mut app, KeyCode::Char('v'));
@@ -291,8 +288,7 @@ fn a_free_period_does_not_reduce_the_actual_expected_working_time() {
     let screen = screen(&mut app).join("\n");
 
     // Then
-    assert!(screen.contains("Actual expected: 7h12m"), "{screen}");
-    assert!(!screen.contains("absence)"), "{screen}");
+    assert!(screen.contains(" of 7h12m |"), "{screen}");
 }
 
 #[test]

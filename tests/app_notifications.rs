@@ -10,31 +10,35 @@ const HEIGHT: u16 = 24;
 /// The row just above the panels' bottom border, which is above the function-key bar.
 const NOTIFICATION_ROW: u16 = HEIGHT - 3;
 
-/// The notification: the centered run of cyan cells on the notification row
-/// (a selection bar on that row is cyan too, but not centered).
+/// The first and last cell of the run of cyan cells through the middle of
+/// the notification row, if the middle cell is cyan.
+fn cyan_run_through_the_middle(buffer: &Buffer) -> Option<(u16, u16)> {
+    let cyan = |x: &u16| buffer[(*x, NOTIFICATION_ROW)].bg == Color::Cyan;
+    let middle = buffer.area.width / 2;
+    let first = (0..=middle).rev().take_while(cyan).last();
+    let last = (middle..buffer.area.width).take_while(cyan).last();
+    first.zip(last)
+}
+
+/// The notification's text, if one is shown: the cyan run through the
+/// middle of the notification row, when it is centered. Bottom-line values
+/// next to it don't count, as the notification has a margin.
 fn notification(buffer: &Buffer) -> Option<String> {
-    let width = buffer.area.width;
-    let cyan = |x: u16| buffer[(x, NOTIFICATION_ROW)].bg == Color::Cyan;
-    let mut x = 0;
-    while x < width {
-        if !cyan(x) {
-            x += 1;
-            continue;
-        }
-        let start = x;
-        while x < width && cyan(x) {
-            x += 1;
-        }
-        let end = x - 1;
-        if start.abs_diff(width - 1 - end) <= 1 {
-            let text: String = (start..=end)
+    cyan_run_through_the_middle(buffer)
+        .filter(|&(first, last)| is_centered(buffer, first, last))
+        .map(|(first, last)| {
+            (first..=last)
                 .map(|x| buffer[(x, NOTIFICATION_ROW)].symbol())
-                .collect();
-            let text = text.trim();
-            return (!text.is_empty()).then(|| text.to_owned());
-        }
-    }
-    None
+                .collect::<String>()
+                .trim()
+                .to_owned()
+        })
+        .filter(|text| !text.is_empty())
+}
+
+/// Whether the cells from `first` to `last` are centered on the screen.
+fn is_centered(buffer: &Buffer, first: u16, last: u16) -> bool {
+    first.abs_diff(buffer.area.width - 1 - last) <= 1
 }
 
 fn shown_notification(app: &mut App) -> Option<String> {
@@ -77,13 +81,13 @@ fn the_notification_is_centered_with_a_cyan_background() {
     let (mut app, _fs) = app_with_a_change();
     ctrl(&mut app, 's');
     let buffer = render(&mut app, WIDTH, HEIGHT);
-    let cyan: Vec<u16> = (0..WIDTH)
-        .filter(|&x| buffer[(x, NOTIFICATION_ROW)].bg == Color::Cyan)
+    let (first, last) = cyan_run_through_the_middle(&buffer).expect("cyan cells");
+    let text: String = (first..=last)
+        .map(|x| buffer[(x, NOTIFICATION_ROW)].symbol())
         .collect();
-    let (first, last) = (cyan[0], cyan[cyan.len() - 1]);
-    assert_eq!(usize::from(last - first + 1), cyan.len(), "one block");
+    assert_eq!(text, " Saved ", "one block");
     assert!(
-        first.abs_diff(WIDTH - 1 - last) <= 1,
+        is_centered(&buffer, first, last),
         "centered: {first}..={last}"
     );
 }
@@ -94,7 +98,7 @@ fn the_notification_floats_over_the_row_and_leaves_the_rest_visible() {
     ctrl(&mut app, 's');
     let row = &rows(&render(&mut app, WIDTH, HEIGHT))[usize::from(NOTIFICATION_ROW)];
     assert!(row.contains("Saved"), "{row}");
-    assert!(row.contains("Actual"), "{row}");
+    assert!(row.contains("Worked"), "{row}");
 }
 
 #[test]
@@ -104,7 +108,7 @@ fn the_notification_disappears_at_the_next_key_press() {
     press(&mut app, KeyCode::Right);
     assert_eq!(shown_notification(&mut app), None);
     let row = &rows(&render(&mut app, WIDTH, HEIGHT))[usize::from(NOTIFICATION_ROW)];
-    assert!(row.contains("Actual expected"), "{row}");
+    assert!(row.contains("Worked"), "{row}");
 }
 
 #[test]
@@ -141,6 +145,24 @@ fn clipboard_messages_are_notifications() {
 }
 
 #[test]
+fn the_notification_stays_apart_from_the_values_on_the_bottom_line() {
+    // Given: on Mon 2 Nov, "7h12m" on the bottom line ends right after where
+    // "Nothing to undo" ends.
+    let (mut app, _fs) = sample_on(date(2026, 11, 2));
+
+    // When
+    ctrl(&mut app, 'z');
+    let buffer = render(&mut app, WIDTH, HEIGHT);
+
+    // Then: after the text and its padding cell comes a cell in the panel's
+    // colors, and so before it.
+    let start = column_of(&buffer, NOTIFICATION_ROW, "Nothing").expect("the notification");
+    let end = column_of(&buffer, NOTIFICATION_ROW, "undo").expect("the notification") + 4;
+    assert_eq!(buffer[(start - 2, NOTIFICATION_ROW)].bg, Color::Blue);
+    assert_eq!(buffer[(end + 1, NOTIFICATION_ROW)].bg, Color::Blue);
+}
+
+#[test]
 fn nothing_to_undo_and_redo_are_notifications() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
     ctrl(&mut app, 'z');
@@ -173,7 +195,7 @@ fn the_period_list_ends_above_the_day_note() {
     let day_note_header = &rows[usize::from(NOTIFICATION_ROW) - 3];
     assert!(day_note_header.contains("Day note"), "{day_note_header}");
     let below = &rows[usize::from(NOTIFICATION_ROW)];
-    assert!(below.contains("Actual expected"), "{below}");
+    assert!(below.contains("Worked"), "{below}");
 }
 
 #[test]

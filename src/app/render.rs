@@ -3,7 +3,7 @@
 use jiff::civil::Date;
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Margin, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Clear, Padding, Paragraph},
@@ -11,7 +11,7 @@ use ratatui::{
 
 use super::{App, Dialog, Field, FieldFocus, Focus, Screen, active_input::ActiveInput};
 use crate::domain::{
-    Day, Extent, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay,
+    Day, Extent, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay, WORK_UNTIL_TARGET,
     calendar::{self, Separator},
 };
 
@@ -31,6 +31,7 @@ const WARNING_WIDTH: usize = 2;
 const TIME_WIDTH: usize = 4;
 /// The part-of-day field covers From, the gap and To.
 const PART_OF_DAY_WIDTH: usize = TIME_WIDTH + GAP + TIME_WIDTH;
+/// Durations are right-aligned in this width, so `42m` lines up with `1h55m`.
 const DURATION_WIDTH: usize = 8;
 const PROJECT_WIDTH: usize = 10;
 const CHECKBOX_WIDTH: usize = 3;
@@ -62,6 +63,8 @@ const FOCUSED_FIELD: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 const GHOST_TEXT: Style = FOCUSED_FIELD.add_modifier(Modifier::DIM);
 /// Global notifications: black on cyan, like the selection bar.
 const NOTIFICATION: Style = SELECTED;
+/// The values on the bottom line.
+const BOTTOM_LINE_VALUE: Style = SELECTED;
 /// Periods that failed the consistency check.
 const HIGHLIGHTED: Style = Style::new().fg(Color::White).bg(Color::Red);
 const DIALOG: Style = Style::new().fg(Color::Black).bg(Color::Gray);
@@ -226,7 +229,7 @@ impl App {
         let lines = self.period_list_lines(&day, &rows, first, &areas, active_input_text.as_ref());
         frame.render_widget(Paragraph::new(lines).style(PANEL), areas.list);
         frame.render_widget(
-            Paragraph::new(actual_expected_text(&day))
+            Paragraph::new(bottom_line(&day))
                 .block(padded_block())
                 .style(PANEL),
             areas.bottom_line,
@@ -578,10 +581,11 @@ fn format_time(time: Option<TimeOfDay>) -> String {
     time.map(TimeOfDay::format_hhmm).unwrap_or_default()
 }
 
-/// The duration of `period` on `day`; empty while it has no duration.
+/// The duration of `period` on `day`, right-aligned with the other
+/// durations; empty while it has no duration.
 fn format_duration(day: &Day, period: &Period) -> String {
     day.duration_of(period)
-        .map(Minutes::format_duration)
+        .map(|duration| format!("{:>DURATION_WIDTH$}", duration.format_duration()))
         .unwrap_or_default()
 }
 
@@ -783,7 +787,11 @@ fn render_notification(frame: &mut Frame, main: Rect, text: &str) {
         width,
         height: 1,
     };
-    frame.render_widget(Clear, area);
+    // A margin in the panel's colors keeps it apart from the cyan values on
+    // the bottom line.
+    let margin = area.outer(Margin::new(1, 0)).intersection(main);
+    frame.render_widget(Clear, margin);
+    frame.render_widget(Block::new().style(PANEL), margin);
     frame.render_widget(Paragraph::new(line).style(NOTIFICATION), area);
 }
 
@@ -805,18 +813,33 @@ fn wrap(text: &str, width: usize) -> Vec<String> {
     lines
 }
 
-fn actual_expected_text(day: &Day) -> String {
-    let actual = day.actual_expected_working_time().format_duration();
-    let absence = day.absence_time();
-    if absence == Minutes(0) {
-        format!("Actual expected: {actual}")
-    } else {
-        format!(
-            "Actual expected: {actual} (regular {} − {} absence)",
-            day.regular_expected_working_time().format_duration(),
-            absence.format_duration()
-        )
-    }
+/// The bottom line: worked time against the actual expected working time,
+/// and until when to work for 8h, with the values on a cyan background.
+fn bottom_line(day: &Day) -> Line<'static> {
+    let work_until = day
+        .work_until()
+        .map_or_else(|| "–".to_owned(), TimeOfDay::format_with_colon);
+    Line::from(vec![
+        Span::raw("Worked "),
+        Span::styled(day.worked_time().format_duration(), BOTTOM_LINE_VALUE),
+        Span::raw(" of "),
+        Span::styled(
+            day.actual_expected_working_time().format_duration(),
+            BOTTOM_LINE_VALUE,
+        ),
+        Span::raw(" | Work until "),
+        Span::styled(work_until, BOTTOM_LINE_VALUE),
+        Span::raw(" for "),
+        Span::styled(format_target(), BOTTOM_LINE_VALUE),
+    ])
+}
+
+/// The worked time "Work until" aims for, like `8h`: without `00m`.
+fn format_target() -> String {
+    let target = WORK_UNTIL_TARGET.format_duration();
+    target
+        .strip_suffix("00m")
+        .map_or_else(|| target.clone(), str::to_owned)
 }
 
 /// Pads or cuts `text` to exactly `width` cells, ending a cut text with `…`.

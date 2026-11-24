@@ -37,6 +37,10 @@ pub struct InconsistentDay {
 
 /// 7h12m.
 pub const DEFAULT_REGULAR_EXPECTED_WORKING_TIME: Minutes = Minutes(432);
+/// The worked time "Work until" aims for: 8h, fixed for now.
+pub const WORK_UNTIL_TARGET: Minutes = Minutes(480);
+/// The break time below which "Work until" adds the missing break time.
+const MINIMUM_BREAK_TIME: Minutes = Minutes(60);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PeriodType {
@@ -231,6 +235,38 @@ impl SortedDay {
             *index = self.on_screen[*index];
         }
         Some(problem)
+    }
+
+    /// The base of "Work until": the latest To of the from–to periods, or
+    /// the From of an open last period.
+    fn work_until_base(&self) -> Option<TimeOfDay> {
+        let from_to: Vec<&Period> = self
+            .day
+            .periods
+            .iter()
+            .filter(|p| p.from().is_some() || p.to().is_some())
+            .collect();
+        match from_to.last() {
+            Some(last) if last.is_open() => last.from(),
+            _ => from_to.iter().filter_map(|p| p.to()).max(),
+        }
+    }
+
+    /// The minimum break time minus the explicit and implied break time, if
+    /// that is positive. Free periods don't count.
+    fn missing_break_time(&self) -> Minutes {
+        let day = &self.day;
+        let explicit: Minutes = day
+            .periods
+            .iter()
+            .filter(|p| p.period_type == PeriodType::Break)
+            .filter_map(|p| day.duration_of(p))
+            .sum();
+        let implied: Minutes = (0..day.periods.len())
+            .filter_map(|index| day.implied_break_after(index))
+            .filter_map(|p| day.duration_of(&p))
+            .sum();
+        (MINIMUM_BREAK_TIME - explicit - implied).max(Minutes(0))
     }
 }
 
@@ -648,6 +684,19 @@ impl Day {
 
     pub fn day_balance(&self) -> Minutes {
         self.worked_time() - self.actual_expected_working_time()
+    }
+
+    /// The time until which to work to reach 8h worked, given the periods as
+    /// they are: the base, plus the time still to work, plus the missing
+    /// break time. `None` once 8h is worked, without from–to periods, or at
+    /// 24:00 or later. Uses the periods in time order.
+    pub fn work_until(&self) -> Option<TimeOfDay> {
+        let remaining = WORK_UNTIL_TARGET - self.worked_time();
+        let sorted = self.sorted_copy();
+        (remaining > Minutes(0))
+            .then(|| sorted.work_until_base())
+            .flatten()
+            .and_then(|base| base.checked_add(remaining + sorted.missing_break_time()))
     }
 }
 

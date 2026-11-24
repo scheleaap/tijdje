@@ -14,11 +14,11 @@ fn left_panel_shows_day_and_total_balances() {
         ("di  3 nov", "+1h26m", "+2h56m"),  // 8h38m
         ("wo  4 nov", "+1h32m", "+4h28m"),  // 8h44m
         ("do  5 nov", "+1h41m", "+6h09m"),  // 8h53m
-        ("vr  6 nov", "0h00m", "+6h09m"),   // full vacation day
-        ("ma  9 nov", "+0h40m", "+6h49m"),  // 7h52m
+        ("vr  6 nov", "0m", "+6h09m"),      // full vacation day
+        ("ma  9 nov", "+40m", "+6h49m"),    // 7h52m
         ("di 10 nov", "-3h22m", "+3h27m"),  // 3h50m, open period not counted
         ("wo 11 nov", "-7h12m", "-3h45m"),  // empty
-        ("do 12 nov", "+0h24m", "-3h21m"),  // 4h00m worked, 3h36m sick
+        ("do 12 nov", "+24m", "-3h21m"),    // 4h00m worked, 3h36m sick
         ("vr 13 nov", "-7h12m", "-10h33m"), // today, empty
     ] {
         let row = row_containing(&screen, day);

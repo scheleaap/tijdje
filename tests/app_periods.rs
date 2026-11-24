@@ -14,7 +14,7 @@ fn right_panel_shows_the_periods_of_the_selected_day() {
         assert!(first.contains(text), "{text} missing in {first:?}");
     }
     let lunch = right(row_containing(&screen, "1230 1300"));
-    assert!(lunch.contains("0h30m") && lunch.contains("✓"), "{lunch:?}");
+    assert!(lunch.contains(" 30m ") && lunch.contains("✓"), "{lunch:?}");
     assert!(screen[0].contains("Periods: ma 2 nov"));
 }
 
@@ -46,7 +46,7 @@ fn a_gap_between_periods_is_shown_as_an_implied_break_row() {
     );
     let row = right(&screen[implied]);
     assert!(
-        row.contains("0h57m") && row.matches('✓').count() == 1,
+        row.contains(" 57m ") && row.matches('✓').count() == 1,
         "{row:?}"
     );
     // Plain text, not fields.
@@ -110,18 +110,6 @@ fn unusual_times_show_a_warning() {
     let screen = rows(&render(&mut app, 120, 24));
     assert!(right(row_containing(&screen, "0540 1228")).contains("❗"));
     assert!(!right(row_containing(&screen, "1325 1530")).contains("❗"));
-}
-
-#[test]
-fn actual_expected_working_time_is_shown_below_the_periods() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 12));
-    let screen = rows(&render(&mut app, 120, 24)).join("\n");
-    assert!(screen.contains("Actual expected: 3h36m (regular 7h12m − 3h36m absence)"));
-
-    let mut app = app_with(SAMPLE, date(2026, 11, 2));
-    let screen = rows(&render(&mut app, 120, 24)).join("\n");
-    assert!(screen.contains("Actual expected: 7h12m"));
-    assert!(!screen.contains("regular"));
 }
 
 #[test]

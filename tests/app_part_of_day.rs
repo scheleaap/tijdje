@@ -45,9 +45,10 @@ fn the_label_replaces_from_and_to_and_duration_shows_its_duration() {
     // When
     let rows = screen(&mut app);
 
-    // Then: the label fills From, the gap and To; then the duration.
+    // Then: the label fills From, the gap and To; then the duration,
+    // right-aligned in its column.
     let row = row_containing(&rows, "1st half");
-    assert!(row.contains("1st half  3h36m"), "{row:?}");
+    assert!(row.contains("1st half     3h36m"), "{row:?}");
 }
 
 #[test]
@@ -127,9 +128,9 @@ fn ctrl_c_and_ctrl_v_do_nothing_on_the_part_of_day_field() {
 #[test]
 fn alt_1_2_3_switch_to_full_day_1st_half_and_2nd_half() {
     for (key, part, label) in [
-        ('1', PartOfDay::FullDay, "Full day  7h12m"),
-        ('2', PartOfDay::FirstHalf, "1st half  3h36m"),
-        ('3', PartOfDay::SecondHalf, "2nd half  3h36m"),
+        ('1', PartOfDay::FullDay, "Full day     7h12m"),
+        ('2', PartOfDay::FirstHalf, "1st half     3h36m"),
+        ('3', PartOfDay::SecondHalf, "2nd half     3h36m"),
     ] {
         // Given
         let mut app = app_on(&[ACME_1300_1400]);
@@ -340,7 +341,7 @@ fn checking_vacation_on_an_empty_day_shows_a_full_day() {
 
     // Then
     let rows = screen(&mut app);
-    assert!(row_containing(&rows, "Full day").contains("Full day  7h12m"));
+    assert!(row_containing(&rows, "Full day").contains("Full day     7h12m"));
     assert_eq!(app.focus(), focus(0, Field::PartOfDay));
 }
 

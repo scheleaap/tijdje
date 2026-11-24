@@ -15,7 +15,7 @@ fn left_panel_shows_worked_time_per_day_from_the_file() {
         ("di  3 nov", "8h38m"),
         ("wo  4 nov", "8h44m"),
         ("do  5 nov", "8h53m"),
-        ("vr  6 nov", "0h00m"),
+        ("vr  6 nov", "0m"),
         ("ma  9 nov", "7h52m"),
         ("di 10 nov", "3h50m"),
         ("do 12 nov", "4h00m"),
@@ -76,7 +76,7 @@ fn double_line_separates_years() {
     let last = row_index(&screen, "do 31 dec");
     assert!(screen[last + 1].contains("════"));
     assert!(screen[last + 2].contains("vr  1 jan"));
-    assert!(row_containing(&screen, "vr  1 jan").contains("0h00m"));
+    assert!(row_containing(&screen, "vr  1 jan").contains(" 0m "));
 }
 
 #[test]

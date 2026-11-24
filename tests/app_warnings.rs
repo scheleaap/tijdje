@@ -70,7 +70,11 @@ days:
 
     // Then
     assert!(right(row_containing(&screen, "1200 1230")).starts_with("│☕"));
-    assert!(right(row_containing(&screen, "1230     ")).starts_with("│⚠️"));
+    let open = screen
+        .iter()
+        .find(|row| row.contains("1230") && !row.contains("1200"))
+        .expect("the open period");
+    assert!(right(open).starts_with("│⚠️"), "{open:?}");
 }
 
 #[test]

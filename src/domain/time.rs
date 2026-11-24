@@ -48,6 +48,20 @@ impl TimeOfDay {
     pub fn format_hhmm(self) -> String {
         format!("{:02}{:02}", self.0 / 60, self.0 % 60)
     }
+
+    /// Formats the time like `12:35`.
+    pub fn format_with_colon(self) -> String {
+        format!("{:02}:{:02}", self.0 / 60, self.0 % 60)
+    }
+
+    /// The time `minutes` later, or `None` if that is before 00:00 or at
+    /// 24:00 or later.
+    pub fn checked_add(self, minutes: Minutes) -> Option<Self> {
+        let total = i32::from(self.0) + minutes.0;
+        u16::try_from(total)
+            .ok()
+            .and_then(|total| Self::new(total / 60, total % 60))
+    }
 }
 
 /// A signed amount of time in minutes.
@@ -55,14 +69,18 @@ impl TimeOfDay {
 pub struct Minutes(pub i32);
 
 impl Minutes {
-    /// Formats a duration like `1h55m`.
+    /// Formats a duration like `1h55m`, or `42m` under an hour; zero is `0m`.
     pub fn format_duration(self) -> String {
         let sign = if self.0 < 0 { "-" } else { "" };
         let abs = self.0.unsigned_abs();
-        format!("{sign}{}h{:02}m", abs / 60, abs % 60)
+        if abs < 60 {
+            format!("{sign}{abs}m")
+        } else {
+            format!("{sign}{}h{:02}m", abs / 60, abs % 60)
+        }
     }
 
-    /// Formats a balance like `+0h45m` or `-1h12m`; zero has no sign.
+    /// Formats a balance like `+45m` or `-1h12m`; zero has no sign.
     pub fn format_balance(self) -> String {
         let sign = if self.0 > 0 { "+" } else { "" };
         format!("{sign}{}", self.format_duration())
