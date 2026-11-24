@@ -1,7 +1,7 @@
 mod common;
 
 use common::{day, period};
-use tijdje::domain::PeriodType::Work;
+use tijdje::domain::PeriodType::{Free, Work};
 
 #[test]
 fn gap_before_the_next_period_is_an_implied_break() {
@@ -10,6 +10,21 @@ fn gap_before_the_next_period_is_an_implied_break() {
         period(1230, Some(1700), Work),
     ]);
     assert!(d.has_implied_break_after(0));
+}
+
+#[test]
+fn gap_between_a_work_and_a_free_period_is_an_implied_break() {
+    // Given
+    let d = day(vec![
+        period(900, Some(1200), Work),
+        period(1230, Some(1700), Free),
+    ]);
+
+    // When
+    let implied = d.has_implied_break_after(0);
+
+    // Then
+    assert!(implied);
 }
 
 #[test]

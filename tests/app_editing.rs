@@ -511,7 +511,7 @@ fn del_unchecks_a_checkbox_and_leaves_others_alone() {
     let mut app = app_on_monday();
     // The break (period 1) has Break checked.
     press(&mut app, KeyCode::Down);
-    tab_to(&mut app, Field::Vacation);
+    tab_to(&mut app, Field::Free);
     press(&mut app, KeyCode::Delete);
     assert_eq!(
         period(&app, 1).period_type,

@@ -5,7 +5,7 @@ use jiff::civil::{Date, date};
 use tijdje::domain::{
     Period, PeriodIndicator,
     PeriodIndicator::{ConsistencyFailure, NonWorking, PeriodWarning},
-    PeriodType::{Break, Vacation, Work},
+    PeriodType::{Break, Free, Vacation, Work},
 };
 
 const TODAY: Date = date(2026, 11, 13);
@@ -39,6 +39,18 @@ fn an_unusual_time_gets_a_period_warning() {
 }
 
 #[test]
+fn a_free_period_at_an_unusual_time_gets_a_period_warning() {
+    // Given
+    let periods = vec![period(1900, Some(2030), Free)];
+
+    // When
+    let found = indicators(periods);
+
+    // Then
+    assert_eq!(found, vec![Some(PeriodWarning)]);
+}
+
+#[test]
 fn a_needless_split_warns_on_the_second_period() {
     assert_eq!(
         indicators(vec![
@@ -58,6 +70,21 @@ fn a_needless_split_without_project_and_notes_is_warned_too() {
         ]),
         vec![None, Some(PeriodWarning)]
     );
+}
+
+#[test]
+fn adjacent_free_periods_with_the_same_notes_are_a_needless_split() {
+    // Given
+    let periods = vec![
+        with_project_and_notes(period(1300, Some(1400), Free), None, Some("x")),
+        with_project_and_notes(period(1400, Some(1500), Free), None, Some("x")),
+    ];
+
+    // When
+    let found = indicators(periods);
+
+    // Then
+    assert_eq!(found, vec![Some(NonWorking(Free)), Some(PeriodWarning)]);
 }
 
 #[test]
@@ -205,4 +232,16 @@ fn an_open_period_can_be_a_needless_split_too() {
         d.period_indicators(TODAY, TODAY),
         vec![None, Some(PeriodWarning)]
     );
+}
+
+#[test]
+fn a_free_period_shows_its_type() {
+    // Given
+    let periods = vec![period(1300, Some(1500), Free)];
+
+    // When
+    let found = indicators(periods);
+
+    // Then
+    assert_eq!(found, vec![Some(NonWorking(Free))]);
 }

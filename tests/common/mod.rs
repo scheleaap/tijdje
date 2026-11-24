@@ -23,6 +23,19 @@ use tijdje::{
 
 pub const SAMPLE: &str = include_str!("../../sample/timesheet.yaml");
 
+/// Width of the left panel, in cells.
+pub const LEFT_PANEL_WIDTH: usize = 46;
+
+/// The part of a screen row that belongs to the left panel.
+pub fn left(row: &str) -> String {
+    row.chars().take(LEFT_PANEL_WIDTH).collect()
+}
+
+/// The part of a screen row that belongs to the right panel.
+pub fn right(row: &str) -> String {
+    row.chars().skip(LEFT_PANEL_WIDTH).collect()
+}
+
 /// An in-memory file system; clones share the same files.
 #[derive(Default, Clone)]
 pub struct InMemoryFileSystem {

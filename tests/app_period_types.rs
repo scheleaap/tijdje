@@ -45,6 +45,7 @@ fn alt_letters_toggle_period_types_from_any_field() {
     let mut app = monday_with_first_period_focused();
     for (key, period_type) in [
         ('b', PeriodType::Break),
+        ('f', PeriodType::Free),
         ('v', PeriodType::Vacation),
         ('s', PeriodType::Sick),
         ('h', PeriodType::Holiday),
@@ -198,4 +199,152 @@ fn space_does_not_toggle_a_checkbox() {
     press(&mut app, KeyCode::Char(' '));
     assert_eq!(first_period(&app).period_type, PeriodType::Work);
     assert!(!app.is_editing());
+}
+
+/// The break (1230–1300) of Mon 2 Nov as a free period.
+fn monday_with_a_free_period() -> App {
+    let mut app = monday_with_first_period_focused();
+    press(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Char('f'));
+    app
+}
+
+#[test]
+fn the_free_checkbox_header_is_between_break_and_vacation() {
+    // Given
+    let mut app = monday_with_first_period_focused();
+
+    // When
+    let rows = screen(&mut app);
+
+    // Then
+    let header = row_containing(&rows, "Project");
+    let positions: Vec<usize> = ["☕", "🆓", "🏖️"]
+        .iter()
+        .map(|emoji| header.find(emoji).expect(emoji))
+        .collect();
+    assert!(positions.is_sorted(), "{header:?}");
+}
+
+#[test]
+fn enter_on_the_free_checkbox_toggles_free() {
+    // Given
+    let mut app = monday_with_first_period_focused();
+    tab_to(&mut app, Field::Free);
+
+    // When
+    press(&mut app, KeyCode::Enter);
+
+    // Then
+    assert_eq!(first_period(&app).period_type, PeriodType::Free);
+    let rows = screen(&mut app);
+    let row = row_containing(&rows, "0845 1230");
+    assert_eq!(row.matches('✓').count(), 1, "{row:?}");
+}
+
+#[test]
+fn a_free_period_shows_its_indicator_left_of_from() {
+    // Given
+    let mut app = monday_with_a_free_period();
+
+    // When
+    let rows = screen(&mut app);
+
+    // Then
+    let row = row_containing(&rows, "1230 1300");
+    assert!(right(row).starts_with("│🆓"), "{row:?}");
+}
+
+#[test]
+fn a_free_period_is_not_worked_time() {
+    // Given: 0845–1230 work becomes free, leaving 1300–1757 (4h57m) worked.
+    let mut app = monday_with_first_period_focused();
+
+    // When
+    alt_key(&mut app, KeyCode::Char('f'));
+
+    // Then
+    let rows = screen(&mut app);
+    let monday = left(row_containing(&rows, "ma  2 nov"));
+    assert!(monday.contains("4h57m"), "{monday:?}");
+}
+
+#[test]
+fn a_free_period_has_no_absence_indicator() {
+    // Given
+    let mut app = monday_with_a_free_period();
+
+    // When
+    let rows = screen(&mut app);
+
+    // Then
+    let monday = left(row_containing(&rows, "ma  2 nov"));
+    assert!(
+        !["🏖️", "🤒", "🎄"].iter().any(|e| monday.contains(e)),
+        "{monday:?}"
+    );
+}
+
+#[test]
+fn a_free_period_does_not_reduce_the_actual_expected_working_time() {
+    // Given
+    let mut app = monday_with_a_free_period();
+
+    // When
+    let screen = screen(&mut app).join("\n");
+
+    // Then
+    assert!(screen.contains("Actual expected: 7h12m"), "{screen}");
+    assert!(!screen.contains("absence)"), "{screen}");
+}
+
+#[test]
+fn a_free_period_on_an_empty_day_does_not_fill_times() {
+    // Given: Wed 11 Nov has no periods.
+    let mut app = app_with(SAMPLE, date(2026, 11, 11));
+
+    // When
+    alt_key(&mut app, KeyCode::Char('f'));
+
+    // Then
+    assert_eq!(first_period(&app).period_type, PeriodType::Free);
+    assert_eq!(
+        (first_period(&app).from, first_period(&app).to),
+        (None, None)
+    );
+}
+
+#[test]
+fn alt_f_accepts_the_active_input_first() {
+    // Given
+    let mut app = monday_with_first_period_focused();
+    type_text(&mut app, "0815");
+
+    // When
+    alt_key(&mut app, KeyCode::Char('f'));
+
+    // Then
+    assert!(!app.is_editing());
+    assert_eq!(first_period(&app).from, TimeOfDay::new(8, 15));
+    assert_eq!(first_period(&app).period_type, PeriodType::Free);
+}
+
+#[test]
+fn free_periods_are_saved() {
+    // Given
+    let (mut app, fs) = sample_on(date(2026, 11, 2));
+    press(&mut app, KeyCode::Down);
+    alt_key(&mut app, KeyCode::Char('f'));
+
+    // When
+    ctrl(&mut app, 's');
+
+    // Then
+    let yaml = fs.get(TIMESHEET).unwrap();
+    assert!(
+        yaml.contains(
+            "      - from: \"12:30\"\n        to: \"13:00\"\n        project: null\n        notes: null\n        type: free\n"
+        ),
+        "{yaml}"
+    );
 }

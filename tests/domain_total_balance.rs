@@ -89,6 +89,26 @@ fn total_balance_adds_up_from_the_first_recorded_day() {
 }
 
 #[test]
+fn free_time_beyond_the_overtime_makes_the_total_balance_negative() {
+    // Given: Mon 2 Nov +1h00m, then a whole day of free time on Tue 3 Nov.
+    let mut t = timesheet();
+    t.days.insert(
+        date(2026, 11, 3),
+        Day {
+            regular_expected_working_time: Some(Minutes(432)),
+            periods: vec![period(900, Some(1612), PeriodType::Free)],
+        },
+    );
+
+    // When
+    let total = t.total_balance_on(date(2026, 11, 3), TODAY);
+
+    // Then
+    assert_eq!(total, Some(Minutes(60 - 432)));
+    assert!(!t.has_day_warning_on(date(2026, 11, 3), TODAY));
+}
+
+#[test]
 fn total_balance_skips_weekends() {
     let mut t = timesheet();
     t.days.clear();

@@ -53,6 +53,8 @@ pub enum PeriodType {
     #[default]
     Work,
     Break,
+    /// Time taken off from overtime: not worked time, and not an absence.
+    Free,
     Vacation,
     Sick,
     Holiday,
@@ -99,7 +101,7 @@ impl PeriodType {
             Self::Sick => Some(Absence::Sick),
             Self::Vacation => Some(Absence::Vacation),
             Self::Holiday => Some(Absence::Holiday),
-            Self::Work | Self::Break => None,
+            Self::Work | Self::Break | Self::Free => None,
         }
     }
 }

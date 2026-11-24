@@ -41,3 +41,21 @@ fn worked_time_excludes_open_periods() {
     };
     assert_eq!(day.worked_time(), Minutes(120));
 }
+
+#[test]
+fn worked_time_excludes_free_periods() {
+    // Given
+    let day = Day {
+        periods: vec![
+            period(900, Some(1200), PeriodType::Work),
+            period(1300, Some(1500), PeriodType::Free),
+        ],
+        ..Day::default()
+    };
+
+    // When
+    let worked = day.worked_time();
+
+    // Then
+    assert_eq!(worked, Minutes(180));
+}

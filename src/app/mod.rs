@@ -60,6 +60,7 @@ pub enum Field {
     Project,
     Notes,
     Break,
+    Free,
     Vacation,
     Sick,
     Holiday,
@@ -67,11 +68,12 @@ pub enum Field {
 
 impl Field {
     /// All fields in Tab order, which is their order on screen.
-    const ALL: [Field; 8] = [
+    const ALL: [Field; 9] = [
         Field::From,
         Field::To,
         Field::Project,
         Field::Break,
+        Field::Free,
         Field::Vacation,
         Field::Sick,
         Field::Holiday,
@@ -98,12 +100,19 @@ impl Field {
     }
 
     /// The period-type checkboxes, in Tab order.
-    pub const CHECKBOXES: [Field; 4] = [Field::Break, Field::Vacation, Field::Sick, Field::Holiday];
+    pub const CHECKBOXES: [Field; 5] = [
+        Field::Break,
+        Field::Free,
+        Field::Vacation,
+        Field::Sick,
+        Field::Holiday,
+    ];
 
     /// The period type a checkbox field stands for.
     pub fn period_type(self) -> Option<PeriodType> {
         match self {
             Field::Break => Some(PeriodType::Break),
+            Field::Free => Some(PeriodType::Free),
             Field::Vacation => Some(PeriodType::Vacation),
             Field::Sick => Some(PeriodType::Sick),
             Field::Holiday => Some(PeriodType::Holiday),
@@ -133,10 +142,11 @@ impl Field {
     }
 }
 
-/// The period type Alt+b/v/s/h toggles on the focused period.
+/// The period type Alt+b/f/s/v/h toggles on the focused period.
 fn period_type_for_alt_key(code: KeyCode) -> Option<PeriodType> {
     Some(match code {
         KeyCode::Char('b') => PeriodType::Break,
+        KeyCode::Char('f') => PeriodType::Free,
         KeyCode::Char('v') => PeriodType::Vacation,
         KeyCode::Char('s') => PeriodType::Sick,
         KeyCode::Char('h') => PeriodType::Holiday,
@@ -545,7 +555,9 @@ impl App {
             Field::To => time(period.to),
             Field::Project => period.project.clone().unwrap_or_default(),
             Field::Notes => period.notes.clone().unwrap_or_default(),
-            Field::Break | Field::Vacation | Field::Sick | Field::Holiday => String::new(),
+            Field::Break | Field::Free | Field::Vacation | Field::Sick | Field::Holiday => {
+                String::new()
+            }
         }
     }
 

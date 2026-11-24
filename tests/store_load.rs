@@ -107,6 +107,25 @@ days:
 }
 
 #[test]
+fn a_free_period_is_read() {
+    // Given
+    let content = r#"
+days:
+  "2026-11-12":
+    regular_expected_working_time_in_minutes: 432
+    periods:
+      - { from: "13:00", to: "15:00", project: null, notes: null, type: free }
+"#;
+
+    // When
+    let timesheet = load(content).unwrap();
+
+    // Then
+    let period = &timesheet.days[&date(2026, 11, 12)].periods[0];
+    assert_eq!(period.period_type, PeriodType::Free);
+}
+
+#[test]
 fn sample_file_loads() {
     load(common::SAMPLE).unwrap();
 }

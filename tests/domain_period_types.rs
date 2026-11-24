@@ -3,7 +3,7 @@ mod common;
 use common::{day, period};
 use tijdje::domain::{
     Period,
-    PeriodType::{self, Break, Holiday, Sick, Vacation, Work},
+    PeriodType::{self, Break, Free, Holiday, Sick, Vacation, Work},
     TimeOfDay,
 };
 
@@ -110,4 +110,32 @@ fn switching_from_an_absence_to_break_keeps_the_times() {
     d.toggle_period_type(0, Break);
     assert_eq!(d.periods[0].period_type, PeriodType::Break);
     assert_eq!(d.periods[0].from, TimeOfDay::new(9, 0));
+}
+
+#[test]
+fn checking_free_does_not_fill_times() {
+    // Given
+    let mut d = day(vec![empty()]);
+
+    // When
+    d.toggle_period_type(0, Free);
+
+    // Then
+    assert_eq!(d.periods[0].period_type, Free);
+    assert_eq!((d.periods[0].from, d.periods[0].to), (None, None));
+}
+
+#[test]
+fn free_is_mutually_exclusive_with_the_other_types() {
+    // Given
+    let mut d = day(vec![period(900, Some(1200), Break)]);
+
+    // When
+    d.toggle_period_type(0, Free);
+    let after_checking_free = d.periods[0].period_type;
+    d.toggle_period_type(0, Vacation);
+
+    // Then
+    assert_eq!(after_checking_free, Free);
+    assert_eq!(d.periods[0].period_type, Vacation);
 }

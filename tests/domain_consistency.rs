@@ -6,7 +6,7 @@ use common::{day, period};
 use jiff::civil::{Date, date};
 use tijdje::domain::{
     Period,
-    PeriodType::{Break, Holiday, Sick, Vacation, Work},
+    PeriodType::{Break, Free, Holiday, Sick, Vacation, Work},
     Timesheet,
 };
 
@@ -162,6 +162,21 @@ fn at_most_one_period_per_absence() {
 }
 
 #[test]
+fn a_day_may_have_more_than_one_free_period() {
+    // Given
+    let periods = vec![
+        period(900, Some(1000), Free),
+        period(1100, Some(1200), Free),
+    ];
+
+    // When
+    let found = problem(periods, PAST);
+
+    // Then
+    assert_eq!(found, None);
+}
+
+#[test]
 fn non_working_periods_have_no_project() {
     assert_eq!(
         problem(vec![with_project(period(900, Some(1200), Work))], PAST),
@@ -170,6 +185,21 @@ fn non_working_periods_have_no_project() {
     assert_eq!(
         problem(vec![with_project(period(1200, Some(1230), Break))], PAST),
         Some(("Non-working period 1200–1230 has a project".into(), vec![0]))
+    );
+}
+
+#[test]
+fn a_free_period_has_no_project() {
+    // Given
+    let periods = vec![with_project(period(1300, Some(1500), Free))];
+
+    // When
+    let found = problem(periods, PAST);
+
+    // Then
+    assert_eq!(
+        found,
+        Some(("Non-working period 1300–1500 has a project".into(), vec![0]))
     );
 }
 

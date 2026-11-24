@@ -307,9 +307,10 @@ fn yaml_text(text: Option<&str>) -> String {
 }
 
 /// The stored name of each period type.
-const PERIOD_TYPE_NAMES: [(PeriodType, &str); 5] = [
+const PERIOD_TYPE_NAMES: [(PeriodType, &str); 6] = [
     (PeriodType::Work, "work"),
     (PeriodType::Break, "break"),
+    (PeriodType::Free, "free"),
     (PeriodType::Vacation, "vacation"),
     (PeriodType::Sick, "sick"),
     (PeriodType::Holiday, "holiday"),

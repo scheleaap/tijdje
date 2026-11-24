@@ -5,14 +5,6 @@ use jiff::civil::date;
 use ratatui::crossterm::event::KeyCode;
 use tijdje::app::{App, Outcome};
 
-fn right(row: &str) -> String {
-    row.chars().skip(46).collect()
-}
-
-fn left(row: &str) -> String {
-    row.chars().take(46).collect()
-}
-
 /// Mon 2 Nov on the sample, with focus on the first period's To.
 fn monday_on_the_first_to() -> App {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));

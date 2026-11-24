@@ -43,6 +43,7 @@ const NOTES_X: usize = CHECKBOXES_X + Field::CHECKBOXES.len() * (GAP + CHECKBOX_
 fn period_type_emoji(period_type: PeriodType) -> &'static str {
     match period_type {
         PeriodType::Break => "☕",
+        PeriodType::Free => "🆓",
         PeriodType::Vacation => "🏖️",
         PeriodType::Sick => "🤒",
         PeriodType::Holiday => "🎄",
@@ -443,7 +444,7 @@ fn text_field_geometry(field: Field, notes_width: usize) -> Option<(usize, usize
         Field::To => Some((TO_X, TIME_WIDTH)),
         Field::Project => Some((PROJECT_X, PROJECT_WIDTH)),
         Field::Notes => Some((NOTES_X, notes_width)),
-        Field::Break | Field::Vacation | Field::Sick | Field::Holiday => None,
+        Field::Break | Field::Free | Field::Vacation | Field::Sick | Field::Holiday => None,
     }
 }
 
@@ -693,7 +694,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ),
         ("Ctrl+U/Ctrl+K", "While editing: delete to the start/end"),
         ("Ctrl+Del", "Delete the focused period"),
-        ("Alt+b/v/s/h", "Toggle break/vacation/sick/holiday"),
+        ("Alt+b/f/s/v/h", "Toggle break/free/sick/vacation/holiday"),
         ("F1", "Help"),
         ("F2, Esc", "Back to Tracking"),
         ("Ctrl+C/Ctrl+V", "Copy/paste the focused field"),

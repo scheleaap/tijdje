@@ -9,14 +9,6 @@ fn focus(period: usize, field: Field) -> FieldFocus {
     FieldFocus { period, field }
 }
 
-/// Width of the left panel, in cells.
-const LEFT_PANEL_WIDTH: usize = 46;
-
-/// The part of a screen row that belongs to the right panel.
-fn right(row: &str) -> String {
-    row.chars().skip(LEFT_PANEL_WIDTH).collect()
-}
-
 #[test]
 fn right_panel_shows_the_periods_of_the_selected_day() {
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
@@ -62,7 +54,7 @@ fn a_gap_between_periods_is_shown_as_an_implied_break_row() {
         "{row:?}"
     );
     // Plain text, not fields.
-    let x = u16::try_from(46 + row.find("1228").unwrap()).unwrap();
+    let x = u16::try_from(LEFT_PANEL_WIDTH + row.find("1228").unwrap()).unwrap();
     assert_eq!(buffer[(x, u16::try_from(implied).unwrap())].bg, Color::Blue);
 }
 
@@ -91,17 +83,18 @@ fn checkboxes_come_right_after_project_as_colored_boxes() {
     let project_end = row.find("internal").unwrap() + 10;
     let notes = row.find("Onboarding").unwrap();
     let y = u16::try_from(y).unwrap();
-    // Four 3-cell boxes, each after a one-cell gap, then Notes.
+    // Five 3-cell boxes, each after a one-cell gap, then Notes.
     for box_start in [
         project_end + 1,
         project_end + 5,
         project_end + 9,
         project_end + 13,
+        project_end + 17,
     ] {
         let x = u16::try_from(LEFT_PANEL_WIDTH + box_start).unwrap();
         assert_eq!(buffer[(x, y)].bg, Color::Gray, "box at {box_start}");
     }
-    assert_eq!(notes, project_end + 17, "{row:?}");
+    assert_eq!(notes, project_end + 21, "{row:?}");
 }
 
 #[test]
@@ -111,7 +104,7 @@ fn fields_are_light_gray() {
     let screen = rows(&buffer);
     // Not the first period: its From has focus.
     let y = row_index(&screen, "1300 1757");
-    let x = u16::try_from(46 + right(&screen[y]).find("1300").unwrap()).unwrap();
+    let x = u16::try_from(LEFT_PANEL_WIDTH + right(&screen[y]).find("1300").unwrap()).unwrap();
     assert_eq!(buffer[(x, u16::try_from(y).unwrap())].bg, Color::Gray);
 }
 
@@ -184,6 +177,7 @@ fn tab_follows_the_fields_on_screen_and_continues_in_the_next_period() {
         Field::To,
         Field::Project,
         Field::Break,
+        Field::Free,
         Field::Vacation,
         Field::Sick,
         Field::Holiday,
