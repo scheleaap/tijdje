@@ -17,6 +17,6 @@
 - [x] While editing, Tab/Shift-Tab and Ctrl+Enter accept and move on (staying put if accepting fails); day navigation, Ctrl+Del, ↑/↓, Ctrl+S, Ctrl+Q, F1 and Ctrl+Z/Y are silently ignored
 - [x] Removed: Alt+Enter, Alt+Del, Alt+p/n
 - [x] Clearing a field and Ctrl+Enter's added period are undo steps
-- [ ] Checked by hand in Ghostty (with `keybind = ctrl+enter=unbind`): Ctrl+Enter, Ctrl+Backspace, Ctrl+Del, Shift+Tab and Alt+digits each do their own action (carried over from ticket 14)
+- [x] Checked by hand in Ghostty (with `keybind = ctrl+enter=unbind`): Ctrl+Enter, Ctrl+Backspace, Ctrl+Del, Shift+Tab and Alt+digits each do their own action (carried over from ticket 14)
 
 Spec: `.scratch/time-tracking/spec.md`
