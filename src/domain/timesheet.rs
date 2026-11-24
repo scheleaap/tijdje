@@ -574,6 +574,38 @@ impl Timesheet {
             .map(|(&date, _)| date)
     }
 
+    /// The project to suggest while `typed` is being entered as a project:
+    /// of the projects used in the timesheet that start with `typed` (ignoring
+    /// case) and are longer, the most used one; ties go to the one used most
+    /// recently. `None` for empty `typed`.
+    pub fn project_suggestion(&self, typed: &str) -> Option<&str> {
+        if typed.is_empty() {
+            return None;
+        }
+        // Each use of a matching project, with its position among all uses.
+        let mut uses: Vec<(&str, usize)> = self
+            .days
+            .values()
+            .flat_map(|day| &day.periods)
+            .filter_map(|period| period.project.as_deref())
+            .enumerate()
+            .filter(|&(_, project)| completes(project, typed))
+            .map(|(position, project)| (project, position))
+            .collect();
+        uses.sort_unstable();
+        uses.chunk_by(|a, b| a.0 == b.0)
+            .map(|same_project| {
+                let (project, last_use) = same_project[same_project.len() - 1];
+                let usage = ProjectUsage {
+                    count: same_project.len(),
+                    last_use,
+                };
+                (project, usage)
+            })
+            .max_by_key(|&(_, usage)| usage)
+            .map(|(project, _)| project)
+    }
+
     /// Whether `date` is on or after the first recorded day.
     fn is_tracked(&self, date: Date) -> bool {
         self.first_recorded_day().is_some_and(|first| date >= first)
@@ -583,4 +615,22 @@ impl Timesheet {
     fn has_balances_on(&self, date: Date, today: Date) -> bool {
         self.is_tracked(date) && date <= today
     }
+}
+
+/// How a project is used, ordered from least to most suited as a suggestion.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+struct ProjectUsage {
+    /// The number of periods with the project.
+    count: usize,
+    /// The position of the last period with the project, in date order.
+    last_use: usize,
+}
+
+/// Whether `project` starts with `typed`, ignoring case, and is longer.
+fn completes(project: &str, typed: &str) -> bool {
+    project.chars().count() > typed.chars().count()
+        && project
+            .chars()
+            .zip(typed.chars())
+            .all(|(p, t)| p.to_lowercase().eq(t.to_lowercase()))
 }

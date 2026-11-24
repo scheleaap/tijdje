@@ -4,7 +4,7 @@ use jiff::civil::Date;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Style},
+    style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Clear, Padding, Paragraph},
 };
@@ -56,6 +56,8 @@ const HEADER: Style = Style::new().fg(Color::Yellow).bg(Color::Blue);
 const SELECTED: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 const FIELD: Style = Style::new().fg(Color::Black).bg(Color::Gray);
 const FOCUSED_FIELD: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
+/// The rest of a suggested project after the active input.
+const GHOST_TEXT: Style = FOCUSED_FIELD.add_modifier(Modifier::DIM);
 /// Global notifications: black on cyan, like the selection bar.
 const NOTIFICATION: Style = SELECTED;
 /// Periods that failed the consistency check.
@@ -208,6 +210,7 @@ impl App {
         let height = usize::from(list.height);
         let first = self.scroll_to_focused_period(&rows, height);
         let focus = self.focus;
+        let suggestion = self.project_suggestion();
         let active_input_text = match self.active_input.as_mut() {
             Some(input) => {
                 let (x, width) = text_field_geometry(focus.field, notes_width).unwrap_or_default();
@@ -218,7 +221,7 @@ impl App {
                 if let Some(row) = row {
                     frame.set_cursor_position((list.x + to_u16(x + column), list.y + to_u16(row)));
                 }
-                Some(text)
+                Some(ActiveInputText::new(text, input.len(), suggestion, width))
             }
             None => None,
         };
@@ -238,7 +241,7 @@ impl App {
                         &day.periods[index],
                         indicators[index],
                         notes_width,
-                        active_input_text.as_deref(),
+                        active_input_text.as_ref(),
                     );
                     if self.inconsistent_periods.contains(&index) {
                         for span in &mut line.spans {
@@ -263,32 +266,35 @@ impl App {
         period: &'a Period,
         indicator: Option<PeriodIndicator>,
         notes_width: usize,
-        active_input_text: Option<&str>,
+        active_input_text: Option<&ActiveInputText>,
     ) -> Line<'a> {
         let text_field = |field: Field, text: &str, width: usize| match (
             self.is_focused(index, field),
             active_input_text,
         ) {
-            (true, Some(active_input)) => Span::styled(fit(active_input, width), FOCUSED_FIELD),
-            (true, None) => Span::styled(fit(text, width), FOCUSED_FIELD),
-            (false, _) => Span::styled(fit(text, width), FIELD),
+            (true, Some(active_input)) => active_input.spans(width),
+            (true, None) => vec![Span::styled(fit(text, width), FOCUSED_FIELD)],
+            (false, _) => vec![Span::styled(fit(text, width), FIELD)],
         };
         let gap = || Span::raw(" ");
-        let mut spans = vec![
-            Span::raw(indicator_emoji(indicator)),
-            gap(),
-            text_field(Field::From, &format_time(period.from), TIME_WIDTH),
-            gap(),
-            text_field(Field::To, &format_time(period.to), TIME_WIDTH),
+        let mut spans = vec![Span::raw(indicator_emoji(indicator)), gap()];
+        spans.extend(text_field(
+            Field::From,
+            &format_time(period.from),
+            TIME_WIDTH,
+        ));
+        spans.push(gap());
+        spans.extend(text_field(Field::To, &format_time(period.to), TIME_WIDTH));
+        spans.extend([
             gap(),
             Span::raw(format!("{:<DURATION_WIDTH$}", format_duration(period))),
             gap(),
-            text_field(
-                Field::Project,
-                period.project.as_deref().unwrap_or_default(),
-                PROJECT_WIDTH,
-            ),
-        ];
+        ]);
+        spans.extend(text_field(
+            Field::Project,
+            period.project.as_deref().unwrap_or_default(),
+            PROJECT_WIDTH,
+        ));
         for field in Field::CHECKBOXES {
             let style = if self.is_focused(index, field) {
                 FOCUSED_FIELD
@@ -300,14 +306,12 @@ impl App {
                 Span::styled(checkbox(field, period.period_type), style),
             ]);
         }
-        spans.extend([
-            gap(),
-            text_field(
-                Field::Notes,
-                period.notes.as_deref().unwrap_or_default(),
-                notes_width,
-            ),
-        ]);
+        spans.push(gap());
+        spans.extend(text_field(
+            Field::Notes,
+            period.notes.as_deref().unwrap_or_default(),
+            notes_width,
+        ));
         Line::from(spans)
     }
 
@@ -435,6 +439,50 @@ fn format_duration(period: &Period) -> String {
         .duration()
         .map(Minutes::format_duration)
         .unwrap_or_default()
+}
+
+/// The visible part of the active input, and of the ghost text after it.
+struct ActiveInputText {
+    text: String,
+    ghost_text: String,
+}
+
+impl ActiveInputText {
+    /// `text`, the visible part of an active input of `typed_len` characters
+    /// in a field `width` cells wide, followed by as much of the rest of
+    /// `suggestion` as fits.
+    fn new(text: String, typed_len: usize, suggestion: Option<String>, width: usize) -> Self {
+        let rest: String = suggestion
+            .map(|project| project.chars().skip(typed_len).collect())
+            .unwrap_or_default();
+        let room = width.saturating_sub(Span::raw(&text).width());
+        Self {
+            ghost_text: cut_to_width(&rest, room),
+            text,
+        }
+    }
+
+    /// The active input followed by the dimmed ghost text, filling `width` cells.
+    fn spans(&self, width: usize) -> Vec<Span<'static>> {
+        let used = Span::raw(&self.text).width() + Span::raw(&self.ghost_text).width();
+        vec![
+            Span::styled(self.text.clone(), FOCUSED_FIELD),
+            Span::styled(self.ghost_text.clone(), GHOST_TEXT),
+            Span::styled(fit("", width.saturating_sub(used)), FOCUSED_FIELD),
+        ]
+    }
+}
+
+/// The longest start of `text` that fits in `width` cells.
+fn cut_to_width(text: &str, width: usize) -> String {
+    text.chars()
+        .scan(0, |used, c| {
+            *used += Span::raw(c.to_string()).width();
+            Some((*used, c))
+        })
+        .take_while(|&(used, _)| used <= width)
+        .map(|(_, c)| c)
+        .collect()
 }
 
 /// Where an input field starts in a period row, and how wide it is; `None` for checkboxes.
@@ -670,7 +718,10 @@ fn render_help(frame: &mut Frame, area: Rect) {
     let shortcuts = [
         ("Ctrl+↑/↓", "Previous/next day"),
         ("Ctrl+PgUp/PgDn", "Previous/next week"),
-        ("←/→/↑/↓", "Field left/right/above/below"),
+        (
+            "←/→/↑/↓",
+            "Field left/right/above/below; editing a project, → at the end takes the suggestion",
+        ),
         ("Tab/Shift-Tab", "Next/previous field"),
         (
             "Ctrl+Enter",

@@ -437,12 +437,14 @@ impl App {
     }
 
     /// While editing, only editing keys work; Enter, Tab/Shift-Tab and
-    /// Ctrl+Enter accept, Esc rejects. Other keys are ignored silently.
+    /// Ctrl+Enter accept, Esc rejects, → at the end of the input takes the
+    /// project suggestion. Other keys are ignored silently.
     fn handle_editing_key(&mut self, key: KeyEvent) {
         let modifiers = Modifiers::of(key);
         let plain = modifiers == Modifiers::None;
         let ctrl_only = modifiers == Modifiers::Ctrl;
         let field = self.focus.field;
+        let suggestion = self.project_suggestion();
         let Some(input) = &mut self.active_input else {
             return;
         };
@@ -459,7 +461,10 @@ impl App {
             KeyCode::Left if ctrl_only => input.word_left(),
             KeyCode::Right if ctrl_only => input.word_right(),
             KeyCode::Left if plain => input.left(),
-            KeyCode::Right if plain => input.right(),
+            KeyCode::Right if plain => match suggestion {
+                Some(project) => *input = ActiveInput::with_text(&project),
+                None => input.right(),
+            },
             KeyCode::Home if plain => input.home(),
             KeyCode::End if plain => input.end(),
             KeyCode::Esc => self.active_input = None,
@@ -483,6 +488,17 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    /// The earlier project suggested while editing Project with the cursor at
+    /// the end of the active input; shown as ghost text, taken with →. Owned,
+    /// so the active input can change while it is held.
+    fn project_suggestion(&self) -> Option<String> {
+        self.active_input
+            .as_ref()
+            .filter(|input| self.focus.field == Field::Project && input.is_cursor_at_end())
+            .and_then(|input| self.timesheet.project_suggestion(&input.text()))
+            .map(str::to_owned)
     }
 
     /// The focused period: `None` on the empty period of a day without periods.

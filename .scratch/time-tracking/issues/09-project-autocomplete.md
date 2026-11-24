@@ -4,10 +4,12 @@
 
 **Blocked by:** 16
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Projects are free text
+- [x] Projects are free text
 - [ ] While editing Project, the best match from projects used earlier is shown as dimmed ghost text
-- [ ] → at the end of the input accepts the suggestion while editing; when not editing, → moves focus
+- [x] → at the end of the input accepts the suggestion while editing; when not editing, → moves focus
+
+The ghost-text criterion stays unticked until the dimmed look is checked by hand in Ghostty; tests only check that the ghost text has the DIM modifier.
 
 Spec: `.scratch/time-tracking/spec.md`

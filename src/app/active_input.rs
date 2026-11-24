@@ -30,6 +30,11 @@ impl ActiveInput {
         self.text.len()
     }
 
+    /// Whether the cursor is after the last character.
+    pub fn is_cursor_at_end(&self) -> bool {
+        self.cursor == self.text.len()
+    }
+
     pub fn insert(&mut self, c: char) {
         self.text.insert(self.cursor, c);
         self.cursor += 1;

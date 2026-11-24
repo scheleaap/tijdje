@@ -20,6 +20,9 @@ A remark attached to a day as a whole.
 **Project**:
 The work a period is attributed to, e.g. a customer engagement or internal work.
 
+**Project suggestion**:
+The earlier project shown as dimmed ghost text while a project is typed, taken with →.
+
 **Empty period**:
 A period without any values: no start or end time, no part of day, no project or notes, and not marked as a non-working period.
 

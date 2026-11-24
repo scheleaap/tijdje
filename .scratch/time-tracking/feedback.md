@@ -6,6 +6,7 @@ Running list of user feedback and known open points that aren't covered by a tic
 
 - **Other terminals unverified** (ADR-0001, ADR-0003): emoji rendering is only checked in Ptyxis, which ADR-0003 drops. Ghostty (now the main terminal), kitty, foot and Alacritty are still to be checked.
 - **Scattered period type definitions** (review of ticket 20): adding a period type takes ~9 scattered edits (`Field`, `Field::ALL`, `Field::CHECKBOXES`, `Field::period_type`, the alt key, the emoji, the field geometry, the field text, `PERIOD_TYPE_NAMES`, the absence). One table per `PeriodType` would gather them.
+- **Projects screen** (user note, ticket 09): a future "Projects" screen will let projects be defined. Until then, project suggestions come from the projects anywhere in the timesheet.
 - **Total balance performance** (review of ticket 02): the total balance is recalculated from the first recorded day for every visible row. Fine for now; may need caching after years of data.
 
 ## Done
