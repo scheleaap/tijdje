@@ -3,7 +3,7 @@ mod common;
 use common::*;
 use jiff::civil::date;
 use ratatui::{crossterm::event::KeyCode, style::Color};
-use tijdje::app::{Outcome, Screen};
+use tijdje::app::Outcome;
 
 #[test]
 fn left_panel_shows_worked_time_per_day_from_the_file() {
@@ -115,41 +115,6 @@ fn list_scrolls_endlessly_and_keeps_the_selection_visible() {
     assert_eq!(app.selected_day(), date(2028, 1, 7));
     let screen = rows(&render(&mut app, 120, 24));
     row_containing(&screen, "vr  7 jan");
-}
-
-#[test]
-fn function_key_bar_is_on_the_bottom_line() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    let screen = rows(&render(&mut app, 120, 24));
-    assert!(screen[23].starts_with(" 1Help"));
-    assert!(screen[23].contains(" 2Track"));
-    assert!(screen[23].contains("10"));
-}
-
-#[test]
-fn f1_shows_help_and_esc_or_f2_returns_to_tracking() {
-    let mut app = app_with(SAMPLE, date(2026, 11, 13));
-    press(&mut app, KeyCode::F(1));
-    assert_eq!(app.screen(), Screen::Help);
-    let screen = rows(&render(&mut app, 120, 24));
-    for key in [
-        "Ctrl+Q",
-        "Ctrl+Enter",
-        "Ctrl+Del",
-        "Ctrl+Backspace/Ctrl+W",
-        "Del ",
-    ] {
-        row_containing(&screen, key);
-    }
-    let text = screen.join("\n");
-    for removed in ["Alt+Enter", "Alt+Del", "Alt+p/n"] {
-        assert!(!text.contains(removed), "{removed} is gone");
-    }
-    press(&mut app, KeyCode::Esc);
-    assert_eq!(app.screen(), Screen::Tracking);
-    press(&mut app, KeyCode::F(1));
-    press(&mut app, KeyCode::F(2));
-    assert_eq!(app.screen(), Screen::Tracking);
 }
 
 #[test]

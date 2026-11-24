@@ -315,26 +315,21 @@ fn home_and_end_do_nothing_on_the_day_note() {
 // Help
 
 #[test]
-fn the_help_screen_lists_page_up_page_down_home_and_end() {
+fn the_help_window_lists_page_up_page_down_home_and_end() {
     // Given
     let mut app = app_with_twelve_periods();
 
     // When
     press(&mut app, KeyCode::F(1));
 
-    // Then
-    let screen = rows(&render(&mut app, 120, 24));
+    // Then: on a screen on which the whole Help window fits
+    let screen = rows(&render(&mut app, 120, 60));
     assert!(
-        row_containing(&screen, "PgUp/PgDn").contains("10 periods up/down"),
+        row_containing(&screen, " PgUp/PgDn ").contains("10 periods up/down"),
         "{screen:#?}"
     );
     assert!(
-        row_containing(&screen, "Home/End").contains("First/last field of the period"),
-        "{screen:#?}"
-    );
-    // The last entry is still shown: the list fits a 24-row terminal.
-    assert!(
-        row_containing(&screen, "Ctrl+S/Ctrl+Q").contains("Save/quit"),
+        row_containing(&screen, " Home/End ").contains("First/last field of the period"),
         "{screen:#?}"
     );
 }

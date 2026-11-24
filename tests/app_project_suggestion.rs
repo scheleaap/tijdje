@@ -514,37 +514,19 @@ fn other_input_fields_get_no_suggestion() {
 }
 
 #[test]
-fn the_help_screen_explains_taking_the_suggestion() {
+fn the_help_window_explains_taking_the_suggestion() {
     // Given
     let mut app = app_on(Field::Project);
 
     // When
     press(&mut app, KeyCode::F(1));
+    press(&mut app, KeyCode::End);
 
     // Then
     let screen = rows(&render(&mut app, 120, 24));
     assert!(
-        row_containing(&screen, "←/→/↑/↓").contains("→ at the end takes the suggestion"),
-        "{screen:#?}"
-    );
-}
-
-#[test]
-fn the_help_screen_explains_that_tab_and_ctrl_enter_take_the_suggestion() {
-    // Given
-    let mut app = app_on(Field::Project);
-
-    // When
-    press(&mut app, KeyCode::F(1));
-
-    // Then
-    let screen = rows(&render(&mut app, 120, 24));
-    assert!(
-        row_containing(&screen, "Tab/Shift-Tab").contains("takes the suggestion"),
-        "{screen:#?}"
-    );
-    assert!(
-        row_containing(&screen, "Ctrl+Enter").contains("takes the suggestion"),
+        row_containing(&screen, "take the project suggestion, accept and move on")
+            .contains("Tab/Shift-Tab, Ctrl+Enter"),
         "{screen:#?}"
     );
 }

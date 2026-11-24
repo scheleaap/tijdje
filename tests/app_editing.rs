@@ -181,7 +181,7 @@ fn other_shortcuts_are_ignored_while_editing() {
     assert!(!app.has_unsaved_changes());
     assert_eq!(app.focus(), focus(0, Field::From));
     assert_eq!(app.selected_day(), date(2026, 11, 2));
-    assert_eq!(app.screen(), tijdje::app::Screen::Tracking);
+    assert!(!app.shows_help());
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(!screen.contains("─ Delete period ─"));
     assert_eq!(screen.matches("Nothing to").count(), 0, "silently");

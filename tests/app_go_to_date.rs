@@ -3,7 +3,7 @@ mod common;
 use common::*;
 use jiff::civil::date;
 use ratatui::{crossterm::event::KeyCode, style::Color};
-use tijdje::app::{App, Screen};
+use tijdje::app::App;
 
 /// The dialog's label above its input field: shown only while the dialog is open.
 const DIALOG_LABEL: &str = "Date (YYYY-MM-DD, DD MMM or DD MMM YYYY):";
@@ -297,7 +297,7 @@ fn other_keys_do_not_reach_the_tracking_screen_while_the_dialog_is_open() {
 
     // Then
     assert_eq!(app.selected_day(), date(2026, 11, 12));
-    assert_eq!(app.screen(), Screen::Tracking);
+    assert!(!app.shows_help());
     assert!(screen(&mut app).contains(DIALOG_LABEL));
 }
 
@@ -351,7 +351,7 @@ fn ctrl_g_is_ignored_while_editing() {
 }
 
 #[test]
-fn ctrl_g_is_ignored_on_the_help_screen() {
+fn ctrl_g_is_ignored_while_the_help_window_is_open() {
     // Given
     let mut app = app_with(SAMPLE, date(2026, 11, 12));
     press(&mut app, KeyCode::F(1));
@@ -364,7 +364,7 @@ fn ctrl_g_is_ignored_on_the_help_screen() {
 }
 
 #[test]
-fn the_help_screen_lists_ctrl_g() {
+fn the_help_window_lists_ctrl_g() {
     // Given
     let mut app = app_with(SAMPLE, date(2026, 11, 12));
 

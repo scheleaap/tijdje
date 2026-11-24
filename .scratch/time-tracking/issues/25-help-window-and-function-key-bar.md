@@ -4,14 +4,14 @@
 
 **Blocked by:** 16, 19, 20, 21, 24
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] F1 opens the Help window; Esc or F1 closes it; it scrolls if it doesn't fit
-- [ ] Groups: General, Day navigation, Field navigation, Field editing, Period definition, Period management, listing every shortcut of the spec's Keyboard section
+- [x] F1 opens the Help window; Esc or F1 closes it; it scrolls if it doesn't fit
+- [x] Groups: General, Day navigation, Field navigation, Field editing, Period definition, Period management, listing every shortcut of the spec's Keyboard section
 - [ ] Colors: cyan background, light text, yellow title, single-line frame, black shadow
-- [ ] The full-screen Help screen is gone; F2 Track stays
-- [ ] Ctrl+S and Ctrl+Q get a line each again (ticket 24 merged them into "Save/quit" to fit 24 rows until the help scrolls)
-- [ ] F1 and F2/Esc get a line each again (ticket 21 merged them into "F1; F2, Esc" to fit 24 rows until the help scrolls)
-- [ ] The function-key bar's ten slots stretch evenly over the full width
+- [x] The full-screen Help screen is gone; F2 Track stays
+- [x] Ctrl+S and Ctrl+Q get a line each again (ticket 24 merged them into "Save/quit" to fit 24 rows until the help scrolls)
+- [x] F1 and F2/Esc get a line each again (ticket 21 merged them into "F1; F2, Esc" to fit 24 rows until the help scrolls)
+- [x] The function-key bar's ten slots stretch evenly over the full width
 
 Spec: `.scratch/time-tracking/spec.md`

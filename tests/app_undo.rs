@@ -160,7 +160,7 @@ fn sorting_when_leaving_a_day_is_not_an_undo_step() {
 }
 
 #[test]
-fn undo_does_nothing_on_the_help_screen() {
+fn undo_does_nothing_while_the_help_window_is_open() {
     let mut app = monday();
     change_first_from(&mut app, "0815");
     press(&mut app, KeyCode::F(1));

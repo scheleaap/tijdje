@@ -3,6 +3,7 @@
 mod active_input;
 mod dialog;
 mod go_to_date;
+mod help;
 mod history;
 mod render;
 
@@ -14,6 +15,7 @@ use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use active_input::ActiveInput;
 use dialog::{Dialog, DialogAction};
 use go_to_date::{DATE_FORMATS, GoToDate, GoToDateAction};
+use help::HelpWindow;
 use history::{Change, History};
 
 use crate::{
@@ -54,12 +56,6 @@ struct Storage {
     fingerprint: Fingerprint,
     /// Whether this session already kept the original file as a backup.
     backup_made: bool,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Screen {
-    Tracking,
-    Help,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -357,7 +353,8 @@ pub struct App {
     /// The clock's date as last read, so a frame or key press uses one date
     /// throughout; read again before each frame and each key press.
     today: Date,
-    screen: Screen,
+    /// The Help window over the Tracking screen, while it is open.
+    help: Option<HelpWindow>,
     selected: Date,
     /// A field of the right panel always has focus.
     focus: Focus,
@@ -415,7 +412,7 @@ impl App {
             quit_after_saving: false,
             clock,
             today,
-            screen: Screen::Tracking,
+            help: None,
             selected: calendar::start_day(today),
             focus: Focus::START,
             active_input: None,
@@ -434,10 +431,6 @@ impl App {
         app
     }
 
-    pub fn screen(&self) -> Screen {
-        self.screen
-    }
-
     pub fn selected_day(&self) -> Date {
         self.selected
     }
@@ -454,8 +447,9 @@ impl App {
         &self.timesheet
     }
 
-    fn is_tracking(&self) -> bool {
-        self.screen == Screen::Tracking
+    /// Whether the Help window is open over the Tracking screen.
+    pub fn shows_help(&self) -> bool {
+        self.help.is_some()
     }
 
     /// The selected day as the right panel shows it: a day without periods
@@ -533,9 +527,16 @@ impl App {
             self.handle_go_to_date_key(key);
             return Outcome::Continue;
         }
+        if let Some(help) = &mut self.help {
+            match key.code {
+                KeyCode::F(1) | KeyCode::F(2) | KeyCode::Esc => self.help = None,
+                code if modifiers == Modifiers::None => help.scroll(code),
+                _ => {}
+            }
+            return Outcome::Continue;
+        }
         // The day note isn't in a period, so period definitions don't apply to it.
         if alt
-            && self.is_tracking()
             && let Some(period) = self.focus.period()
             && let Some(definition) = PeriodDefinition::of_alt_key(key.code)
         {
@@ -550,7 +551,7 @@ impl App {
             }
             return Outcome::Continue;
         }
-        if ctrl && self.is_tracking() {
+        if ctrl {
             match key.code {
                 KeyCode::Char('c') => {
                     self.copy();
@@ -573,11 +574,11 @@ impl App {
             }
             return Outcome::Continue;
         }
-        if ctrl && key.code == KeyCode::Char('z') && self.screen == Screen::Tracking {
+        if ctrl && key.code == KeyCode::Char('z') {
             self.undo();
             return Outcome::Continue;
         }
-        if ctrl && key.code == KeyCode::Char('y') && self.screen == Screen::Tracking {
+        if ctrl && key.code == KeyCode::Char('y') {
             self.redo();
             return Outcome::Continue;
         }
@@ -587,11 +588,11 @@ impl App {
             }
             return Outcome::Continue;
         }
-        match (self.screen, key.code) {
-            (_, KeyCode::F(1)) => self.screen = Screen::Help,
-            (_, KeyCode::F(2)) | (Screen::Help, KeyCode::Esc) => self.screen = Screen::Tracking,
-            (Screen::Help, _) => {}
-            (Screen::Tracking, code) => self.handle_tracking_key(code, modifiers),
+        match key.code {
+            KeyCode::F(1) => self.help = Some(HelpWindow::default()),
+            // The Tracking screen is the only screen, so F2 has nothing to switch to.
+            KeyCode::F(2) => {}
+            code => self.handle_tracking_key(code, modifiers),
         }
         Outcome::Continue
     }

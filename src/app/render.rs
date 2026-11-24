@@ -9,7 +9,11 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Paragraph},
 };
 
-use super::{App, Dialog, Field, FieldFocus, Focus, Screen, active_input::ActiveInput};
+use super::{
+    App, Dialog, Field, FieldFocus, Focus,
+    active_input::ActiveInput,
+    help::{HelpLine, HelpWindow, help_lines},
+};
 use crate::domain::{
     Day, Extent, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay, WORK_UNTIL_TARGET,
     calendar::{self, Separator},
@@ -74,6 +78,17 @@ const BUTTON: Style = Style::new().fg(Color::Black).bg(Color::White);
 const SELECTED_BUTTON: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
 const KEY_NUMBER: Style = Style::new().fg(Color::White).bg(Color::Black);
 const KEY_LABEL: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
+/// The Help window, in the colors of Midnight Commander's user menu.
+const HELP: Style = Style::new().fg(Color::White).bg(Color::Cyan);
+const HELP_TITLE: Style = Style::new().fg(Color::Yellow).bg(Color::Cyan);
+/// The Help window's group headings, yellow like the title.
+const HELP_HEADING: Style = HELP_TITLE;
+/// The width of the Help window's key column, including the gap to the action.
+const HELP_KEY_WIDTH: usize = 30;
+/// The Help window's frame: one cell on each side.
+const HELP_FRAME_SIZE: u16 = 2;
+/// In the Help window's bottom frame while not all lines fit.
+const HELP_SCROLL_HINT: &str = " ↑↓ PgUp/PgDn scroll ";
 /// The right panel's padding inside its frame for the day note and the
 /// bottom line; the Notes field keeps the same right padding.
 const PANEL_PADDING: Padding = Padding::horizontal(1);
@@ -87,9 +102,9 @@ impl App {
         }
         let [main, keys] =
             Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(area);
-        match self.screen {
-            Screen::Tracking => self.render_tracking(frame, main),
-            Screen::Help => render_help(frame, main),
+        self.render_tracking(frame, main);
+        if let Some(help) = &mut self.help {
+            render_help_window(frame, main, help);
         }
         render_function_keys(frame, keys);
         if let Some(text) = &self.notification {
@@ -716,14 +731,7 @@ fn render_dialog<A>(
         width,
         height,
     };
-    let shadow = Rect {
-        x: area.x + SHADOW_OFFSET.0,
-        y: area.y + SHADOW_OFFSET.1,
-        ..area
-    }
-    .intersection(frame.area());
-    frame.render_widget(Clear, shadow);
-    frame.render_widget(Block::new().style(SHADOW), shadow);
+    render_shadow(frame, area);
     frame.render_widget(Clear, area);
     frame.render_widget(Block::new().style(DIALOG), area);
 
@@ -894,90 +902,89 @@ fn panel_block(title: &str) -> Block<'_> {
     Block::bordered().title(title).style(PANEL)
 }
 
+/// The function-key bar: ten slots stretched evenly over the full width.
 fn render_function_keys(frame: &mut Frame, area: Rect) {
     let labels = ["Help", "Track", "", "", "", "", "", "", "", ""];
-    let key_width = usize::from(area.width) / labels.len();
-    let spans: Vec<Span> = labels
+    let slots = Layout::horizontal(labels.map(|_| Constraint::Fill(1))).split(area);
+    labels
         .iter()
+        .zip(slots.iter())
         .enumerate()
-        .flat_map(|(i, label)| {
-            let number = format!("{:>2}", i + 1);
-            let label_width = key_width.saturating_sub(number.len());
-            [
-                Span::styled(number, KEY_NUMBER),
-                Span::styled(format!("{label:<label_width$}"), KEY_LABEL),
-            ]
-        })
-        .collect();
-    frame.render_widget(Paragraph::new(Line::from(spans)).style(KEY_NUMBER), area);
+        .for_each(|(i, (label, &slot))| {
+            let line = Line::from(vec![
+                Span::styled(format!("{:>2}", i + 1), KEY_NUMBER),
+                Span::raw(*label),
+            ]);
+            frame.render_widget(Paragraph::new(line).style(KEY_LABEL), slot);
+        });
 }
 
-fn render_help(frame: &mut Frame, area: Rect) {
-    let shortcuts = [
-        ("Ctrl+↑/↓", "Previous/next day"),
-        // One line for PgUp/PgDn with and without Ctrl, so the list still
-        // fits a 24-row terminal.
-        (
-            "(Ctrl+)PgUp/PgDn",
-            "10 periods up/down; with Ctrl: previous/next week",
-        ),
-        ("Ctrl+G", "Go to date"),
-        (
-            "←/→/↑/↓",
-            "Field left/right/above/below; editing a project, → at the end takes the suggestion",
-        ),
-        (
-            "Tab/Shift-Tab",
-            "Next/previous field; editing a project, also takes the suggestion",
-        ),
-        (
-            "Ctrl+Enter",
-            "From of the next period; in the last one: add a period; also takes the suggestion",
-        ),
-        ("Type", "Replace the field's value"),
-        (
-            "Enter",
-            "Edit the focused field, or toggle a checkbox; while editing: accept",
-        ),
-        ("Esc", "Reject input"),
-        (
-            "Del",
-            "Clear the field, uncheck the checkbox, or switch a part of day to from–to",
-        ),
-        (
-            "Home/End",
-            "First/last field of the period; while editing (also Ctrl+A/E): start/end of the input",
-        ),
-        ("Ctrl+←/→", "While editing: previous/next word"),
-        (
-            "Ctrl+Backspace/Ctrl+W",
-            "While editing: delete the previous word",
-        ),
-        ("Ctrl+U/Ctrl+K", "While editing: delete to the start/end"),
-        ("Ctrl+Del", "Delete the focused period"),
-        ("Alt+b/f/s/v/h", "Toggle break/free/sick/vacation/holiday"),
-        (
-            "Alt+0/1/2/3",
-            "Switch to from–to/full day/1st half/2nd half",
-        ),
-        // One line for F1 and F2, so the list still fits a 24-row terminal.
-        ("F1; F2, Esc", "Help; back to Tracking"),
-        ("Ctrl+C/Ctrl+V", "Copy/paste the focused field"),
-        ("Ctrl+Z/Ctrl+Y", "Undo/redo"),
-        // One line, so the list still fits a 24-row terminal until the help
-        // dialog scrolls (ticket 25).
-        ("Ctrl+S/Ctrl+Q", "Save/quit"),
-    ];
-    let lines: Vec<Line> = shortcuts
-        .iter()
-        .map(|(key, action)| Line::raw(format!(" {key:<23}{action}")))
-        .collect();
+/// Draws a black shadow below and to the right of `area`.
+fn render_shadow(frame: &mut Frame, area: Rect) {
+    let shadow = Rect {
+        x: area.x + SHADOW_OFFSET.0,
+        y: area.y + SHADOW_OFFSET.1,
+        ..area
+    }
+    .intersection(frame.area());
+    frame.render_widget(Clear, shadow);
+    frame.render_widget(Block::new().style(SHADOW), shadow);
+}
+
+/// Draws the Help window centered over `area`, scrolled as far as `help`
+/// says. If not all lines fit, the bottom frame says how to scroll.
+fn render_help_window(frame: &mut Frame, area: Rect, help: &mut HelpWindow) {
+    let lines: Vec<Line> = help_lines().into_iter().map(help_line).collect();
+    let window = help_window_area(area, &lines);
+    let shown_lines = usize::from(window.height.saturating_sub(HELP_FRAME_SIZE));
+    help.fit(lines.len(), shown_lines);
+    let block = Block::bordered()
+        .title(Span::styled(" Help ", HELP_TITLE))
+        .title_alignment(Alignment::Center)
+        .padding(Padding::horizontal(1))
+        .style(HELP);
+    let block = if lines.len() > shown_lines {
+        block.title_bottom(Line::styled(HELP_SCROLL_HINT, HELP_TITLE).centered())
+    } else {
+        block
+    };
+    render_shadow(frame, window);
+    frame.render_widget(Clear, window);
     frame.render_widget(
         Paragraph::new(lines)
-            .block(panel_block(" Help "))
-            .style(PANEL),
-        area,
+            .block(block)
+            .scroll((to_u16(help.first_line()), 0)),
+        window,
     );
+}
+
+/// Where the Help window goes, centered over `area`: as large as `lines`
+/// with the frame and padding need, but leaving room for the shadow.
+fn help_window_area(area: Rect, lines: &[Line]) -> Rect {
+    let content_width = lines.iter().map(Line::width).max().unwrap_or_default();
+    // The frame and the padding on both sides.
+    let chrome_width = HELP_FRAME_SIZE + 2;
+    let width = (to_u16(content_width) + chrome_width).min(area.width - SHADOW_OFFSET.0);
+    // One row of margin above the window, and one below it for the shadow.
+    let height = (to_u16(lines.len()) + HELP_FRAME_SIZE).min(area.height - 2 * SHADOW_OFFSET.1);
+    Rect {
+        x: area.x + (area.width - width) / 2,
+        y: area.y + (area.height - height) / 2,
+        width,
+        height,
+    }
+}
+
+/// A line of the Help window: a heading, or a shortcut's key and action in
+/// two columns.
+fn help_line(line: HelpLine) -> Line<'static> {
+    match line {
+        HelpLine::Heading(heading) => Line::styled(heading, HELP_HEADING),
+        HelpLine::Shortcut { key, action } => {
+            Line::raw(format!("{}{action}", fit(key, HELP_KEY_WIDTH)))
+        }
+        HelpLine::Blank => Line::default(),
+    }
 }
 
 fn render_too_small(frame: &mut Frame, area: Rect) {

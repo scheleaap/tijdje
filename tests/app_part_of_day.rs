@@ -426,9 +426,9 @@ fn help_lists_the_part_of_day_keys() {
 
     // When
     press(&mut app, KeyCode::F(1));
+    press(&mut app, KeyCode::End);
 
     // Then
     let rows = screen(&mut app);
-    row_containing(&rows, "Alt+0/1/2/3");
-    row_containing(&rows, "Ctrl+S/Ctrl+Q");
+    assert!(row_containing(&rows, "Alt+0/1/2/3").contains("full day/1st half/2nd half"));
 }

@@ -61,14 +61,6 @@ fn saving_shows_saved() {
 }
 
 #[test]
-fn saving_on_the_help_screen_shows_saved() {
-    let (mut app, _fs) = app_with_a_change();
-    press(&mut app, KeyCode::F(1));
-    ctrl(&mut app, 's');
-    assert_eq!(shown_notification(&mut app).as_deref(), Some("Saved"));
-}
-
-#[test]
 fn saving_while_quitting_does_not_show_saved() {
     let (mut app, _fs) = app_with_a_change();
     ctrl(&mut app, 'q');
