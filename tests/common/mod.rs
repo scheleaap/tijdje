@@ -58,7 +58,7 @@ pub fn hourly_periods_yaml(date: &str, count: u16) -> String {
 /// A work period of one hour from `hour`:00 on, in YAML flow style.
 pub fn hourly_period(hour: u16) -> String {
     format!(
-        "{{ from: \"{hour:02}:00\", to: \"{:02}:00\", project: null, notes: null, type: work }}",
+        "{{ from: \"{hour:02}:00\", to: \"{:02}:00\", project: acme, notes: null, type: work }}",
         hour + 1
     )
 }
@@ -253,7 +253,12 @@ pub fn ctrl(app: &mut App, c: char) -> tijdje::app::Outcome {
     app.handle_key(KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL))
 }
 
-/// A period from `from` to `to`, both written as HHMM numbers (e.g. `1235`).
+/// The project that `period` and `part_of_day_period` give work periods, as
+/// work periods need a project to pass the consistency check.
+pub const PROJECT: &str = "acme";
+
+/// A period from `from` to `to`, both written as HHMM numbers (e.g. `1235`);
+/// a work period gets the project [`PROJECT`].
 pub fn period(from: u16, to: Option<u16>, period_type: PeriodType) -> Period {
     let time = |hhmm: u16| TimeOfDay::new(hhmm / 100, hhmm % 100);
     Period {
@@ -261,18 +266,33 @@ pub fn period(from: u16, to: Option<u16>, period_type: PeriodType) -> Period {
             from: time(from),
             to: to.and_then(time),
         },
-        project: None,
+        project: project_for(period_type),
         notes: None,
         period_type,
     }
 }
 
-/// A period with `part` as its part of day instead of times.
+/// A period with `part` as its part of day instead of times; a work period
+/// gets the project [`PROJECT`].
 pub fn part_of_day_period(part: PartOfDay, period_type: PeriodType) -> Period {
     Period {
         extent: Extent::PartOfDay(part),
+        project: project_for(period_type),
         period_type,
         ..Period::default()
+    }
+}
+
+/// [`PROJECT`] for a work period, no project for a non-working period.
+fn project_for(period_type: PeriodType) -> Option<String> {
+    period_type.is_working().then(|| PROJECT.to_owned())
+}
+
+/// `period` without its project.
+pub fn without_project(period: Period) -> Period {
+    Period {
+        project: None,
+        ..period
     }
 }
 
@@ -375,6 +395,13 @@ pub fn tab_to(app: &mut App, field: Field) {
     while app.focus().field() != Some(field) {
         press(app, KeyCode::Tab);
     }
+}
+
+/// Moves focus with Tab to the next Project field and enters `project` there.
+pub fn enter_project(app: &mut App, project: &str) {
+    tab_to(app, Field::Project);
+    type_text(app, project);
+    press(app, KeyCode::Enter);
 }
 
 /// Focus on `field` of the period at index `period`.

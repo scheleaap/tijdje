@@ -102,6 +102,7 @@ fn leaving_a_day_sorts_its_periods() {
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "0800");
     press(&mut app, KeyCode::Enter);
+    enter_project(&mut app, "acme");
     ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 3));
     let monday = &app.timesheet().days[&date(2026, 11, 2)];
@@ -197,7 +198,7 @@ fn quit_anyway_without_unsaved_changes_quits() {
 
 #[test]
 fn ctrl_s_sorts_every_day_before_saving() {
-    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n      - { from: \"13:00\", to: \"17:00\", project: null, notes: null, type: work }\n      - { from: \"09:00\", to: \"12:00\", project: null, notes: null, type: work }\n";
+    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n      - { from: \"13:00\", to: \"17:00\", project: acme, notes: null, type: work }\n      - { from: \"09:00\", to: \"12:00\", project: acme, notes: null, type: work }\n";
     let (mut app, fs) = app_with_fs(yaml, date(2026, 11, 13));
     ctrl(&mut app, 's');
     let saved = fs.get(TIMESHEET).unwrap();
@@ -209,7 +210,7 @@ fn ctrl_s_sorts_every_day_before_saving() {
 
 #[test]
 fn sorting_on_quit_is_not_an_unsaved_change() {
-    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n      - { from: \"13:00\", to: \"17:00\", project: null, notes: null, type: work }\n      - { from: \"09:00\", to: \"12:00\", project: null, notes: null, type: work }\n";
+    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n      - { from: \"13:00\", to: \"17:00\", project: acme, notes: null, type: work }\n      - { from: \"09:00\", to: \"12:00\", project: acme, notes: null, type: work }\n";
     let mut app = app_with(yaml, date(2026, 11, 13));
     assert_eq!(ctrl(&mut app, 'q'), Outcome::Quit);
 }

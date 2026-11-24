@@ -1,6 +1,6 @@
 mod common;
 
-use common::{day, part_of_day_period, period};
+use common::{day, part_of_day_period, period, without_project};
 use jiff::civil::{Date, date};
 use tijdje::domain::{
     Extent, Minutes,
@@ -422,7 +422,7 @@ fn checking_an_absence_on_the_only_period_without_times_sets_a_full_day() {
 #[test]
 fn checking_an_absence_never_fills_in_times() {
     // Given
-    let mut d = day(vec![period(800, None, Work)]);
+    let mut d = day(vec![without_project(period(800, None, Work))]);
 
     // When
     d.toggle_period_type(0, Vacation);
@@ -434,7 +434,7 @@ fn checking_an_absence_never_fills_in_times() {
 #[test]
 fn checking_an_absence_keeps_a_half() {
     // Given
-    let mut d = day(vec![part_of_day_period(FirstHalf, Work)]);
+    let mut d = day(vec![without_project(part_of_day_period(FirstHalf, Work))]);
 
     // When
     d.toggle_period_type(0, Sick);
@@ -507,7 +507,10 @@ fn unchecking_keeps_a_half() {
     d.toggle_period_type(0, Vacation);
 
     // Then
-    assert_eq!(d.periods[0], part_of_day_period(SecondHalf, Work));
+    assert_eq!(
+        d.periods[0],
+        without_project(part_of_day_period(SecondHalf, Work))
+    );
 }
 
 #[test]
@@ -522,7 +525,10 @@ fn unchecking_keeps_the_full_day_when_the_day_has_more_periods() {
     d.toggle_period_type(0, Vacation);
 
     // Then
-    assert_eq!(d.periods[0], part_of_day_period(FullDay, Work));
+    assert_eq!(
+        d.periods[0],
+        without_project(part_of_day_period(FullDay, Work))
+    );
 }
 
 #[test]
@@ -534,7 +540,7 @@ fn unchecking_never_clears_times() {
     d.toggle_period_type(0, Vacation);
 
     // Then
-    assert_eq!(d.periods[0], period(900, Some(1612), Work));
+    assert_eq!(d.periods[0], without_project(period(900, Some(1612), Work)));
 }
 
 #[test]

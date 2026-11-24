@@ -292,7 +292,7 @@ fn right_panel_scrolls_to_keep_the_focused_period_visible() {
     let periods: String = (0..30)
         .map(|i| {
             format!(
-                "      - {{ from: \"{:02}:00\", to: \"{:02}:30\", project: null, notes: \"P{i}\", type: work }}\n",
+                "      - {{ from: \"{:02}:00\", to: \"{:02}:30\", project: acme, notes: \"P{i}\", type: work }}\n",
                 i % 24,
                 i % 24
             )
@@ -418,7 +418,7 @@ fn clear_field(app: &mut tijdje::app::App) {
 
 #[test]
 fn emptying_every_period_keeps_them_until_the_day_is_left_and_focus_keeps_working() {
-    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n      - { from: \"09:00\", to: \"10:00\", project: null, notes: null, type: work }\n      - { from: \"10:00\", to: \"11:00\", project: null, notes: null, type: work }\n";
+    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n      - { from: \"09:00\", to: \"10:00\", project: acme, notes: null, type: work }\n      - { from: \"10:00\", to: \"11:00\", project: acme, notes: null, type: work }\n";
     let mut app = app_with(yaml, date(2026, 11, 2));
     clear_field(&mut app); // period 0 From
     press(&mut app, KeyCode::Right);

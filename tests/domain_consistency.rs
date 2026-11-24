@@ -2,10 +2,12 @@ mod common;
 
 use std::collections::BTreeMap;
 
-use common::{day, period};
+use common::{PROJECT, day, part_of_day_period, period, without_project};
 use jiff::civil::{Date, date};
 use tijdje::domain::{
-    Extent, Period,
+    Extent,
+    PartOfDay::FullDay,
+    Period,
     PeriodType::{Break, Free, Holiday, Sick, Vacation, Work},
     Timesheet,
 };
@@ -50,7 +52,7 @@ fn problem(periods: Vec<Period>, date: Date) -> Option<(String, Vec<usize>)> {
 }
 
 fn with_project(mut p: Period) -> Period {
-    p.project = Some("acme".into());
+    p.project = Some(PROJECT.into());
     p
 }
 
@@ -181,10 +183,7 @@ fn a_day_may_have_more_than_one_free_period() {
 
 #[test]
 fn non_working_periods_have_no_project() {
-    assert_eq!(
-        problem(vec![with_project(period(900, Some(1200), Work))], PAST),
-        None
-    );
+    assert_eq!(problem(vec![period(900, Some(1200), Work)], PAST), None);
     assert_eq!(
         problem(vec![with_project(period(1200, Some(1230), Break))], PAST),
         Some(("Non-working period 1200–1230 has a project".into(), vec![0]))
@@ -250,4 +249,70 @@ fn nothing_may_follow_an_open_period() {
             vec![0, 1]
         ))
     );
+}
+
+#[test]
+fn a_work_period_needs_a_project() {
+    // Given
+    let periods = vec![
+        period(900, Some(1200), Work),
+        without_project(period(1300, Some(1700), Work)),
+    ];
+
+    // When
+    let found = problem(periods, PAST);
+
+    // Then
+    assert_eq!(
+        found,
+        Some(("Work period 1300–1700 has no project".into(), vec![1]))
+    );
+}
+
+#[test]
+fn an_open_work_period_today_needs_a_project_too() {
+    // Given
+    let periods = vec![without_project(period(900, None, Work))];
+
+    // When
+    let found = problem(periods, TODAY);
+
+    // Then
+    assert_eq!(
+        found,
+        Some(("Work period 0900– has no project".into(), vec![0]))
+    );
+}
+
+#[test]
+fn a_part_of_day_work_period_needs_a_project() {
+    // Given
+    let periods = vec![without_project(part_of_day_period(FullDay, Work))];
+
+    // When
+    let found = problem(periods, PAST);
+
+    // Then
+    assert_eq!(
+        found,
+        Some(("Work period Full day has no project".into(), vec![0]))
+    );
+}
+
+#[test]
+fn non_working_periods_without_a_project_pass() {
+    // Given
+    let periods = vec![
+        period(900, Some(1000), Break),
+        period(1000, Some(1100), Free),
+        period(1100, Some(1200), Vacation),
+        period(1300, Some(1400), Sick),
+        period(1400, Some(1500), Holiday),
+    ];
+
+    // When
+    let found = problem(periods, PAST);
+
+    // Then
+    assert_eq!(found, None);
 }

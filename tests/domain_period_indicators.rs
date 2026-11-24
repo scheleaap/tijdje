@@ -1,6 +1,6 @@
 mod common;
 
-use common::{day, period};
+use common::{day, period, without_project};
 use tijdje::domain::PeriodType::{Free, Work};
 
 #[test]
@@ -70,7 +70,7 @@ fn new_period_starts_where_the_last_one_ended() {
     ]);
     let index = d.add_period();
     assert_eq!(index, 2);
-    assert_eq!(d.periods[2], period(1500, None, Work));
+    assert_eq!(d.periods[2], without_project(period(1500, None, Work)));
 }
 
 #[test]

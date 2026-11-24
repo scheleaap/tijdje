@@ -19,7 +19,7 @@ fn monday_with(clipboard: &FakeClipboard) -> App {
 
 /// Mon 2 Nov with the day note "Team day" and one period.
 fn monday_with_a_note() -> App {
-    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    notes: \"Team day\"\n    periods:\n      - { from: \"09:00\", to: \"12:00\", project: null, notes: null, type: work }\n";
+    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 432\n    notes: \"Team day\"\n    periods:\n      - { from: \"09:00\", to: \"12:00\", project: acme, notes: null, type: work }\n";
     app_with(yaml, MONDAY)
 }
 

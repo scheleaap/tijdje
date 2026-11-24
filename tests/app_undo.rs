@@ -145,17 +145,18 @@ fn sorting_when_leaving_a_day_is_not_an_undo_step() {
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "0800");
     press(&mut app, KeyCode::Enter);
+    enter_project(&mut app, "acme");
     ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(
         periods(&app, MONDAY)[0].from(),
         TimeOfDay::new(7, 0),
         "sorted"
     );
-    // The first undo takes back the last accepted change (To), not the sort.
+    // The first undo takes back the last accepted change (Project), not the sort.
     ctrl(&mut app, 'z');
     let periods_now = periods(&app, MONDAY);
     assert_eq!(periods_now[3].from(), TimeOfDay::new(7, 0));
-    assert_eq!(periods_now[3].to(), None);
+    assert_eq!(periods_now[3].project, None);
 }
 
 #[test]

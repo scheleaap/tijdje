@@ -106,6 +106,7 @@ fn a_new_day_stores_the_regular_expected_working_time() {
     press(&mut app, KeyCode::Tab);
     type_text(&mut app, "1200");
     press(&mut app, KeyCode::Enter);
+    enter_project(&mut app, "acme");
     ctrl(&mut app, 's');
     assert!(
         fs.get(TIMESHEET)
@@ -116,7 +117,7 @@ fn a_new_day_stores_the_regular_expected_working_time() {
 
 #[test]
 fn existing_regular_expected_working_time_is_kept() {
-    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 240\n    periods:\n      - { from: \"09:00\", to: \"13:00\", project: null, notes: null, type: work }\n";
+    let yaml = "days:\n  \"2026-11-02\":\n    regular_expected_working_time_in_minutes: 240\n    periods:\n      - { from: \"09:00\", to: \"13:00\", project: acme, notes: null, type: work }\n";
     let (mut app, fs) = app_with_fs(yaml, date(2026, 11, 2));
     type_text(&mut app, "0800");
     press(&mut app, KeyCode::Enter);
@@ -167,6 +168,7 @@ fn saving_a_new_file_creates_it_without_a_backup() {
     .unwrap();
     type_text(&mut app, "0900");
     press(&mut app, KeyCode::Enter);
+    enter_project(&mut app, "acme");
     ctrl(&mut app, 's');
     assert!(fs.get(TIMESHEET).unwrap().contains("\"09:00\""));
     assert_eq!(fs.get("timesheet.yaml.bak"), None);

@@ -8,7 +8,7 @@ Recording the working time of a consultant, per weekday, assigned to projects.
 A weekday (Monday–Friday) for which periods can be recorded.
 
 **Period**:
-A span of a day, from a start time to an end time or as a part of day, optionally assigned to a project.
+A span of a day, from a start time to an end time or as a part of day. A work period needs a project; a non-working period has none.
 _Avoid_: Entry, block, slot
 
 **Part of day**:

@@ -451,6 +451,7 @@ impl Day {
             .or_else(|| self.check_no_overlaps())
             .or_else(|| self.check_open_period(date, today))
             .or_else(|| self.check_one_period_per_absence())
+            .or_else(|| self.check_project_on_work_periods())
             .or_else(|| self.check_no_project_on_non_working_periods())
             .or_else(|| self.check_no_part_of_day_on_breaks())
             .or_else(|| {
@@ -524,6 +525,14 @@ impl Day {
                     periods,
                 })
             })
+    }
+
+    /// Also an open period on the current day needs a project.
+    fn check_project_on_work_periods(&self) -> Option<ConsistencyProblem> {
+        self.first_period_where(
+            |p| p.period_type.is_working() && p.project.is_none(),
+            |p| format!("Work period {} has no project", p.label()),
+        )
     }
 
     fn check_no_project_on_non_working_periods(&self) -> Option<ConsistencyProblem> {
@@ -705,6 +714,11 @@ impl Period {
     /// notes, and type work.
     pub fn is_empty(&self) -> bool {
         *self == Self::default()
+    }
+
+    /// Sets the project to `text`; empty text or only spaces is no project.
+    pub fn set_project(&mut self, text: &str) {
+        self.project = (!text.trim().is_empty()).then(|| text.to_owned());
     }
 
     /// The period's times as a label, e.g. `0900–1200`, `1230–` or `–1200`;

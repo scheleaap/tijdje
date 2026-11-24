@@ -1,6 +1,6 @@
 mod common;
 
-use common::{day, period};
+use common::{day, period, without_project};
 use jiff::civil::{Date, date};
 use tijdje::domain::{
     Period, PeriodIndicator,
@@ -63,21 +63,11 @@ fn a_needless_split_warns_on_the_second_period() {
 
 #[test]
 fn a_needless_split_without_project_and_notes_is_warned_too() {
-    assert_eq!(
-        indicators(vec![
-            period(900, Some(1200), Work),
-            period(1200, Some(1300), Work),
-        ]),
-        vec![None, Some(PeriodWarning)]
-    );
-}
-
-#[test]
-fn adjacent_free_periods_with_the_same_notes_are_a_needless_split() {
-    // Given
+    // Given free periods, as work periods without a project fail the
+    // consistency check
     let periods = vec![
-        with_project_and_notes(period(1300, Some(1400), Free), None, Some("x")),
-        with_project_and_notes(period(1400, Some(1500), Free), None, Some("x")),
+        period(1300, Some(1400), Free),
+        period(1400, Some(1500), Free),
     ];
 
     // When
@@ -88,13 +78,42 @@ fn adjacent_free_periods_with_the_same_notes_are_a_needless_split() {
 }
 
 #[test]
+fn a_period_with_a_project_after_one_without_is_not_a_needless_split() {
+    // Given
+    let periods = vec![
+        with_project_and_notes(period(900, Some(1200), Work), None, Some("x")),
+        with_project_and_notes(period(1200, Some(1300), Work), Some("acme"), Some("x")),
+    ];
+
+    // When
+    let found = indicators(periods);
+
+    // Then the first fails the consistency check; the second gets no warning
+    assert_eq!(found, vec![Some(ConsistencyFailure), None]);
+}
+
+#[test]
+fn of_two_adjacent_work_periods_without_a_project_only_the_first_fails() {
+    // Given
+    let periods = vec![
+        without_project(period(900, Some(1200), Work)),
+        without_project(period(1200, Some(1300), Work)),
+    ];
+
+    // When
+    let found = indicators(periods);
+
+    // Then the check marks the first failing period; the second is a needless split
+    assert_eq!(found, vec![Some(ConsistencyFailure), Some(PeriodWarning)]);
+}
+
+#[test]
 fn consecutive_periods_that_differ_are_not_warned() {
     let first = || with_project_and_notes(period(900, Some(1200), Work), Some("acme"), Some("x"));
     for second in [
         with_project_and_notes(period(1200, Some(1300), Work), Some("other"), Some("x")),
         with_project_and_notes(period(1200, Some(1300), Work), Some("acme"), Some("y")),
         with_project_and_notes(period(1200, Some(1300), Work), Some("acme"), None),
-        with_project_and_notes(period(1200, Some(1300), Work), None, Some("x")),
     ] {
         assert_eq!(
             indicators(vec![first(), second.clone()]),

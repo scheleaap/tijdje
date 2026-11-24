@@ -775,9 +775,10 @@ impl App {
             return;
         };
         let text = clipboard_text.trim();
-        // Only spaces paste as no day note, as when typed; other fields take
-        // them for an empty clipboard.
-        if clipboard_text.is_empty() || (text.is_empty() && focus != Focus::DayNote) {
+        // Only spaces paste as no day note or project, as when typed; other
+        // fields take them for an empty clipboard.
+        let clears_with_spaces = focus == Focus::DayNote || focus.field() == Some(Field::Project);
+        if clipboard_text.is_empty() || (text.is_empty() && !clears_with_spaces) {
             self.notify("The clipboard is empty");
             return;
         }
@@ -889,24 +890,21 @@ impl App {
         };
         self.edit_selected_day(|day| match focus {
             Focus::DayNote => day.set_day_note(&text),
-            Focus::Period(focus) => {
-                let value = (!text.is_empty()).then_some(text);
-                match focus.field {
-                    Field::From => day.set_from(focus.period, time),
-                    Field::To => day.set_to(focus.period, time),
-                    Field::Project => {
-                        if let Some(period) = day.periods.get_mut(focus.period) {
-                            period.project = value;
-                        }
+            Focus::Period(focus) => match focus.field {
+                Field::From => day.set_from(focus.period, time),
+                Field::To => day.set_to(focus.period, time),
+                Field::Project => {
+                    if let Some(period) = day.periods.get_mut(focus.period) {
+                        period.set_project(&text);
                     }
-                    Field::Notes => {
-                        if let Some(period) = day.periods.get_mut(focus.period) {
-                            period.notes = value;
-                        }
-                    }
-                    _ => {}
                 }
-            }
+                Field::Notes => {
+                    if let Some(period) = day.periods.get_mut(focus.period) {
+                        period.notes = (!text.is_empty()).then_some(text);
+                    }
+                }
+                _ => {}
+            },
         });
         self.active_input = None;
         true
