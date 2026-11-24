@@ -30,7 +30,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 
 ### Left panel (days)
 
-9. As a consultant, I want to see a vertical list of days with the columns date, worked time, day balance, total balance, absence indicator and day warning, so that I see my status at a glance.
+9. As a consultant, I want to see a vertical list of days with the columns date, worked time, day balance, total balance and one day indicator (day warning or absence indicator), so that I see my status at a glance.
 10. As a consultant, I want exactly one day to be selected at all times, shown with a cyan bar, so that the right panel always has a clear context.
 11. As a consultant, I want only Monday–Friday to be listed, with a single-line separator between weeks and a double-line separator with the new year between years, so that weeks and years are visually distinct.
 12. As a consultant, I want the list to scroll endlessly into the past and the future, so that I can plan vacation and review history.
@@ -127,6 +127,7 @@ Data is stored in a human-readable YAML file. Moco synchronization follows in a 
 - **Period indicator** (left of From, one symbol): ⚠️ for periods involved in the day's current consistency problem (determined live, on a sorted copy of the day without empty periods, mapped back to the periods on screen; it shows right away, also while the day is being filled in), else ❗ for a period warning, else the emoji of a non-working period type (☕ break, 🆓 free, 🏖️ vacation, 🤒 sick, 🎄 holiday), else nothing. Implied-break rows show ☕ in the same column.
 - **Day warning** (left panel, ⚠️ only): a day that fails the consistency check, or an empty past weekday after the first recorded day. A day with only a day note counts as empty here, and doesn't count as a recorded day for the first recorded day. ❗ is never shown in the left panel. An empty past day is not a consistency failure: saving and quitting don't ask about it.
 - **Absence indicator** (left panel): 🤒 > 🏖️ > 🎄; free periods have no absence indicator.
+- **Day indicator** (left panel, one column right after the total balance, one symbol): the day warning ⚠️, else the absence indicator (🤒 > 🏖️ > 🎄), else nothing.
 - **"Work until"**: the time until which to work on the selected day to reach 8h worked (a fixed value for now), given the periods as they are: base + (8h − worked time) + missing break time. The base is the latest To of the from–to periods, or the From of an open last period. The missing break time is 1h minus the break time so far (explicit breaks plus implied breaks; free periods don't count) if that is under 1h, otherwise nothing. Shows `[–]` when 8h is already worked, the day has no from–to periods, or the result would be 24:00 or later. Example: 0900–1200 and 1230–1500 is 5h30m worked with a 30m implied break: 1500 + 2h30m + 30m = `[18:00]`.
 - **Bottom line**: `Worked [<worked time>] of [<actual expected working time>] | Work until [<time>] for [8h]`; the bracketed parts are spans with a cyan background.
 
