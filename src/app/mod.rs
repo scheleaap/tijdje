@@ -28,6 +28,12 @@ use crate::{
 
 const NO_CLIPBOARD: &str = "The clipboard is not available";
 
+/// The number of periods PgUp/PgDn move focus.
+const PAGE_PERIODS: usize = 10;
+
+/// The number of periods ↑/↓ move focus.
+const ARROW_PERIODS: usize = 1;
+
 fn invalid_time_message(text: &str) -> String {
     format!("{text} is not a valid time (HHMM, 0000–2359)")
 }
@@ -609,8 +615,16 @@ impl App {
             KeyCode::Char('g') if ctrl_only => self.go_to_date = Some(GoToDate::new()),
             KeyCode::Left if plain => self.move_focus_within_period(Direction::Backward),
             KeyCode::Right if plain => self.move_focus_within_period(Direction::Forward),
-            KeyCode::Up if plain => self.move_focus_vertically(Direction::Backward),
-            KeyCode::Down if plain => self.move_focus_vertically(Direction::Forward),
+            KeyCode::Up if plain => self.move_focus_vertically(Direction::Backward, ARROW_PERIODS),
+            KeyCode::Down if plain => self.move_focus_vertically(Direction::Forward, ARROW_PERIODS),
+            KeyCode::PageUp if plain => {
+                self.move_focus_vertically(Direction::Backward, PAGE_PERIODS)
+            }
+            KeyCode::PageDown if plain => {
+                self.move_focus_vertically(Direction::Forward, PAGE_PERIODS)
+            }
+            KeyCode::Home if plain => self.move_focus_to_field(Field::FIRST),
+            KeyCode::End if plain => self.move_focus_to_field(Field::LAST),
             KeyCode::Tab if plain => self.move_focus_in_tab_order(Direction::Forward),
             KeyCode::BackTab if plain => self.move_focus_in_tab_order(Direction::Backward),
             KeyCode::Enter if ctrl_only => self.focus_next_period(),
@@ -1260,33 +1274,45 @@ impl App {
         self.shown_day().periods.len()
     }
 
-    /// ↑/↓: the closest field in the row above/below, stopping at the first
-    /// period and the day note. Implied-break rows aren't focusable, so they
-    /// are skipped. Every period row has the same fields in the same columns,
-    /// so the closest field is the same field, except that the part-of-day
-    /// field stands for both From and To; leaving it toward a from–to row
-    /// lands on From (see `fit_focus_to_period`). The day note is below the
-    /// last period; above it, From of the last period is the closest field.
-    fn move_focus_vertically(&mut self, direction: Direction) {
-        let last_period = self.period_count() - 1;
+    /// ↑/↓ and PgUp/PgDn: the closest field `periods` rows
+    /// above/below, stopping at the first period and the day note.
+    /// Implied-break rows aren't focusable, so they are skipped. Every period
+    /// row has the same fields in the same columns, so the closest field is
+    /// the same field, except that the part-of-day field stands for both From
+    /// and To; leaving it toward a from–to row lands on From (see
+    /// `fit_focus_to_period`). The day note is the row below the last period;
+    /// above it, From is the closest field.
+    fn move_focus_vertically(&mut self, direction: Direction, periods: usize) {
+        let day_note_row = self.period_count();
         self.focus = match (direction, self.focus) {
             (Direction::Forward, Focus::DayNote) => Focus::DayNote,
             (Direction::Backward, Focus::DayNote) => Focus::Period(FieldFocus {
-                period: last_period,
+                period: day_note_row.saturating_sub(periods),
                 field: Field::FIRST,
             }),
             (Direction::Backward, Focus::Period(focus)) => Focus::Period(FieldFocus {
-                period: focus.period.saturating_sub(1),
+                period: focus.period.saturating_sub(periods),
                 ..focus
             }),
-            (Direction::Forward, Focus::Period(focus)) if focus.period == last_period => {
+            (Direction::Forward, Focus::Period(focus))
+                if focus.period + periods >= day_note_row =>
+            {
                 Focus::DayNote
             }
             (Direction::Forward, Focus::Period(focus)) => Focus::Period(FieldFocus {
-                period: focus.period + 1,
+                period: focus.period + periods,
                 ..focus
             }),
         };
+    }
+
+    /// Home/End: `field` of the focused period, i.e. its first or last field
+    /// (see `fit_focus_to_period` for a part of day). The day note is alone
+    /// in its row.
+    fn move_focus_to_field(&mut self, field: Field) {
+        if let Focus::Period(focus) = self.focus {
+            self.focus = Focus::Period(FieldFocus { field, ..focus });
+        }
     }
 
     /// ←/→: the previous/next field of the focused period, stopping at its

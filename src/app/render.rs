@@ -892,7 +892,12 @@ fn render_function_keys(frame: &mut Frame, area: Rect) {
 fn render_help(frame: &mut Frame, area: Rect) {
     let shortcuts = [
         ("Ctrl+↑/↓", "Previous/next day"),
-        ("Ctrl+PgUp/PgDn", "Previous/next week"),
+        // One line for PgUp/PgDn with and without Ctrl, so the list still
+        // fits a 24-row terminal.
+        (
+            "(Ctrl+)PgUp/PgDn",
+            "10 periods up/down; with Ctrl: previous/next week",
+        ),
         ("Ctrl+G", "Go to date"),
         (
             "←/→/↑/↓",
@@ -917,8 +922,8 @@ fn render_help(frame: &mut Frame, area: Rect) {
             "Clear the field, uncheck the checkbox, or switch a part of day to from–to",
         ),
         (
-            "Home/End, Ctrl+A/E",
-            "While editing: start/end of the input",
+            "Home/End",
+            "First/last field of the period; while editing (also Ctrl+A/E): start/end of the input",
         ),
         ("Ctrl+←/→", "While editing: previous/next word"),
         (

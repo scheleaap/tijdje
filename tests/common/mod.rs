@@ -51,17 +51,15 @@ pub fn inside_frame(row: &str) -> &str {
 /// A day on `date` with `count` consecutive hourly periods from 08:00 on,
 /// as timesheet YAML.
 pub fn hourly_periods_yaml(date: &str, count: u16) -> String {
-    let periods: String = (0..count)
-        .map(|i| {
-            format!(
-                "      - {{ from: \"{:02}:00\", to: \"{:02}:00\", project: null, notes: null, type: work }}\n",
-                8 + i,
-                9 + i
-            )
-        })
-        .collect();
+    let periods: Vec<String> = (0..count).map(|i| hourly_period(8 + i)).collect();
+    one_day_yaml(date, &periods)
+}
+
+/// A work period of one hour from `hour`:00 on, in YAML flow style.
+pub fn hourly_period(hour: u16) -> String {
     format!(
-        "days:\n  \"{date}\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n{periods}"
+        "{{ from: \"{hour:02}:00\", to: \"{:02}:00\", project: null, notes: null, type: work }}",
+        hour + 1
     )
 }
 
@@ -134,10 +132,10 @@ pub const TIMESHEET: &str = "timesheet.yaml";
 /// A timesheet with one day on `date` (`YYYY-MM-DD`) with `periods`, each
 /// one period in YAML flow style, e.g.
 /// `{ from: "09:00", to: "12:00", project: acme, notes: null, type: work }`.
-pub fn one_day_yaml(date: &str, periods: &[&str]) -> String {
+pub fn one_day_yaml(date: &str, periods: &[impl AsRef<str>]) -> String {
     let periods: String = periods
         .iter()
-        .map(|period| format!("      - {period}\n"))
+        .map(|period| format!("      - {}\n", period.as_ref()))
         .collect();
     format!(
         "days:\n  \"{date}\":\n    regular_expected_working_time_in_minutes: 432\n    periods:\n{periods}"

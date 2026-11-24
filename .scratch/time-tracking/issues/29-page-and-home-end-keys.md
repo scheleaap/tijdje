@@ -4,12 +4,12 @@
 
 **Blocked by:** 28
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] PgUp/PgDn (not editing) move focus 10 periods up/down, keeping the field, stopping at the first period and at the day note (the row after the last period); from the day note, PgUp goes to From of the period 10 above it, or of the first period
-- [ ] Home/End (not editing) move to From/Notes of the focused period; on the day note they do nothing
-- [ ] While editing, Home/End keep moving the cursor and PgUp/PgDn are ignored
-- [ ] The Help screen lists the new keys
+- [x] PgUp/PgDn (not editing) move focus 10 periods up/down, keeping the field, stopping at the first period and at the day note (the row after the last period); from the day note, PgUp goes to From of the period 10 above it, or of the first period
+- [x] Home/End (not editing) move to From/Notes of the focused period; on the day note they do nothing
+- [x] While editing, Home/End keep moving the cursor and PgUp/PgDn are ignored
+- [x] The Help screen lists the new keys
 
 Spec: `.scratch/time-tracking/spec.md`
 
