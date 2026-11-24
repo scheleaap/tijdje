@@ -169,7 +169,7 @@ fn tab_takes_the_suggestion_accepts_and_moves_on() {
     // Then
     assert_eq!(project(&app), Some("otto"));
     assert!(!app.is_editing());
-    assert_eq!(app.focus(), focus(0, Field::Break));
+    assert_eq!(app.focus(), focus(0, Field::Notes));
 }
 
 #[test]
@@ -571,5 +571,5 @@ fn right_moves_focus_when_not_editing() {
     press(&mut app, KeyCode::Right);
 
     // Then
-    assert_eq!(app.focus(), focus(0, Field::Break));
+    assert_eq!(app.focus(), focus(0, Field::Notes));
 }

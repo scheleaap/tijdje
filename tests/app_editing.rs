@@ -2,7 +2,7 @@ mod common;
 
 use common::*;
 use jiff::civil::date;
-use ratatui::crossterm::event::KeyCode;
+use ratatui::{crossterm::event::KeyCode, style::Color};
 use tijdje::{
     app::{App, Field, Outcome},
     domain::{Minutes, TimeOfDay},
@@ -125,12 +125,11 @@ fn tab_accepts_and_moves_on() {
     press(&mut app, KeyCode::Tab);
     assert!(!app.is_editing());
     assert_eq!(period_at(&app, 0).project.as_deref(), Some("acme"));
-    assert_eq!(app.focus(), focus(0, Field::Break));
-    tab_to(&mut app, Field::Notes);
+    assert_eq!(app.focus(), focus(0, Field::Notes));
     type_text(&mut app, "n");
     press(&mut app, KeyCode::BackTab);
     assert_eq!(period_at(&app, 0).notes.as_deref(), Some("n"));
-    assert_eq!(app.focus(), focus(0, Field::Holiday));
+    assert_eq!(app.focus(), focus(0, Field::Project));
 }
 
 #[test]
@@ -407,6 +406,44 @@ fn the_cursor_is_shown_in_the_edited_field() {
         (cursor.x, cursor.y),
         (u16::try_from(x).unwrap(), u16::try_from(y).unwrap())
     );
+}
+
+#[test]
+fn the_cursor_is_shown_in_the_edited_notes_field_right_after_project() {
+    // Given
+    let mut app = app_on_monday();
+    tab_to(&mut app, Field::Notes);
+
+    // When
+    type_text(&mut app, "abc");
+
+    // Then
+    let mut terminal = ratatui::Terminal::new(ratatui::backend::TestBackend::new(120, 24)).unwrap();
+    terminal.draw(|frame| app.render(frame)).unwrap();
+    let buffer = terminal.backend().buffer();
+    let y = u16::try_from(row_index(&rows(buffer), "0845 1230")).unwrap();
+    assert_eq!(column_of(buffer, y, "abc "), Some(NOTES_X));
+    let cursor = terminal.get_cursor_position().unwrap();
+    assert_eq!((cursor.x, cursor.y), (NOTES_X + 3, y));
+}
+
+#[test]
+fn long_notes_are_cut_off_before_the_checkboxes() {
+    // Given
+    let mut app = app_on_monday();
+    tab_to(&mut app, Field::Notes);
+    type_text(&mut app, &"word ".repeat(20));
+
+    // When
+    press(&mut app, KeyCode::Enter);
+
+    // Then
+    let buffer = render(&mut app, 120, 24);
+    let y = u16::try_from(row_index(&rows(&buffer), "0845 1230")).unwrap();
+    assert_eq!(buffer[(notes_end_x(120), y)].symbol(), "…");
+    let break_x = checkbox_x(120, Field::Break);
+    assert_eq!(buffer[(break_x - 1, y)].symbol(), " ", "the gap");
+    assert_eq!(buffer[(break_x - 1, y)].bg, Color::Blue, "the gap");
 }
 
 #[test]

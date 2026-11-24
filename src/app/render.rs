@@ -44,8 +44,10 @@ const FROM_X: usize = WARNING_WIDTH + GAP;
 const TO_X: usize = FROM_X + TIME_WIDTH + GAP;
 const DURATION_X: usize = TO_X + TIME_WIDTH + GAP;
 const PROJECT_X: usize = DURATION_X + DURATION_WIDTH + GAP;
-const CHECKBOXES_X: usize = PROJECT_X + PROJECT_WIDTH;
-const NOTES_X: usize = CHECKBOXES_X + Field::CHECKBOXES.len() * (GAP + CHECKBOX_WIDTH) + GAP;
+const NOTES_X: usize = PROJECT_X + PROJECT_WIDTH + GAP;
+/// The checkboxes after Notes, each after a gap; their position depends on
+/// the width of Notes, which takes the rest of the row.
+const CHECKBOXES_WIDTH: usize = Field::CHECKBOXES.len() * (GAP + CHECKBOX_WIDTH);
 
 /// The emoji for a non-working period type: checkbox headers and absence indicators.
 fn period_type_emoji(period_type: PeriodType) -> &'static str {
@@ -91,7 +93,7 @@ const HELP_FRAME_SIZE: u16 = 2;
 /// In the Help window's bottom frame while not all lines fit.
 const HELP_SCROLL_HINT: &str = " ↑↓ PgUp/PgDn scroll ";
 /// The right panel's padding inside its frame for the day note and the
-/// bottom line; the Notes field keeps the same right padding.
+/// bottom line; the checkboxes keep the same right padding.
 const PANEL_PADDING: Padding = Padding::horizontal(1);
 
 impl App {
@@ -220,7 +222,7 @@ impl App {
         let block = panel_block(&title);
         let areas = PeriodPanelAreas::of(block.inner(area));
         frame.render_widget(block, area);
-        render_period_header(frame, areas.header);
+        render_period_header(frame, areas.header, areas.notes_width);
         frame.render_widget(
             Paragraph::new("Day note").style(HEADER),
             areas.day_note_header,
@@ -306,7 +308,7 @@ impl App {
             .take(usize::from(areas.list.height))
             .map(|&row| match row {
                 PeriodRow::Blank => Line::raw(""),
-                PeriodRow::ImpliedBreak(after) => implied_break_line(day, after),
+                PeriodRow::ImpliedBreak(after) => implied_break_line(day, after, areas.notes_width),
                 PeriodRow::Period(index) => {
                     let mut line = self.period_line(
                         day,
@@ -368,6 +370,12 @@ impl App {
             period.project.as_deref().unwrap_or_default(),
             PROJECT_WIDTH,
         ));
+        spans.push(gap());
+        spans.extend(text_field(
+            Field::Notes,
+            period.notes.as_deref().unwrap_or_default(),
+            notes_width,
+        ));
         for field in Field::CHECKBOXES {
             let style = if self.is_focused(index, field) {
                 FOCUSED_FIELD
@@ -379,12 +387,6 @@ impl App {
                 Span::styled(checkbox(field, period.period_type), style),
             ]);
         }
-        spans.push(gap());
-        spans.extend(text_field(
-            Field::Notes,
-            period.notes.as_deref().unwrap_or_default(),
-            notes_width,
-        ));
         Line::from(spans)
     }
 
@@ -443,7 +445,8 @@ struct PeriodPanelAreas {
     day_note_header: Rect,
     day_note: Rect,
     bottom_line: Rect,
-    /// The width of the Notes input field, which ends at the right padding.
+    /// The width of the Notes input field: what's left between Project and
+    /// the checkboxes, which end at the right padding.
     notes_width: usize,
 }
 
@@ -468,7 +471,7 @@ impl PeriodPanelAreas {
             day_note: padded_block().inner(day_note),
             bottom_line,
             notes_width: usize::from(inner.width)
-                .saturating_sub(NOTES_X + usize::from(PANEL_PADDING.right)),
+                .saturating_sub(NOTES_X + CHECKBOXES_WIDTH + usize::from(PANEL_PADDING.right)),
         }
     }
 }
@@ -479,9 +482,9 @@ fn padded_block() -> Block<'static> {
     Block::new().padding(PANEL_PADDING)
 }
 
-/// The period column headers: From, To, Duration, Project, the checkbox
-/// emoji and Notes.
-fn render_period_header(frame: &mut Frame, area: Rect) {
+/// The period column headers: From, To, Duration, Project, Notes and the
+/// checkbox emoji, with Notes `notes_width` cells wide.
+fn render_period_header(frame: &mut Frame, area: Rect, notes_width: usize) {
     let checkbox_headers: String = Field::CHECKBOXES
         .iter()
         .filter_map(|field| field.period_type())
@@ -490,8 +493,8 @@ fn render_period_header(frame: &mut Frame, area: Rect) {
     let header_text = plain_period_row(
         None,
         ["From", "To", "Duration", "Project"],
+        &fit("Notes", notes_width),
         &checkbox_headers,
-        "Notes",
     );
     frame.render_widget(Paragraph::new(header_text).style(HEADER), area);
 }
@@ -528,8 +531,9 @@ fn period_rows(day: &Day) -> Vec<PeriodRow> {
 }
 
 /// An implied break as plain text: from the end of one period to the start
-/// of the next, with the break indicator and Break checked.
-fn implied_break_line(day: &Day, after: usize) -> Line<'static> {
+/// of the next, with the break indicator, empty Notes `notes_width` cells
+/// wide and Break checked.
+fn implied_break_line(day: &Day, after: usize, notes_width: usize) -> Line<'static> {
     let Some(implied) = day.implied_break_after(after) else {
         return Line::raw("");
     };
@@ -545,24 +549,25 @@ fn implied_break_line(day: &Day, after: usize) -> Line<'static> {
             &format_duration(day, &implied),
             "",
         ],
+        &fit("", notes_width),
         &checkboxes,
-        "",
     ))
 }
 
-/// A period row as plain text, for the header and implied breaks:
-/// the indicator, `[from, to, duration, project]`, the checkbox columns, and notes.
+/// A period row as plain text, for the header and implied breaks: the
+/// indicator, `[from, to, duration, project]`, `notes` (already as wide as
+/// the Notes field) and the checkbox columns.
 fn plain_period_row(
     indicator: Option<PeriodIndicator>,
     columns: [&str; 4],
-    checkboxes: &str,
     notes: &str,
+    checkboxes: &str,
 ) -> String {
     let [from, to, duration, project] = columns;
     // Already `WARNING_WIDTH` cells wide; `{:<}` would pad by characters.
     let indicator = indicator_emoji(indicator);
     format!(
-        "{indicator} {from:<TIME_WIDTH$} {to:<TIME_WIDTH$} {duration:<DURATION_WIDTH$} {project:<PROJECT_WIDTH$}{checkboxes} {notes}"
+        "{indicator} {from:<TIME_WIDTH$} {to:<TIME_WIDTH$} {duration:<DURATION_WIDTH$} {project:<PROJECT_WIDTH$} {notes}{checkboxes}"
     )
 }
 

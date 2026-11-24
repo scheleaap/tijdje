@@ -269,7 +269,7 @@ fn the_right_panel_scrolls_to_the_period_page_up_focuses() {
 // Home/End
 
 #[test]
-fn home_and_end_move_to_from_and_notes_of_the_focused_period() {
+fn home_and_end_move_to_from_and_holiday_of_the_focused_period() {
     // Given
     let mut app = app_with_twelve_periods();
     press(&mut app, KeyCode::Down);
@@ -281,7 +281,7 @@ fn home_and_end_move_to_from_and_notes_of_the_focused_period() {
     press(&mut app, KeyCode::Home);
 
     // Then
-    assert_eq!(after_end, focus(1, Field::Notes));
+    assert_eq!(after_end, focus(1, Field::Holiday));
     assert_eq!(app.focus(), focus(1, Field::From));
 }
 
@@ -299,7 +299,7 @@ fn home_moves_to_the_part_of_day_field_of_a_part_of_day_period() {
 }
 
 #[test]
-fn end_moves_to_notes_of_a_part_of_day_period() {
+fn end_moves_to_holiday_of_a_part_of_day_period() {
     // Given
     let mut app = app_with_a_part_of_day_period_first();
 
@@ -307,7 +307,7 @@ fn end_moves_to_notes_of_a_part_of_day_period() {
     press(&mut app, KeyCode::End);
 
     // Then
-    assert_eq!(app.focus(), focus(0, Field::Notes));
+    assert_eq!(app.focus(), focus(0, Field::Holiday));
 }
 
 #[test]

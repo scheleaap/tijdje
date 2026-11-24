@@ -40,8 +40,58 @@ pub fn right(row: &str) -> String {
 /// inside its frame, before the day note and the bottom line.
 pub const LEFT_PADDING_X: u16 = 47;
 /// The right panel's right padding at a screen width of 120: the last cell
-/// inside its frame, after the day note and the Notes field.
-pub const RIGHT_PADDING_X: u16 = 118;
+/// inside its frame, after the day note and the checkboxes.
+pub const RIGHT_PADDING_X: u16 = right_padding_x(120);
+
+/// The right panel's right padding on a screen `screen_width` cells wide:
+/// the last cell inside its frame.
+pub const fn right_padding_x(screen_width: u16) -> u16 {
+    screen_width - 2
+}
+
+/// The one-cell gap between the columns of a period row.
+pub const GAP: u16 = 1;
+/// The widths of the indicator, a time (From, To) and the Duration column,
+/// in cells, as the spec describes the period row.
+pub const INDICATOR_WIDTH: u16 = 2;
+pub const TIME_WIDTH: u16 = 4;
+pub const DURATION_WIDTH: u16 = 8;
+/// Where the Project field starts in a period row: after the indicator,
+/// From, To and Duration, each followed by a gap.
+pub const PROJECT_X: u16 = LEFT_PADDING_X
+    + INDICATOR_WIDTH
+    + GAP
+    + TIME_WIDTH
+    + GAP
+    + TIME_WIDTH
+    + GAP
+    + DURATION_WIDTH
+    + GAP;
+/// The width of the Project field, in cells.
+pub const PROJECT_WIDTH: u16 = 10;
+/// Where the Notes field starts in a period row: one gap after Project.
+pub const NOTES_X: u16 = PROJECT_X + PROJECT_WIDTH + GAP;
+
+/// The width of a checkbox, in cells.
+pub const CHECKBOX_WIDTH: u16 = 3;
+
+/// Where the checkbox `field` starts in a period row on a screen
+/// `screen_width` cells wide: the checkboxes, each after a one-cell gap, end
+/// right before the right padding.
+pub fn checkbox_x(screen_width: u16, field: Field) -> u16 {
+    let index = Field::CHECKBOXES
+        .iter()
+        .position(|&checkbox| checkbox == field)
+        .unwrap_or_else(|| panic!("{field:?} is no checkbox"));
+    let following = u16::try_from(Field::CHECKBOXES.len() - index).unwrap();
+    right_padding_x(screen_width) - following * (GAP + CHECKBOX_WIDTH) + GAP
+}
+
+/// The last cell of the Notes field on a screen `screen_width` cells wide:
+/// one gap before the first checkbox.
+pub fn notes_end_x(screen_width: u16) -> u16 {
+    checkbox_x(screen_width, Field::CHECKBOXES[0]) - 2
+}
 
 /// A right-panel row without its frame and the spaces next to it.
 pub fn inside_frame(row: &str) -> &str {

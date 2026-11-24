@@ -88,12 +88,12 @@ impl Field {
         Field::To,
         Field::PartOfDay,
         Field::Project,
+        Field::Notes,
         Field::Break,
         Field::Free,
         Field::Vacation,
         Field::Sick,
         Field::Holiday,
-        Field::Notes,
     ];
     const FIRST: Field = Field::ALL[0];
     const LAST: Field = Field::ALL[Field::ALL.len() - 1];

@@ -69,28 +69,106 @@ fn the_period_warning_is_left_of_from() {
     assert!(right(row_containing(&screen, "0540 1228")).starts_with("│❗"));
 }
 
+/// Screen widths at which the period columns are checked: the minimum width,
+/// and a wider one, where Notes is wider and the checkboxes move right.
+const SCREEN_WIDTHS: [u16; 2] = [120, 151];
+
+/// The checkbox headers, in the order of `Field::CHECKBOXES`.
+const CHECKBOX_EMOJI: [&str; 5] = ["☕", "🆓", "🏖️", "🤒", "🎄"];
+
 #[test]
-fn checkboxes_come_right_after_project_as_colored_boxes() {
+fn notes_comes_right_after_project() {
+    // Given
     let mut app = app_with(SAMPLE, date(2026, 11, 2));
+
+    // When
     let buffer = render(&mut app, 120, 24);
-    let screen = rows(&buffer);
-    let y = row_index(&screen, "0845 1230");
-    let row = right(&screen[y]);
-    let project_end = row.find("internal").unwrap() + 10;
-    let notes = row.find("Onboarding").unwrap();
-    let y = u16::try_from(y).unwrap();
-    // Five 3-cell boxes, each after a one-cell gap, then Notes.
-    for box_start in [
-        project_end + 1,
-        project_end + 5,
-        project_end + 9,
-        project_end + 13,
-        project_end + 17,
-    ] {
-        let x = u16::try_from(LEFT_PANEL_WIDTH + box_start).unwrap();
-        assert_eq!(buffer[(x, y)].bg, Color::Gray, "box at {box_start}");
+
+    // Then
+    let y = u16::try_from(row_index(&rows(&buffer), "0845 1230")).unwrap();
+    assert_eq!(column_of(&buffer, y, "internal"), Some(PROJECT_X));
+    assert_eq!(column_of(&buffer, y, "Onboarding"), Some(NOTES_X));
+    assert_eq!(buffer[(NOTES_X - 1, y)].bg, Color::Blue, "the gap");
+}
+
+#[test]
+fn checkboxes_are_colored_boxes_that_end_one_cell_before_the_right_frame() {
+    for width in SCREEN_WIDTHS {
+        // Given
+        let mut app = app_with(SAMPLE, date(2026, 11, 2));
+
+        // When
+        let buffer = render(&mut app, width, 24);
+
+        // Then
+        let y = u16::try_from(row_index(&rows(&buffer), "0845 1230")).unwrap();
+        for field in Field::CHECKBOXES {
+            let x = checkbox_x(width, field);
+            assert_eq!(buffer[(x - 1, y)].bg, Color::Blue, "gap before {field:?}");
+            for x in x..x + CHECKBOX_WIDTH {
+                assert_eq!(buffer[(x, y)].bg, Color::Gray, "{field:?} at {x}");
+            }
+        }
+        let padding = right_padding_x(width);
+        assert_eq!(buffer[(padding, y)].bg, Color::Blue, "padding");
+        assert_eq!(buffer[(padding + 1, y)].symbol(), "│", "frame");
     }
-    assert_eq!(notes, project_end + 21, "{row:?}");
+}
+
+#[test]
+fn notes_takes_all_width_between_project_and_the_checkboxes() {
+    for width in SCREEN_WIDTHS {
+        // Given
+        let mut app = app_with(SAMPLE, date(2026, 11, 2));
+
+        // When
+        let buffer = render(&mut app, width, 24);
+
+        // Then
+        let y = u16::try_from(row_index(&rows(&buffer), "0845 1230")).unwrap();
+        for x in NOTES_X..=notes_end_x(width) {
+            assert_eq!(buffer[(x, y)].bg, Color::Gray, "Notes at {x}");
+        }
+        assert_eq!(buffer[(notes_end_x(width) + 1, y)].bg, Color::Blue, "gap");
+    }
+}
+
+#[test]
+fn the_header_follows_the_column_order() {
+    for width in SCREEN_WIDTHS {
+        // Given
+        let mut app = app_with(SAMPLE, date(2026, 11, 2));
+
+        // When
+        let buffer = render(&mut app, width, 24);
+
+        // Then
+        let y = u16::try_from(row_index(&rows(&buffer), "From")).unwrap();
+        assert_eq!(column_of(&buffer, y, "Project"), Some(PROJECT_X));
+        assert_eq!(column_of(&buffer, y, "Notes"), Some(NOTES_X));
+        for (field, emoji) in Field::CHECKBOXES.into_iter().zip(CHECKBOX_EMOJI) {
+            assert_eq!(
+                symbol_column(&buffer, "From", emoji),
+                checkbox_x(width, field),
+                "{field:?} at width {width}"
+            );
+        }
+    }
+}
+
+#[test]
+fn an_implied_break_row_has_break_checked_in_the_break_column() {
+    // Given
+    let mut app = app_with(SAMPLE, date(2026, 11, 5));
+
+    // When
+    let buffer = render(&mut app, 120, 24);
+
+    // Then
+    assert_eq!(
+        symbol_column(&buffer, "1228 1325", "✓"),
+        checkbox_x(120, Field::Break) + 1
+    );
 }
 
 #[test]
@@ -170,12 +248,12 @@ fn tab_follows_the_fields_on_screen_and_continues_in_the_next_period() {
     for expected in [
         Field::To,
         Field::Project,
+        Field::Notes,
         Field::Break,
         Field::Free,
         Field::Vacation,
         Field::Sick,
         Field::Holiday,
-        Field::Notes,
     ] {
         press(&mut app, KeyCode::Tab);
         assert_eq!(app.focus(), focus(0, expected));
@@ -183,7 +261,7 @@ fn tab_follows_the_fields_on_screen_and_continues_in_the_next_period() {
     press(&mut app, KeyCode::Tab);
     assert_eq!(app.focus(), focus(1, Field::From));
     press(&mut app, KeyCode::BackTab);
-    assert_eq!(app.focus(), focus(0, Field::Notes));
+    assert_eq!(app.focus(), focus(0, Field::Holiday));
 }
 
 #[test]
@@ -192,7 +270,7 @@ fn tab_wraps_around_within_the_day() {
     press(&mut app, KeyCode::BackTab);
     assert_eq!(app.focus(), DAY_NOTE);
     press(&mut app, KeyCode::BackTab);
-    assert_eq!(app.focus(), focus(2, Field::Notes));
+    assert_eq!(app.focus(), focus(2, Field::Holiday));
     press(&mut app, KeyCode::Tab);
     assert_eq!(app.focus(), DAY_NOTE);
     press(&mut app, KeyCode::Tab);
@@ -206,7 +284,7 @@ fn tab_wraps_around_on_the_empty_period_of_a_day_without_periods() {
     press(&mut app, KeyCode::BackTab);
     assert_eq!(app.focus(), DAY_NOTE);
     press(&mut app, KeyCode::BackTab);
-    assert_eq!(app.focus(), focus(0, Field::Notes));
+    assert_eq!(app.focus(), focus(0, Field::Holiday));
     press(&mut app, KeyCode::Tab);
     assert_eq!(app.focus(), DAY_NOTE);
     press(&mut app, KeyCode::Tab);
@@ -327,23 +405,9 @@ fn left_and_right_move_between_fields_and_stop_at_the_period_edges() {
     }
     assert_eq!(
         app.focus(),
-        focus(0, Field::Notes),
+        focus(0, Field::Holiday),
         "stops at the last field"
     );
-}
-
-#[test]
-fn the_notes_field_ends_one_cell_before_the_right_frame() {
-    // Given
-    let mut app = app_with(SAMPLE, date(2026, 11, 2));
-
-    // When
-    let buffer = render(&mut app, 120, 24);
-
-    // Then
-    let y = u16::try_from(row_index(&rows(&buffer), "0845")).unwrap();
-    assert_eq!(buffer[(RIGHT_PADDING_X - 1, y)].bg, Color::Gray, "Notes");
-    assert_eq!(buffer[(RIGHT_PADDING_X, y)].bg, Color::Blue, "padding");
 }
 
 /// The sample has no periods on Wed 11 Nov.
@@ -391,9 +455,7 @@ fn the_empty_period_stays_unsaved_while_nothing_is_filled_in() {
 #[test]
 fn a_period_emptied_again_is_never_saved() {
     let (mut app, fs) = app_with_fs(SAMPLE, DAY_WITHOUT_PERIODS);
-    for _ in 0..3 {
-        press(&mut app, KeyCode::Tab);
-    }
+    tab_to(&mut app, Field::Break);
     press(&mut app, KeyCode::Enter);
     assert_eq!(app.timesheet().day(DAY_WITHOUT_PERIODS).periods.len(), 1);
     press(&mut app, KeyCode::Enter);

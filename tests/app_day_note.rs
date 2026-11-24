@@ -191,10 +191,10 @@ fn down_left_and_right_on_the_day_note_keep_focus() {
 fn the_day_note_is_the_last_field_in_tab_order() {
     // Given
     let mut app = sample_on(MONDAY).0;
-    tab_to(&mut app, Field::Notes);
+    tab_to(&mut app, Field::Holiday);
     press(&mut app, KeyCode::Down);
     press(&mut app, KeyCode::Down);
-    assert_eq!(app.focus(), focus(2, Field::Notes));
+    assert_eq!(app.focus(), focus(2, Field::Holiday));
 
     // When
     press(&mut app, KeyCode::Tab);
@@ -229,7 +229,7 @@ fn shift_tab_from_the_first_period_wraps_around_to_the_day_note() {
 }
 
 #[test]
-fn shift_tab_from_the_day_note_focuses_notes_of_the_last_period() {
+fn shift_tab_from_the_day_note_focuses_holiday_of_the_last_period() {
     // Given
     let mut app = sample_on(MONDAY).0;
     focus_day_note(&mut app);
@@ -238,7 +238,7 @@ fn shift_tab_from_the_day_note_focuses_notes_of_the_last_period() {
     press(&mut app, KeyCode::BackTab);
 
     // Then
-    assert_eq!(app.focus(), focus(2, Field::Notes));
+    assert_eq!(app.focus(), focus(2, Field::Holiday));
 }
 
 #[test]
