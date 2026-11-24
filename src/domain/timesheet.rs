@@ -35,6 +35,8 @@ pub enum DayIndicator {
     DayWarning,
     /// The day's absence indicator.
     Absence(Absence),
+    /// The day has a free period; the lowest priority.
+    Free,
 }
 
 /// A day that fails the consistency check, with its problem.
@@ -872,11 +874,21 @@ impl Timesheet {
         }
     }
 
-    /// The day indicator on `date`: the day warning, else the absence indicator.
+    /// The day indicator on `date`: the day warning, else the absence
+    /// indicator, else free if the day has a free period.
     pub fn day_indicator_on(&self, date: Date, today: Date) -> Option<DayIndicator> {
         self.has_day_warning_on(date, today)
             .then_some(DayIndicator::DayWarning)
             .or_else(|| self.absence_on(date).map(DayIndicator::Absence))
+            .or_else(|| self.has_free_period_on(date).then_some(DayIndicator::Free))
+    }
+
+    /// Whether `date` has a free period.
+    fn has_free_period_on(&self, date: Date) -> bool {
+        self.day(date)
+            .periods
+            .iter()
+            .any(|p| p.period_type == PeriodType::Free)
     }
 
     /// The earliest day that fails the consistency check, with its problem.

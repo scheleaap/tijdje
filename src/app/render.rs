@@ -571,6 +571,7 @@ fn day_indicator_emoji(indicator: Option<DayIndicator>) -> &'static str {
     match indicator {
         Some(DayIndicator::DayWarning) => "⚠️",
         Some(DayIndicator::Absence(absence)) => period_type_emoji(absence.into()),
+        Some(DayIndicator::Free) => period_type_emoji(PeriodType::Free),
         None => "  ",
     }
 }

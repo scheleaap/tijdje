@@ -4,10 +4,10 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Day indicator priority: ⚠️ > 🤒 > 🏖️ > 🎄 > 🆓 > nothing (domain built test-first)
-- [ ] A free period is still not an absence: it doesn't change the actual expected working time or the absence figures
-- [ ] Glossary "Day indicator" entry updated
+- [x] Day indicator priority: ⚠️ > 🤒 > 🏖️ > 🎄 > 🆓 > nothing (domain built test-first)
+- [x] A free period is still not an absence: it doesn't change the actual expected working time or the absence figures
+- [x] Glossary "Day indicator" entry updated
 
 Spec: `.scratch/time-tracking/spec.md`

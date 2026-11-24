@@ -93,7 +93,7 @@ A violation of the consistency check, shown as ⚠️.
 The ⚠️ indicator in the day list for a day with a consistency failure or an empty past weekday.
 
 **Day indicator**:
-The one symbol per day in the day list: the day warning, else the **absence indicator**, else nothing.
+The one symbol per day in the day list: the day warning, else the **absence indicator**, else 🆓 if the day has a **free period**, else nothing.
 
 **Absence indicator**:
 The emoji for a day's absence in the day list: 🤒 > 🏖️ > 🎄, at most one per day; free periods have none.

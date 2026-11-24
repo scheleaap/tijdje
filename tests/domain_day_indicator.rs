@@ -6,7 +6,7 @@ use common::{day, period};
 use jiff::civil::{Date, date};
 use tijdje::domain::{
     Absence, DayIndicator, Period,
-    PeriodType::{Holiday, Sick, Vacation, Work},
+    PeriodType::{Free, Holiday, Sick, Vacation, Work},
     Timesheet,
 };
 
@@ -79,6 +79,63 @@ fn an_inconsistent_day_with_an_absence_shows_the_day_warning() {
     let t = monday_with(vec![
         period(900, Some(1200), Work),
         period(1100, Some(1612), Sick),
+    ]);
+
+    // When
+    let indicator = t.day_indicator_on(MONDAY, TODAY);
+
+    // Then
+    assert_eq!(indicator, Some(DayIndicator::DayWarning));
+}
+
+#[test]
+fn a_day_with_a_free_period_shows_the_free_indicator() {
+    // Given
+    let t = monday_with(vec![
+        period(900, Some(1300), Work),
+        period(1300, Some(1612), Free),
+    ]);
+
+    // When
+    let indicator = t.day_indicator_on(MONDAY, TODAY);
+
+    // Then
+    assert_eq!(indicator, Some(DayIndicator::Free));
+}
+
+#[test]
+fn a_free_period_is_not_an_absence() {
+    // Given
+    let t = monday_with(vec![period(900, Some(1612), Free)]);
+
+    // When
+    let absence = t.absence_on(MONDAY);
+
+    // Then
+    assert_eq!(absence, None);
+}
+
+#[test]
+fn an_absence_wins_over_a_free_period() {
+    // Given
+    let t = monday_with(vec![
+        period(900, Some(1300), Free),
+        period(1300, Some(1612), Holiday),
+    ]);
+
+    // When
+    let indicator = t.day_indicator_on(MONDAY, TODAY);
+
+    // Then
+    assert_eq!(indicator, Some(DayIndicator::Absence(Absence::Holiday)));
+}
+
+#[test]
+fn a_day_warning_wins_over_a_free_period() {
+    // Given a free period overlapping a work period
+    let t = monday_with(vec![
+        period(900, Some(1300), Work),
+        period(1200, Some(1612), Free),
     ]);
 
     // When

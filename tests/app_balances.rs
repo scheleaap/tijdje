@@ -123,3 +123,24 @@ days:
         "{monday:?}"
     );
 }
+
+#[test]
+fn a_day_with_a_free_period_shows_the_free_indicator() {
+    // Given a past day with a work period and a free period
+    let yaml = r#"
+days:
+  "2026-11-02":
+    regular_expected_working_time_in_minutes: 432
+    periods:
+      - { from: "09:00", to: "13:00", project: acme, notes: null, type: work }
+      - { from: "13:00", to: "16:12", project: null, notes: null, type: free }
+"#;
+    let mut app = app_with(yaml, date(2026, 11, 3));
+
+    // When
+    let screen = rows(&render(&mut app, 120, 24));
+
+    // Then
+    let monday = left(row_containing(&screen, "ma  2 nov"));
+    assert!(monday.contains("🆓"), "{monday:?}");
+}
