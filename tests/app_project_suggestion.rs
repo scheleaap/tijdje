@@ -2,7 +2,7 @@ mod common;
 
 use common::*;
 use jiff::civil::date;
-use ratatui::{buffer::Buffer, crossterm::event::KeyCode, style::Modifier};
+use ratatui::{crossterm::event::KeyCode, style::Modifier};
 use tijdje::app::{App, Field};
 
 /// Mon 2 Nov uses "otto" twice and three other projects once; Tue 3 Nov
@@ -55,20 +55,6 @@ fn dimmed(app: &mut App, text: &str) -> Vec<bool> {
     (x..x + u16::try_from(text.len()).unwrap())
         .map(|x| buffer[(x, y)].modifier.contains(Modifier::DIM))
         .collect()
-}
-
-/// Where `text` starts on row `y`, as a cell column.
-fn column_of(buffer: &Buffer, y: u16, text: &str) -> Option<u16> {
-    let chars: Vec<String> = text.chars().map(String::from).collect();
-    (0..buffer.area.width).find(|&x| {
-        chars.iter().enumerate().all(|(i, c)| {
-            u16::try_from(i)
-                .ok()
-                .and_then(|i| x.checked_add(i))
-                .filter(|&x| x < buffer.area.width)
-                .is_some_and(|x| buffer[(x, y)].symbol() == c)
-        })
-    })
 }
 
 #[test]

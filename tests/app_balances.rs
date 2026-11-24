@@ -78,12 +78,18 @@ fn emoji_columns_line_up() {
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
     let buffer = render(&mut app, 120, 40);
     let screen = rows(&buffer);
-    let column_of = |day: &str, emoji: &str| {
+    let emoji_column = |day: &str, emoji: &str| {
         let y = row_index(&screen, day);
         (0..buffer.area.width)
             .find(|&x| buffer[(x, u16::try_from(y).unwrap())].symbol() == emoji)
             .unwrap()
     };
-    assert_eq!(column_of("vr  6 nov", "🏖️"), column_of("do 12 nov", "🤒"));
-    assert_eq!(column_of("di 10 nov", "⚠️"), column_of("wo 11 nov", "⚠️"));
+    assert_eq!(
+        emoji_column("vr  6 nov", "🏖️"),
+        emoji_column("do 12 nov", "🤒")
+    );
+    assert_eq!(
+        emoji_column("di 10 nov", "⚠️"),
+        emoji_column("wo 11 nov", "⚠️")
+    );
 }

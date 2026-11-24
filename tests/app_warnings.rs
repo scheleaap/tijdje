@@ -24,6 +24,56 @@ days:
 }
 
 #[test]
+fn an_implied_break_shows_a_break_indicator_and_lines_up_with_from() {
+    // Given an implied break 1200–1230 between two work periods
+    let yaml = r#"
+days:
+  "2026-11-02":
+    regular_expected_working_time_in_minutes: 432
+    periods:
+      - { from: "09:00", to: "12:00", project: acme, notes: null, type: work }
+      - { from: "12:30", to: "15:00", project: acme, notes: null, type: work }
+"#;
+    let mut app = app_with(yaml, date(2026, 11, 2));
+
+    // When
+    let buffer = render(&mut app, 120, 24);
+    let screen = rows(&buffer);
+
+    // Then
+    assert!(right(row_containing(&screen, "1200 1230")).starts_with("│☕"));
+    let from_column = |text: &str| {
+        let y = u16::try_from(row_index(&screen, text)).unwrap();
+        column_of(&buffer, y, text)
+    };
+    assert_eq!(from_column("1200 1230"), from_column("0900 1200"));
+    assert!(right(row_containing(&screen, "0900 1200")).starts_with("│  "));
+    assert!(right(row_containing(&screen, "1230 1500")).starts_with("│  "));
+}
+
+#[test]
+fn an_implied_break_next_to_a_consistency_failure_still_shows_a_break_indicator() {
+    // Given an implied break 1200–1230 before an open period on a past day
+    let yaml = r#"
+days:
+  "2026-11-02":
+    regular_expected_working_time_in_minutes: 432
+    periods:
+      - { from: "09:00", to: "12:00", project: acme, notes: null, type: work }
+      - { from: "12:30", to: null, project: acme, notes: null, type: work }
+"#;
+    let mut app = app_with(yaml, date(2026, 11, 3));
+    ctrl_key(&mut app, KeyCode::Up);
+
+    // When
+    let screen = rows(&render(&mut app, 120, 24));
+
+    // Then
+    assert!(right(row_containing(&screen, "1200 1230")).starts_with("│☕"));
+    assert!(right(row_containing(&screen, "1230     ")).starts_with("│⚠️"));
+}
+
+#[test]
 fn a_consistency_failure_shows_right_away_while_filling_in_the_day() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
     press(&mut app, KeyCode::Down);

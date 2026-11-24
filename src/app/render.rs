@@ -217,7 +217,8 @@ impl App {
             .map(|period_type| format!(" {} ", period_type_emoji(period_type)))
             .collect();
         let header_text = plain_period_row(
-            ["", "From", "To", "Duration", "Project"],
+            None,
+            ["From", "To", "Duration", "Project"],
             &checkbox_headers,
             "Notes",
         );
@@ -428,7 +429,7 @@ fn period_rows(day: &Day) -> Vec<PeriodRow> {
 }
 
 /// An implied break as plain text: from the end of one period to the start
-/// of the next, with Break checked.
+/// of the next, with the break indicator and Break checked.
 fn implied_break_line(day: &Day, after: usize) -> Line<'static> {
     let Some(implied) = day.implied_break_after(after) else {
         return Line::raw("");
@@ -438,8 +439,8 @@ fn implied_break_line(day: &Day, after: usize) -> Line<'static> {
         .map(|&field| format!(" {}", checkbox(field, implied.period_type)))
         .collect();
     Line::raw(plain_period_row(
+        Some(PeriodIndicator::NonWorking(implied.period_type)),
         [
-            "",
             &format_time(implied.from),
             &format_time(implied.to),
             &format_duration(&implied),
@@ -451,11 +452,18 @@ fn implied_break_line(day: &Day, after: usize) -> Line<'static> {
 }
 
 /// A period row as plain text, for the header and implied breaks:
-/// `[warning, from, to, duration, project]`, the checkbox columns, and notes.
-fn plain_period_row(columns: [&str; 5], checkboxes: &str, notes: &str) -> String {
-    let [warning, from, to, duration, project] = columns;
+/// the indicator, `[from, to, duration, project]`, the checkbox columns, and notes.
+fn plain_period_row(
+    indicator: Option<PeriodIndicator>,
+    columns: [&str; 4],
+    checkboxes: &str,
+    notes: &str,
+) -> String {
+    let [from, to, duration, project] = columns;
+    // Already `WARNING_WIDTH` cells wide; `{:<}` would pad by characters.
+    let indicator = indicator_emoji(indicator);
     format!(
-        "{warning:<WARNING_WIDTH$} {from:<TIME_WIDTH$} {to:<TIME_WIDTH$} {duration:<DURATION_WIDTH$} {project:<PROJECT_WIDTH$}{checkboxes} {notes}"
+        "{indicator} {from:<TIME_WIDTH$} {to:<TIME_WIDTH$} {duration:<DURATION_WIDTH$} {project:<PROJECT_WIDTH$}{checkboxes} {notes}"
     )
 }
 

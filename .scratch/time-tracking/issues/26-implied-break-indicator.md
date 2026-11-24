@@ -4,9 +4,9 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] An implied-break row shows ☕ in the period indicator column
-- [ ] Rows of explicit periods keep their indicators (⚠️ > ❗ > period type emoji)
+- [x] An implied-break row shows ☕ in the period indicator column
+- [x] Rows of explicit periods keep their indicators (⚠️ > ❗ > period type emoji)
 
 Spec: `.scratch/time-tracking/spec.md`

@@ -161,6 +161,20 @@ pub fn rows(buffer: &Buffer) -> Vec<String> {
         .collect()
 }
 
+/// Where `text` starts on row `y`, as a cell column.
+pub fn column_of(buffer: &Buffer, y: u16, text: &str) -> Option<u16> {
+    let chars: Vec<String> = text.chars().map(String::from).collect();
+    (0..buffer.area.width).find(|&x| {
+        chars.iter().enumerate().all(|(i, c)| {
+            u16::try_from(i)
+                .ok()
+                .and_then(|i| x.checked_add(i))
+                .filter(|&x| x < buffer.area.width)
+                .is_some_and(|x| buffer[(x, y)].symbol() == c)
+        })
+    })
+}
+
 /// The first row containing `text`, skipping the top border row with the panel titles.
 pub fn row_containing<'a>(rows: &'a [String], text: &str) -> &'a str {
     &rows[row_index(rows, text)]
