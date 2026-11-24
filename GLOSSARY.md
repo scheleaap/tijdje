@@ -92,6 +92,12 @@ A violation of the consistency check, shown as ⚠️.
 **Day warning**:
 The ⚠️ indicator in the day list for a day with a consistency failure or an empty past weekday.
 
+**Day indicator**:
+The one symbol per day in the day list: the day warning, else the **absence indicator**, else nothing.
+
+**Absence indicator**:
+The emoji for a day's absence in the day list: 🤒 > 🏖️ > 🎄, at most one per day; free periods have none.
+
 **Field**:
 Anything in the right panel that can have focus: an input field, a checkbox or the part-of-day field.
 

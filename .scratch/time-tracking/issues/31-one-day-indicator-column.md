@@ -4,10 +4,10 @@
 
 **Blocked by:** none
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] One indicator column right after the total balance, showing one symbol: ⚠️ (day warning), else 🤒 > 🏖️ > 🎄 (absence indicator), else nothing
-- [ ] The separate day warning column is gone; the other columns keep their alignment
-- [ ] A day that is both inconsistent and has an absence shows ⚠️
+- [x] One indicator column right after the total balance, showing one symbol: ⚠️ (day warning), else 🤒 > 🏖️ > 🎄 (absence indicator), else nothing
+- [x] The separate day warning column is gone; the other columns keep their alignment
+- [x] A day that is both inconsistent and has an absence shows ⚠️
 
 Spec: `.scratch/time-tracking/spec.md`

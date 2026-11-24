@@ -28,6 +28,15 @@ pub enum PeriodIndicator {
     NonWorking(PeriodType),
 }
 
+/// What the day indicator in the left panel shows for a day.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DayIndicator {
+    /// The day has a day warning; it wins over an absence.
+    DayWarning,
+    /// The day's absence indicator.
+    Absence(Absence),
+}
+
 /// A day that fails the consistency check, with its problem.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InconsistentDay {
@@ -861,6 +870,13 @@ impl Timesheet {
         } else {
             day.sorted_copy().consistency_problem(date, today).is_some()
         }
+    }
+
+    /// The day indicator on `date`: the day warning, else the absence indicator.
+    pub fn day_indicator_on(&self, date: Date, today: Date) -> Option<DayIndicator> {
+        self.has_day_warning_on(date, today)
+            .then_some(DayIndicator::DayWarning)
+            .or_else(|| self.absence_on(date).map(DayIndicator::Absence))
     }
 
     /// The earliest day that fails the consistency check, with its problem.

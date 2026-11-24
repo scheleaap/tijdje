@@ -240,6 +240,14 @@ pub fn column_of(buffer: &Buffer, y: u16, text: &str) -> Option<u16> {
     })
 }
 
+/// The cell column of `symbol` on the first row containing `row_text`.
+pub fn symbol_column(buffer: &Buffer, row_text: &str, symbol: &str) -> u16 {
+    let y = u16::try_from(row_index(&rows(buffer), row_text)).unwrap();
+    (0..buffer.area.width)
+        .find(|&x| buffer[(x, y)].symbol() == symbol)
+        .unwrap_or_else(|| panic!("no {symbol:?} on the row with {row_text:?}"))
+}
+
 /// The first row containing `text`, skipping the top border row with the panel titles.
 pub fn row_containing<'a>(rows: &'a [String], text: &str) -> &'a str {
     &rows[row_index(rows, text)]

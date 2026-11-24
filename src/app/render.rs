@@ -15,7 +15,8 @@ use super::{
     help::{HelpLine, HelpWindow, help_lines},
 };
 use crate::domain::{
-    Day, Extent, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay, WORK_UNTIL_TARGET,
+    Day, DayIndicator, Extent, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay,
+    WORK_UNTIL_TARGET,
     calendar::{self, Separator},
 };
 
@@ -185,16 +186,13 @@ impl App {
             .total_balance_on(date, self.today)
             .map(Minutes::format_balance)
             .unwrap_or_default();
-        let absence = timesheet
-            .absence_on(date)
-            .map_or("  ", |absence| period_type_emoji(absence.into()));
-        let warning = day_warning_emoji(timesheet.has_day_warning_on(date, self.today));
+        let indicator = day_indicator_emoji(timesheet.day_indicator_on(date, self.today));
         day_columns(
             &calendar::format_dutch(date),
             &worked,
             &day_balance,
             &total_balance,
-            &format!("{absence} {warning}"),
+            indicator,
         )
     }
 
@@ -568,9 +566,13 @@ fn plain_period_row(
     )
 }
 
-/// The day warning in the left panel.
-fn day_warning_emoji(warn: bool) -> &'static str {
-    if warn { "⚠️" } else { "  " }
+/// The day indicator right after the total balance.
+fn day_indicator_emoji(indicator: Option<DayIndicator>) -> &'static str {
+    match indicator {
+        Some(DayIndicator::DayWarning) => "⚠️",
+        Some(DayIndicator::Absence(absence)) => period_type_emoji(absence.into()),
+        None => "  ",
+    }
 }
 
 /// The indicator left of From.
@@ -665,9 +667,9 @@ fn text_field_geometry(field: Field, notes_width: usize) -> Option<(usize, usize
 }
 
 /// The left panel's columns.
-fn day_columns(date: &str, worked: &str, day: &str, total: &str, indicators: &str) -> String {
+fn day_columns(date: &str, worked: &str, day: &str, total: &str, indicator: &str) -> String {
     format!(
-        " {date:<DATE_WIDTH$}{worked:>WORKED_WIDTH$} {day:>DAY_BALANCE_WIDTH$} {total:>TOTAL_BALANCE_WIDTH$}  {indicators}"
+        " {date:<DATE_WIDTH$}{worked:>WORKED_WIDTH$} {day:>DAY_BALANCE_WIDTH$} {total:>TOTAL_BALANCE_WIDTH$}  {indicator}"
     )
 }
 

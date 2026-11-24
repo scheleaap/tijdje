@@ -59,10 +59,23 @@ fn alt_letters_toggle_period_types_from_any_field() {
 
 #[test]
 fn checking_an_absence_updates_the_figures_and_indicator() {
-    let mut app = monday_with_first_period_focused();
+    // Given a first period without a project, so a vacation period stays consistent
+    let yaml = r#"
+days:
+  "2026-11-02":
+    regular_expected_working_time_in_minutes: 432
+    periods:
+      - { from: "08:45", to: "12:30", project: null, notes: null, type: work }
+      - { from: "13:00", to: "17:57", project: acme, notes: null, type: work }
+"#;
+    let mut app = app_with(yaml, date(2026, 11, 2));
+
+    // When
     alt_key(&mut app, KeyCode::Char('v'));
+
+    // Then
     let rows = screen(&mut app);
-    let monday = row_containing(&rows, "ma  2 nov");
+    let monday = left(row_containing(&rows, "ma  2 nov"));
     assert!(
         monday.contains("🏖️") && monday.contains("4h57m"),
         "{monday:?}"

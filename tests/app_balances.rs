@@ -74,22 +74,52 @@ fn warnings_show_for_past_empty_days_and_open_periods_only() {
 }
 
 #[test]
-fn emoji_columns_line_up() {
+fn absence_indicators_and_day_warnings_share_one_column_after_the_total_balance() {
+    // Given
     let mut app = app_with(SAMPLE, date(2026, 11, 13));
+
+    // When
     let buffer = render(&mut app, 120, 40);
+
+    // Then
     let screen = rows(&buffer);
-    let emoji_column = |day: &str, emoji: &str| {
-        let y = row_index(&screen, day);
-        (0..buffer.area.width)
-            .find(|&x| buffer[(x, u16::try_from(y).unwrap())].symbol() == emoji)
-            .unwrap()
-    };
-    assert_eq!(
-        emoji_column("vr  6 nov", "🏖️"),
-        emoji_column("do 12 nov", "🤒")
-    );
-    assert_eq!(
-        emoji_column("di 10 nov", "⚠️"),
-        emoji_column("wo 11 nov", "⚠️")
+    let y = u16::try_from(row_index(&screen, "vr  6 nov")).unwrap();
+    let total_balance_end = column_of(&buffer, y, "+6h09m").unwrap() + 6;
+    let indicator_column = total_balance_end + 2;
+    for (day, emoji) in [
+        ("vr  6 nov", "🏖️"),
+        ("do 12 nov", "🤒"),
+        ("di 10 nov", "⚠️"),
+        ("wo 11 nov", "⚠️"),
+    ] {
+        assert_eq!(
+            symbol_column(&buffer, day, emoji),
+            indicator_column,
+            "{day}"
+        );
+    }
+}
+
+#[test]
+fn an_inconsistent_day_with_an_absence_shows_only_the_day_warning() {
+    // Given a sick period overlapping a work period on a past day
+    let yaml = r#"
+days:
+  "2026-11-02":
+    regular_expected_working_time_in_minutes: 432
+    periods:
+      - { from: "09:00", to: "12:00", project: acme, notes: null, type: work }
+      - { from: "11:00", to: "16:12", project: null, notes: null, type: sick }
+"#;
+    let mut app = app_with(yaml, date(2026, 11, 3));
+
+    // When
+    let screen = rows(&render(&mut app, 120, 24));
+
+    // Then
+    let monday = left(row_containing(&screen, "ma  2 nov"));
+    assert!(
+        monday.contains("⚠️") && !monday.contains("🤒"),
+        "{monday:?}"
     );
 }
