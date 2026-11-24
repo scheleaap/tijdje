@@ -309,7 +309,7 @@ fn ctrl_del_deletes_the_focused_period_after_confirming() {
 }
 
 #[test]
-fn delete_popup_can_be_canceled() {
+fn delete_dialog_can_be_canceled() {
     for keys in [
         vec![KeyCode::Esc],
         vec![KeyCode::Char('c')],
@@ -327,7 +327,7 @@ fn delete_popup_can_be_canceled() {
 }
 
 #[test]
-fn delete_popup_buttons_are_chosen_with_arrows_and_enter() {
+fn delete_dialog_buttons_are_chosen_with_arrows_and_enter() {
     let mut app = app_on_monday();
     ctrl_key(&mut app, KeyCode::Delete);
     press(&mut app, KeyCode::Right);
@@ -433,7 +433,7 @@ fn ctrl_enter_does_not_add_a_period_after_an_open_last_period() {
 }
 
 #[test]
-fn popups_have_a_short_title_and_a_message() {
+fn dialogs_have_a_short_title_and_a_message() {
     let mut app = app_on_monday();
     ctrl_key(&mut app, KeyCode::Delete);
     let screen = rows(&render(&mut app, 120, 24));
@@ -443,7 +443,7 @@ fn popups_have_a_short_title_and_a_message() {
 }
 
 #[test]
-fn the_consistency_popup_has_a_short_title() {
+fn the_consistency_dialog_has_a_short_title() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
     press(&mut app, KeyCode::Down);
     type_text(&mut app, "1215");

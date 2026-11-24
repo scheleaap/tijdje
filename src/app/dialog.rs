@@ -1,9 +1,9 @@
-//! Popups that ask the user to choose between labeled buttons.
+//! Dialogs that ask the user to choose between labeled buttons.
 
 use ratatui::crossterm::event::KeyCode;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PopupAction {
+pub enum DialogAction {
     DeletePeriod,
     GoToDay,
     SaveAnyway,
@@ -14,9 +14,9 @@ pub enum PopupAction {
     Cancel,
 }
 
-/// A popup with labeled buttons, each standing for an action of type `A`.
+/// A dialog with labeled buttons, each standing for an action of type `A`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Popup<A = PopupAction> {
+pub struct Dialog<A = DialogAction> {
     /// A short title, shown in the frame.
     pub title: &'static str,
     /// The full text, shown inside and wrapped if needed.
@@ -25,13 +25,13 @@ pub struct Popup<A = PopupAction> {
     pub selected: usize,
 }
 
-impl<A: Copy> Popup<A> {
+impl<A: Copy> Dialog<A> {
     /// The index of the selected button.
     pub fn selected_index(&self) -> usize {
         self.selected
     }
 
-    /// How many buttons the popup has.
+    /// How many buttons the dialog has.
     pub fn button_count(&self) -> usize {
         self.buttons.len()
     }
@@ -70,15 +70,15 @@ impl<A: Copy> Popup<A> {
     }
 }
 
-impl Popup {
+impl Dialog {
     /// Asks to delete the period with times `label`, e.g. `0845–1230`.
     pub fn delete_period(label: &str) -> Self {
         Self {
             title: "Delete period",
             message: format!("Delete period {label}?"),
             buttons: vec![
-                ("Delete", PopupAction::DeletePeriod),
-                ("Cancel", PopupAction::Cancel),
+                ("Delete", DialogAction::DeletePeriod),
+                ("Cancel", DialogAction::Cancel),
             ],
             selected: 0,
         }
@@ -89,9 +89,9 @@ impl Popup {
             title: "Quit",
             message: "Save before quitting?".to_owned(),
             buttons: vec![
-                ("Save", PopupAction::Save),
-                ("Don't save", PopupAction::DontSave),
-                ("Cancel", PopupAction::Cancel),
+                ("Save", DialogAction::Save),
+                ("Don't save", DialogAction::DontSave),
+                ("Cancel", DialogAction::Cancel),
             ],
             selected: 0,
         }
@@ -102,8 +102,8 @@ impl Popup {
             title: "File changed",
             message: "The file changed on disk since it was loaded or saved.".to_owned(),
             buttons: vec![
-                ("Overwrite", PopupAction::Overwrite),
-                ("Cancel", PopupAction::Cancel),
+                ("Overwrite", DialogAction::Overwrite),
+                ("Cancel", DialogAction::Cancel),
             ],
             selected: 0,
         }
@@ -111,14 +111,14 @@ impl Popup {
 
     /// A day fails the consistency check; `anyway` is the button that
     /// continues regardless ("Save anyway" or "Quit anyway").
-    pub fn inconsistent_day(problem: String, anyway: (&'static str, PopupAction)) -> Self {
+    pub fn inconsistent_day(problem: String, anyway: (&'static str, DialogAction)) -> Self {
         Self {
             title: "Consistency",
             message: problem,
             buttons: vec![
-                ("Go to day", PopupAction::GoToDay),
+                ("Go to day", DialogAction::GoToDay),
                 anyway,
-                ("Cancel", PopupAction::Cancel),
+                ("Cancel", DialogAction::Cancel),
             ],
             selected: 0,
         }
@@ -126,7 +126,7 @@ impl Popup {
 
     /// ←/→ select a button, Enter or a button's first letter chooses it, and
     /// Esc cancels. Returns the chosen action, if any.
-    pub fn handle_key(&mut self, code: KeyCode) -> Option<PopupAction> {
+    pub fn handle_key(&mut self, code: KeyCode) -> Option<DialogAction> {
         match code {
             KeyCode::Left => {
                 self.select_previous();
@@ -137,7 +137,7 @@ impl Popup {
                 None
             }
             KeyCode::Enter => Some(self.selected_action()),
-            KeyCode::Esc => Some(PopupAction::Cancel),
+            KeyCode::Esc => Some(DialogAction::Cancel),
             KeyCode::Char(c) => self.action_for_letter(c),
             _ => None,
         }

@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Paragraph},
 };
 
-use super::{App, Field, FieldFocus, Focus, Popup, Screen, active_input::ActiveInput};
+use super::{App, Dialog, Field, FieldFocus, Focus, Screen, active_input::ActiveInput};
 use crate::domain::{
     Day, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay,
     calendar::{self, Separator},
@@ -65,8 +65,8 @@ const DAY_NOTE_PLACEHOLDER: &str = "Day note";
 const NOTIFICATION: Style = SELECTED;
 /// Periods that failed the consistency check.
 const HIGHLIGHTED: Style = Style::new().fg(Color::White).bg(Color::Red);
-const POPUP: Style = Style::new().fg(Color::Black).bg(Color::Gray);
-const POPUP_TITLE: Style = Style::new().fg(Color::Blue).bg(Color::Gray);
+const DIALOG: Style = Style::new().fg(Color::Black).bg(Color::Gray);
+const DIALOG_TITLE: Style = Style::new().fg(Color::Blue).bg(Color::Gray);
 const SHADOW: Style = Style::new().bg(Color::Black);
 const BUTTON: Style = Style::new().fg(Color::Black).bg(Color::White);
 const SELECTED_BUTTON: Style = Style::new().fg(Color::Black).bg(Color::Cyan);
@@ -90,16 +90,16 @@ impl App {
         if let Some(text) = &self.notification {
             render_notification(frame, main, text);
         }
-        if let Some(popup) = &self.popup {
-            render_popup(frame, popup, Some(popup.selected), None);
+        if let Some(dialog) = &self.dialog {
+            render_dialog(frame, dialog, Some(dialog.selected), None);
         }
         if let Some(go_to_date) = &mut self.go_to_date {
             let selected = go_to_date.shown_selected_button();
-            let input = PopupInput {
+            let input = DialogInput {
                 input: &mut go_to_date.input,
                 focused: go_to_date.input_focused,
             };
-            render_popup(frame, &go_to_date.popup, selected, Some(input));
+            render_dialog(frame, &go_to_date.dialog, selected, Some(input));
         }
     }
 
@@ -568,44 +568,44 @@ fn to_u16(n: usize) -> u16 {
     u16::try_from(n).unwrap_or(u16::MAX)
 }
 
-const POPUP_MIN_WIDTH: usize = 40;
-/// Space between the popup's edge and its frame: (columns, rows).
-const POPUP_MARGIN: (u16, u16) = (2, 1);
-/// How far the popup's shadow is offset: (columns, rows).
+const DIALOG_MIN_WIDTH: usize = 40;
+/// Space between the dialog's edge and its frame: (columns, rows).
+const DIALOG_MARGIN: (u16, u16) = (2, 1);
+/// How far the dialog's shadow is offset: (columns, rows).
 const SHADOW_OFFSET: (u16, u16) = (2, 1);
 /// A button's padding on both sides plus the gap to the next button.
 const BUTTON_EXTRA_WIDTH: usize = 4;
 
-/// A popup's input field, shown below its message.
-struct PopupInput<'a> {
+/// A dialog's input field, shown below its message.
+struct DialogInput<'a> {
     input: &'a mut ActiveInput,
     focused: bool,
 }
 
-/// Draws `popup` with button `selected` highlighted (none if `None`), and
+/// Draws `dialog` with button `selected` highlighted (none if `None`), and
 /// `input` as a full-width input field below the message, with the cursor
 /// in it while it has focus.
-fn render_popup<A>(
+fn render_dialog<A>(
     frame: &mut Frame,
-    popup: &Popup<A>,
+    dialog: &Dialog<A>,
     selected: Option<usize>,
-    input: Option<PopupInput>,
+    input: Option<DialogInput>,
 ) {
-    let buttons_width: usize = popup
+    let buttons_width: usize = dialog
         .buttons
         .iter()
         .map(|(label, _)| Span::raw(*label).width() + BUTTON_EXTRA_WIDTH)
         .sum();
-    let title = format!(" {} ", popup.title);
+    let title = format!(" {} ", dialog.title);
     // The outer margin on both sides, and the frame with its padding.
-    let chrome_width = 2 * usize::from(POPUP_MARGIN.0) + 4;
+    let chrome_width = 2 * usize::from(DIALOG_MARGIN.0) + 4;
     let max_width = usize::from(frame.area().width.saturating_sub(SHADOW_OFFSET.0));
-    let width = (Span::raw(popup.message.as_str()).width() + chrome_width)
+    let width = (Span::raw(dialog.message.as_str()).width() + chrome_width)
         .max(buttons_width + chrome_width)
         .max(Span::raw(title.as_str()).width() + chrome_width)
-        .max(POPUP_MIN_WIDTH)
+        .max(DIALOG_MIN_WIDTH)
         .min(max_width);
-    let message = wrap(&popup.message, width.saturating_sub(chrome_width));
+    let message = wrap(&dialog.message, width.saturating_sub(chrome_width));
     let input_rows = usize::from(input.is_some());
     // Margin, frame, message, input field, blank line, buttons, frame, margin.
     let height = to_u16(message.len() + input_rows + 6);
@@ -625,24 +625,24 @@ fn render_popup<A>(
     frame.render_widget(Clear, shadow);
     frame.render_widget(Block::new().style(SHADOW), shadow);
     frame.render_widget(Clear, area);
-    frame.render_widget(Block::new().style(POPUP), area);
+    frame.render_widget(Block::new().style(DIALOG), area);
 
     let frame_area = Rect {
-        x: area.x + POPUP_MARGIN.0,
-        y: area.y + POPUP_MARGIN.1,
-        width: area.width.saturating_sub(2 * POPUP_MARGIN.0),
-        height: area.height.saturating_sub(2 * POPUP_MARGIN.1),
+        x: area.x + DIALOG_MARGIN.0,
+        y: area.y + DIALOG_MARGIN.1,
+        width: area.width.saturating_sub(2 * DIALOG_MARGIN.0),
+        height: area.height.saturating_sub(2 * DIALOG_MARGIN.1),
     };
     let block = Block::bordered()
-        .title(Span::styled(title, POPUP_TITLE))
+        .title(Span::styled(title, DIALOG_TITLE))
         .title_alignment(Alignment::Center)
         .padding(Padding::horizontal(1))
-        .style(POPUP);
+        .style(DIALOG);
     let inner = block.inner(frame_area);
     frame.render_widget(block, frame_area);
 
     let mut buttons: Vec<Span> = Vec::new();
-    for (i, (label, _)) in popup.buttons.iter().enumerate() {
+    for (i, (label, _)) in dialog.buttons.iter().enumerate() {
         let style = if Some(i) == selected {
             SELECTED_BUTTON
         } else {
@@ -651,7 +651,7 @@ fn render_popup<A>(
         let mut chars = label.chars();
         let hotkey: String = chars.next().into_iter().collect();
         if i > 0 {
-            buttons.push(Span::styled("  ", POPUP));
+            buttons.push(Span::styled("  ", DIALOG));
         }
         buttons.extend([
             Span::styled(" ", style),
@@ -661,7 +661,7 @@ fn render_popup<A>(
     }
     let message_rows = message.len();
     let mut lines: Vec<Line> = message.into_iter().map(Line::raw).collect();
-    if let Some(PopupInput { input, focused }) = input {
+    if let Some(DialogInput { input, focused }) = input {
         let width = usize::from(inner.width);
         // One cell less, so the cursor at the end stays inside the field.
         let (text, column) = input.visible(width.saturating_sub(1));
@@ -672,7 +672,7 @@ fn render_popup<A>(
         }
     }
     lines.extend([Line::raw(""), Line::from(buttons).centered()]);
-    frame.render_widget(Paragraph::new(lines).style(POPUP), inner);
+    frame.render_widget(Paragraph::new(lines).style(DIALOG), inner);
 }
 
 /// A global notification: `text` centered across the screen, floating over
@@ -831,7 +831,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ("Ctrl+C/Ctrl+V", "Copy/paste the focused field"),
         ("Ctrl+Z/Ctrl+Y", "Undo/redo"),
         // One line, so the list still fits a 24-row terminal until the help
-        // popup scrolls (ticket 25).
+        // dialog scrolls (ticket 25).
         ("Ctrl+S/Ctrl+Q", "Save/quit"),
     ];
     let lines: Vec<Line> = shortcuts

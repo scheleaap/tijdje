@@ -1,9 +1,9 @@
 //! Interactive application state and key handling. Drawing lives in `render`.
 
 mod active_input;
+mod dialog;
 mod go_to_date;
 mod history;
-mod popup;
 mod render;
 
 use std::{borrow::Cow, collections::HashSet, path::PathBuf};
@@ -12,9 +12,9 @@ use jiff::civil::Date;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use active_input::ActiveInput;
+use dialog::{Dialog, DialogAction};
 use go_to_date::{DATE_FORMATS, GoToDate, GoToDateAction};
 use history::{Change, History};
-use popup::{Popup, PopupAction};
 
 use crate::{
     clipboard::{Clipboard, NoClipboard},
@@ -253,7 +253,7 @@ pub struct App {
     clipboard: Box<dyn Clipboard>,
     /// Whether the timesheet has changes that aren't saved yet.
     has_unsaved_changes: bool,
-    /// Set when "Save" was chosen in the "Save before quitting?" popup.
+    /// Set when "Save" was chosen in the "Save before quitting?" dialog.
     quit_after_saving: bool,
     /// Where today comes from; injected so tests can fake it.
     clock: Box<dyn Clock>,
@@ -276,10 +276,10 @@ pub struct App {
     history: History,
     /// Days changed in this session; only these are checked when leaving them.
     changed_days: HashSet<Date>,
-    /// The day named in a consistency-check popup, for "Go to day".
+    /// The day named in a consistency-check dialog, for "Go to day".
     inconsistent_day: Option<InconsistentDay>,
-    popup: Option<Popup>,
-    /// The "Go to date" popup, while it is open.
+    dialog: Option<Dialog>,
+    /// The "Go to date" dialog, while it is open.
     go_to_date: Option<GoToDate>,
     /// `None` until the first render.
     first_visible_day: Option<Date>,
@@ -327,7 +327,7 @@ impl App {
             history: History::default(),
             changed_days: HashSet::new(),
             inconsistent_day: None,
-            popup: None,
+            dialog: None,
             go_to_date: None,
             first_visible_day: None,
             last_visible_day: None,
@@ -394,10 +394,10 @@ impl App {
         let alt = key.modifiers.contains(KeyModifiers::ALT);
         self.notification = None;
         self.inconsistent_periods.clear();
-        if let Some(popup) = &mut self.popup {
-            if let Some(action) = popup.handle_key(key.code) {
-                self.popup = None;
-                return self.run_popup_action(action);
+        if let Some(dialog) = &mut self.dialog {
+            if let Some(action) = dialog.handle_key(key.code) {
+                self.dialog = None;
+                return self.run_dialog_action(action);
             }
             return Outcome::Continue;
         }
@@ -435,7 +435,7 @@ impl App {
             return Outcome::Continue;
         }
         if ctrl && key.code == KeyCode::Char('q') {
-            if self.check_all_days(("Quit anyway", PopupAction::QuitAnyway)) {
+            if self.check_all_days(("Quit anyway", DialogAction::QuitAnyway)) {
                 return self.quit();
             }
             return Outcome::Continue;
@@ -449,7 +449,7 @@ impl App {
             return Outcome::Continue;
         }
         if ctrl && key.code == KeyCode::Char('s') {
-            if self.check_all_days(("Save anyway", PopupAction::SaveAnyway)) {
+            if self.check_all_days(("Save anyway", DialogAction::SaveAnyway)) {
                 return self.save(Overwrite::IfUnchanged);
             }
             return Outcome::Continue;
@@ -494,7 +494,7 @@ impl App {
                 if ctrl_only && !self.shows_empty_period() && self.focus.period().is_some() =>
             {
                 let label = self.focused_period().map(Period::label).unwrap_or_default();
-                self.popup = Some(Popup::delete_period(&label));
+                self.dialog = Some(Dialog::delete_period(&label));
             }
             KeyCode::Delete if plain => self.clear_focused_field(),
             KeyCode::Char(c) if plain => self.start_editing(c),
@@ -825,9 +825,9 @@ impl App {
         self.select_day(date);
     }
 
-    /// Keys while the "Go to date" popup is open. Ctrl+C/Ctrl+V copy and
+    /// Keys while the "Go to date" dialog is open. Ctrl+C/Ctrl+V copy and
     /// paste the input field's text while it has focus, as in other input
-    /// fields; the popup handles all other keys.
+    /// fields; the dialog handles all other keys.
     fn handle_go_to_date_key(&mut self, key: KeyEvent) {
         match (key.code, Modifiers::of(key)) {
             (KeyCode::Char('c'), Modifiers::Ctrl) => self.copy_go_to_date_input(),
@@ -841,7 +841,7 @@ impl App {
         }
     }
 
-    /// Ctrl+C in the "Go to date" popup: copies the typed date.
+    /// Ctrl+C in the "Go to date" dialog: copies the typed date.
     fn copy_go_to_date_input(&mut self) {
         let text = self
             .go_to_date
@@ -855,7 +855,7 @@ impl App {
         }
     }
 
-    /// Ctrl+V in the "Go to date" popup: replaces the typed date with the
+    /// Ctrl+V in the "Go to date" dialog: replaces the typed date with the
     /// clipboard text, on one line. It doesn't go to the date yet.
     fn paste_into_go_to_date_input(&mut self) {
         let input_focused = self
@@ -869,9 +869,9 @@ impl App {
         }
     }
 
-    /// Runs the choice made in the "Go to date" popup. A typed date on a
+    /// Runs the choice made in the "Go to date" dialog. A typed date on a
     /// weekend, like today on a weekend, means the Friday before. An invalid
-    /// date keeps the popup open, with a notification, so it can be fixed.
+    /// date keeps the dialog open, with a notification, so it can be fixed.
     fn run_go_to_date_action(&mut self, action: GoToDateAction) {
         let date = match action {
             GoToDateAction::Go(text) => {
@@ -932,10 +932,10 @@ impl App {
     }
 
     /// Sorts every day and removes empty periods, then checks all days. For
-    /// the earliest failing day, shows a popup with `anyway` as the button
+    /// the earliest failing day, shows a dialog with `anyway` as the button
     /// that continues regardless; returns whether all days passed. Sorting
     /// alone isn't an unsaved change.
-    fn check_all_days(&mut self, anyway: (&'static str, PopupAction)) -> bool {
+    fn check_all_days(&mut self, anyway: (&'static str, DialogAction)) -> bool {
         let mut moved_on_selected_day = Vec::new();
         for (&date, day) in &mut self.timesheet.days {
             let moved = day.normalize();
@@ -952,7 +952,7 @@ impl App {
                     calendar::format_dutch_short(inconsistent.date),
                     inconsistent.problem.message
                 );
-                self.popup = Some(Popup::inconsistent_day(question, anyway));
+                self.dialog = Some(Dialog::inconsistent_day(question, anyway));
                 self.inconsistent_day = Some(inconsistent);
                 false
             }
@@ -964,11 +964,11 @@ impl App {
         if !self.has_unsaved_changes {
             return Outcome::Quit;
         }
-        self.popup = Some(Popup::save_before_quitting());
+        self.dialog = Some(Dialog::save_before_quitting());
         Outcome::Continue
     }
 
-    /// Selects the day from a consistency-check popup and shows its problem.
+    /// Selects the day from a consistency-check dialog and shows its problem.
     fn go_to_inconsistent_day(&mut self) {
         if let Some(inconsistent) = self.inconsistent_day.take() {
             self.select_day(inconsistent.date);
@@ -1008,19 +1008,19 @@ impl App {
         });
     }
 
-    fn run_popup_action(&mut self, action: PopupAction) -> Outcome {
+    fn run_dialog_action(&mut self, action: DialogAction) -> Outcome {
         match action {
-            PopupAction::DeletePeriod => self.delete_focused_period(),
-            PopupAction::GoToDay => self.go_to_inconsistent_day(),
-            PopupAction::SaveAnyway => return self.save(Overwrite::IfUnchanged),
-            PopupAction::QuitAnyway => return self.quit(),
-            PopupAction::Save => {
+            DialogAction::DeletePeriod => self.delete_focused_period(),
+            DialogAction::GoToDay => self.go_to_inconsistent_day(),
+            DialogAction::SaveAnyway => return self.save(Overwrite::IfUnchanged),
+            DialogAction::QuitAnyway => return self.quit(),
+            DialogAction::Save => {
                 self.quit_after_saving = true;
                 return self.save(Overwrite::IfUnchanged);
             }
-            PopupAction::DontSave => return Outcome::Quit,
-            PopupAction::Overwrite => return self.save(Overwrite::Always),
-            PopupAction::Cancel => self.quit_after_saving = false,
+            DialogAction::DontSave => return Outcome::Quit,
+            DialogAction::Overwrite => return self.save(Overwrite::Always),
+            DialogAction::Cancel => self.quit_after_saving = false,
         }
         Outcome::Continue
     }
@@ -1053,7 +1053,7 @@ impl App {
                 }
                 self.notify("Saved");
             }
-            Err(SaveError::ChangedOnDisk) => self.popup = Some(Popup::file_changed_on_disk()),
+            Err(SaveError::ChangedOnDisk) => self.dialog = Some(Dialog::file_changed_on_disk()),
             Err(e @ SaveError::Io(_)) => {
                 self.notify(e.to_string());
                 self.quit_after_saving = false;

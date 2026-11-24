@@ -1,14 +1,14 @@
-//! The "Go to date" popup: an input field for a date and the buttons Go,
+//! The "Go to date" dialog: an input field for a date and the buttons Go,
 //! Today and Cancel.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent};
 
-use super::{Modifiers, active_input::ActiveInput, popup::Popup};
+use super::{Modifiers, active_input::ActiveInput, dialog::Dialog};
 
 /// The date formats the input field takes, as shown to the user.
 pub const DATE_FORMATS: &str = "YYYY-MM-DD, DD MMM or DD MMM YYYY";
 
-/// A button of the popup.
+/// A button of the dialog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GoToDateButton {
     Go,
@@ -16,24 +16,24 @@ pub enum GoToDateButton {
     Cancel,
 }
 
-/// What the user chose in the popup.
+/// What the user chose in the dialog.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum GoToDateAction {
     /// Go to the date typed as this text.
     Go(String),
     /// Go to today.
     Today,
-    /// Close the popup without going anywhere.
+    /// Close the dialog without going anywhere.
     Cancel,
 }
 
-/// The popup's state: the typed date, and whether the input field or one of
+/// The dialog's state: the typed date, and whether the input field or one of
 /// the buttons has focus.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GoToDate {
     /// The title, the label above the input field and the buttons; its
     /// selected button is the focused one while the input field hasn't focus.
-    pub popup: Popup<GoToDateButton>,
+    pub dialog: Dialog<GoToDateButton>,
     /// The typed date.
     pub input: ActiveInput,
     /// Whether the input field has focus rather than a button.
@@ -41,10 +41,10 @@ pub struct GoToDate {
 }
 
 impl GoToDate {
-    /// The popup as it opens: an empty input field with focus.
+    /// The dialog as it opens: an empty input field with focus.
     pub fn new() -> Self {
         Self {
-            popup: Popup {
+            dialog: Dialog {
                 title: "Go to date",
                 message: format!("Date ({DATE_FORMATS}):"),
                 buttons: vec![
@@ -70,8 +70,8 @@ impl GoToDate {
         let button = match (key.code, modifiers) {
             (KeyCode::Esc, _) => Some(GoToDateButton::Cancel),
             (KeyCode::Tab, Modifiers::None) => self.move_focus(1),
-            (KeyCode::BackTab, Modifiers::None) => self.move_focus(self.popup.button_count()),
-            (KeyCode::Char(c), Modifiers::Alt) => self.popup.action_for_letter(c),
+            (KeyCode::BackTab, Modifiers::None) => self.move_focus(self.dialog.button_count()),
+            (KeyCode::Char(c), Modifiers::Alt) => self.dialog.action_for_letter(c),
             _ if self.input_focused => self.handle_input_key(key, modifiers),
             (code, Modifiers::None) => self.handle_button_key(code),
             _ => None,
@@ -99,15 +99,15 @@ impl GoToDate {
     fn handle_button_key(&mut self, code: KeyCode) -> Option<GoToDateButton> {
         match code {
             KeyCode::Left => {
-                self.popup.select_previous();
+                self.dialog.select_previous();
                 None
             }
             KeyCode::Right => {
-                self.popup.select_next();
+                self.dialog.select_next();
                 None
             }
-            KeyCode::Enter => Some(self.popup.selected_action()),
-            KeyCode::Char(c) => self.popup.action_for_letter(c),
+            KeyCode::Enter => Some(self.dialog.selected_action()),
+            KeyCode::Char(c) => self.dialog.action_for_letter(c),
             _ => None,
         }
     }
@@ -115,15 +115,15 @@ impl GoToDate {
     /// Moves focus `steps` places forward through the input field and the
     /// buttons, wrapping around. Never chooses a button.
     fn move_focus(&mut self, steps: usize) -> Option<GoToDateButton> {
-        let places = self.popup.button_count() + 1;
+        let places = self.dialog.button_count() + 1;
         let current = if self.input_focused {
             0
         } else {
-            self.popup.selected_index() + 1
+            self.dialog.selected_index() + 1
         };
         let next = (current + steps) % places;
         self.input_focused = next == 0;
-        self.popup.select(next.saturating_sub(1));
+        self.dialog.select(next.saturating_sub(1));
         None
     }
 
@@ -143,6 +143,6 @@ impl GoToDate {
 
     /// The selected button as shown: none while the input field has focus.
     pub fn shown_selected_button(&self) -> Option<usize> {
-        (!self.input_focused).then_some(self.popup.selected_index())
+        (!self.input_focused).then_some(self.dialog.selected_index())
     }
 }

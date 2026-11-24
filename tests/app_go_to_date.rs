@@ -5,8 +5,8 @@ use jiff::civil::date;
 use ratatui::{crossterm::event::KeyCode, style::Color};
 use tijdje::app::{App, Screen};
 
-/// The popup's label above its input field: shown only while the popup is open.
-const POPUP_LABEL: &str = "Date (YYYY-MM-DD, DD MMM or DD MMM YYYY):";
+/// The dialog's label above its input field: shown only while the dialog is open.
+const DIALOG_LABEL: &str = "Date (YYYY-MM-DD, DD MMM or DD MMM YYYY):";
 
 fn screen(app: &mut App) -> String {
     rows(&render(app, 120, 24)).join("\n")
@@ -30,7 +30,7 @@ fn first_listed_day(app: &mut App) -> String {
     screen[2].chars().skip(2).take(9).collect()
 }
 
-/// Opens the popup with Ctrl+G, types `text` and presses Enter.
+/// Opens the dialog with Ctrl+G, types `text` and presses Enter.
 fn go_to(app: &mut App, text: &str) {
     ctrl(app, 'g');
     type_text(app, text);
@@ -38,7 +38,7 @@ fn go_to(app: &mut App, text: &str) {
 }
 
 #[test]
-fn ctrl_g_opens_a_popup_with_an_input_field_and_three_buttons() {
+fn ctrl_g_opens_a_dialog_with_an_input_field_and_three_buttons() {
     // Given
     let mut app = app_with(SAMPLE, date(2026, 11, 12));
 
@@ -90,7 +90,7 @@ fn a_typed_date_is_selected() {
 
     // Then
     assert_eq!(app.selected_day(), date(2026, 10, 14));
-    assert!(!screen(&mut app).contains(POPUP_LABEL));
+    assert!(!screen(&mut app).contains(DIALOG_LABEL));
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn the_selected_day_is_shown_after_a_far_jump() {
 }
 
 #[test]
-fn an_invalid_date_shows_a_notification_and_keeps_the_popup_open() {
+fn an_invalid_date_shows_a_notification_and_keeps_the_dialog_open() {
     // Given
     let mut app = app_with(SAMPLE, date(2026, 11, 12));
 
@@ -159,7 +159,7 @@ fn an_invalid_date_shows_a_notification_and_keeps_the_popup_open() {
         text.contains("15 may is not a valid date (YYYY-MM-DD, DD MMM or DD MMM YYYY)"),
         "{text}"
     );
-    assert!(text.contains(POPUP_LABEL), "{text}");
+    assert!(text.contains(DIALOG_LABEL), "{text}");
     assert!(text.contains("15 may"), "{text}");
 }
 
@@ -267,7 +267,7 @@ fn letters_are_typed_into_the_input_field_not_taken_as_hotkeys() {
 }
 
 #[test]
-fn esc_and_cancel_close_the_popup_without_moving() {
+fn esc_and_cancel_close_the_dialog_without_moving() {
     for keys in [vec![KeyCode::Esc], vec![KeyCode::BackTab, KeyCode::Enter]] {
         // Given
         let mut app = app_with(SAMPLE, date(2026, 11, 12));
@@ -281,12 +281,12 @@ fn esc_and_cancel_close_the_popup_without_moving() {
 
         // Then
         assert_eq!(app.selected_day(), date(2026, 11, 12), "{keys:?}");
-        assert!(!screen(&mut app).contains(POPUP_LABEL), "{keys:?}");
+        assert!(!screen(&mut app).contains(DIALOG_LABEL), "{keys:?}");
     }
 }
 
 #[test]
-fn other_keys_do_not_reach_the_tracking_screen_while_the_popup_is_open() {
+fn other_keys_do_not_reach_the_tracking_screen_while_the_dialog_is_open() {
     // Given
     let mut app = app_with(SAMPLE, date(2026, 11, 12));
     ctrl(&mut app, 'g');
@@ -298,7 +298,7 @@ fn other_keys_do_not_reach_the_tracking_screen_while_the_popup_is_open() {
     // Then
     assert_eq!(app.selected_day(), date(2026, 11, 12));
     assert_eq!(app.screen(), Screen::Tracking);
-    assert!(screen(&mut app).contains(POPUP_LABEL));
+    assert!(screen(&mut app).contains(DIALOG_LABEL));
 }
 
 #[test]
@@ -317,7 +317,7 @@ fn going_to_a_date_checks_the_changed_day_it_leaves() {
     assert_eq!(app.selected_day(), date(2026, 11, 2));
     let text = screen(&mut app);
     assert!(text.contains("0845–1230 overlaps 1215–1300"), "{text}");
-    assert!(!text.contains(POPUP_LABEL), "{text}");
+    assert!(!text.contains(DIALOG_LABEL), "{text}");
 }
 
 #[test]
@@ -347,7 +347,7 @@ fn ctrl_g_is_ignored_while_editing() {
 
     // Then
     assert!(app.is_editing());
-    assert!(!screen(&mut app).contains(POPUP_LABEL));
+    assert!(!screen(&mut app).contains(DIALOG_LABEL));
 }
 
 #[test]
@@ -360,7 +360,7 @@ fn ctrl_g_is_ignored_on_the_help_screen() {
     ctrl(&mut app, 'g');
 
     // Then
-    assert!(!screen(&mut app).contains(POPUP_LABEL));
+    assert!(!screen(&mut app).contains(DIALOG_LABEL));
 }
 
 #[test]
@@ -396,7 +396,7 @@ fn with_a_button_focused_its_plain_letter_chooses_a_button() {
 
         // Then
         assert_eq!(app.selected_day(), expected, "{letter}");
-        assert!(!screen(&mut app).contains(POPUP_LABEL), "{letter}");
+        assert!(!screen(&mut app).contains(DIALOG_LABEL), "{letter}");
     }
 }
 
@@ -414,7 +414,7 @@ fn ctrl_c_copies_the_typed_date() {
 
     // Then
     assert_eq!(clipboard.text().as_deref(), Some("15 okt"));
-    assert!(screen(&mut app).contains(POPUP_LABEL));
+    assert!(screen(&mut app).contains(DIALOG_LABEL));
 }
 
 #[test]
