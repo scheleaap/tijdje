@@ -153,6 +153,55 @@ fn period_type_for_alt_key(code: KeyCode) -> Option<PeriodType> {
     })
 }
 
+/// What a key does while editing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EditingAction {
+    /// Esc: rejects the active input.
+    Reject,
+    /// Accepts the active input, first taking the project suggestion if
+    /// `takes_suggestion`, then moves focus `then`.
+    Accept {
+        takes_suggestion: bool,
+        then: AfterAccepting,
+    },
+    /// →: takes the project suggestion, or else moves the cursor.
+    TakeSuggestionOrEdit,
+    /// Types, moves the cursor or deletes; other keys do nothing.
+    Edit,
+}
+
+impl EditingAction {
+    fn of(key: KeyEvent) -> Self {
+        let plain = Modifiers::of(key) == Modifiers::None;
+        let ctrl_only = Modifiers::of(key) == Modifiers::Ctrl;
+        let accept = |then| EditingAction::Accept {
+            takes_suggestion: then != AfterAccepting::Stay,
+            then,
+        };
+        match key.code {
+            KeyCode::Esc => EditingAction::Reject,
+            KeyCode::Enter if plain => accept(AfterAccepting::Stay),
+            KeyCode::Enter if ctrl_only => accept(AfterAccepting::NextPeriod),
+            KeyCode::Tab if plain => accept(AfterAccepting::Field(Direction::Forward)),
+            KeyCode::BackTab if plain => accept(AfterAccepting::Field(Direction::Backward)),
+            // Unlike Modifiers, Shift counts here: Shift+→ only moves the cursor.
+            KeyCode::Right if key.modifiers.is_empty() => EditingAction::TakeSuggestionOrEdit,
+            _ => EditingAction::Edit,
+        }
+    }
+}
+
+/// Where focus goes after accepting the active input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AfterAccepting {
+    /// Enter: stays on the field.
+    Stay,
+    /// Tab/Shift-Tab: the next/previous field.
+    Field(Direction),
+    /// Ctrl+Enter: From of the next period.
+    NextPeriod,
+}
+
 /// Which way focus moves.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Direction {
@@ -503,60 +552,76 @@ impl App {
     }
 
     /// While editing, only editing keys work; Enter, Tab/Shift-Tab and
-    /// Ctrl+Enter accept, Esc rejects, → at the end of the input takes the
-    /// project suggestion. Other keys are ignored silently.
+    /// Ctrl+Enter accept, Esc rejects. → at the end of the input takes the
+    /// project suggestion and keeps editing; Tab/Shift-Tab and Ctrl+Enter
+    /// take it before accepting. Other keys are ignored silently.
     fn handle_editing_key(&mut self, key: KeyEvent) {
-        let modifiers = Modifiers::of(key);
-        let plain = modifiers == Modifiers::None;
-        let ctrl_only = modifiers == Modifiers::Ctrl;
-        let focus = self.focus;
-        let suggestion = self.project_suggestion();
-        let Some(input) = &mut self.active_input else {
-            return;
-        };
-        // → takes the project suggestion before it would move the cursor.
-        if plain
-            && key.code == KeyCode::Right
-            && let Some(project) = suggestion
-        {
-            *input = ActiveInput::with_text(&project);
-            return;
-        }
-        if input.apply_editing_key(key) {
-            return;
-        }
-        match key.code {
-            KeyCode::Char(c) if plain && focus.accepts(c, input.len()) => input.insert(c),
-            KeyCode::Esc => self.active_input = None,
-            KeyCode::Enter if plain => {
-                self.accept();
-            }
-            KeyCode::Enter if ctrl_only => {
+        match EditingAction::of(key) {
+            EditingAction::Reject => self.active_input = None,
+            EditingAction::Accept {
+                takes_suggestion,
+                then,
+            } => {
+                if takes_suggestion {
+                    self.take_project_suggestion();
+                }
                 if self.accept() {
-                    self.focus_next_period();
+                    self.move_after_accepting(then);
                 }
             }
-            KeyCode::Tab | KeyCode::BackTab if plain => {
-                let direction = if key.code == KeyCode::Tab {
-                    Direction::Forward
-                } else {
-                    Direction::Backward
-                };
-                if self.accept() {
-                    self.move_focus_in_tab_order(direction);
+            EditingAction::TakeSuggestionOrEdit => {
+                if !self.take_project_suggestion() {
+                    self.edit_active_input(key);
                 }
             }
-            _ => {}
+            EditingAction::Edit => self.edit_active_input(key),
         }
     }
 
+    /// Applies an editing key or types a character the focused field takes.
+    fn edit_active_input(&mut self, key: KeyEvent) {
+        let focus = self.focus;
+        if let Some(input) = &mut self.active_input
+            && !input.apply_editing_key(key)
+            && let KeyCode::Char(c) = key.code
+            && Modifiers::of(key) == Modifiers::None
+            && focus.accepts(c, input.len())
+        {
+            input.insert(c);
+        }
+    }
+
+    /// Moves focus after the active input was accepted.
+    fn move_after_accepting(&mut self, then: AfterAccepting) {
+        match then {
+            AfterAccepting::Stay => {}
+            AfterAccepting::Field(direction) => self.move_focus_in_tab_order(direction),
+            AfterAccepting::NextPeriod => self.focus_next_period(),
+        }
+    }
+
+    /// Fills in the project suggestion, if there is one, keeping the cursor
+    /// at the end. Returns whether there was one.
+    fn take_project_suggestion(&mut self) -> bool {
+        let suggestion = self.project_suggestion();
+        if let (Some(project), Some(input)) = (&suggestion, &mut self.active_input) {
+            input.replace_with(project);
+        }
+        suggestion.is_some()
+    }
+
     /// The earlier project suggested while editing Project with the cursor at
-    /// the end of the active input; shown as ghost text, taken with →. Owned,
-    /// so the active input can change while it is held.
+    /// the end of the active input, once something was typed or deleted in
+    /// it; shown as ghost text, taken with →, Tab/Shift-Tab and Ctrl+Enter.
+    /// Owned, so the active input can change while it is held.
     fn project_suggestion(&self) -> Option<String> {
         self.active_input
             .as_ref()
-            .filter(|input| self.focus.field() == Some(Field::Project) && input.is_cursor_at_end())
+            .filter(|input| {
+                self.focus.field() == Some(Field::Project)
+                    && input.is_cursor_at_end()
+                    && input.is_changed()
+            })
             .and_then(|input| self.timesheet.project_suggestion(&input.text()))
             .map(str::to_owned)
     }

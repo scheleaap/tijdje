@@ -21,7 +21,7 @@ A remark attached to a day as a whole.
 The work a period is attributed to, e.g. a customer engagement or internal work.
 
 **Project suggestion**:
-The earlier project shown as dimmed ghost text while a project is typed, taken with →.
+The earlier project shown as dimmed ghost text while a project is typed; → takes it and keeps editing, Tab/Shift-Tab and Ctrl+Enter take it, accept and move on.
 
 **Empty period**:
 A period without any values: no start or end time, no part of day, no project or notes, and not marked as a non-working period.

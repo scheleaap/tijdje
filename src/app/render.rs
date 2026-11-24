@@ -810,10 +810,13 @@ fn render_help(frame: &mut Frame, area: Rect) {
             "←/→/↑/↓",
             "Field left/right/above/below; editing a project, → at the end takes the suggestion",
         ),
-        ("Tab/Shift-Tab", "Next/previous field"),
+        (
+            "Tab/Shift-Tab",
+            "Next/previous field; editing a project, also takes the suggestion",
+        ),
         (
             "Ctrl+Enter",
-            "From of the next period; in the last one: add a period",
+            "From of the next period; in the last one: add a period; also takes the suggestion",
         ),
         ("Type", "Replace the field's value"),
         (

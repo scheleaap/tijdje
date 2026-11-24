@@ -12,6 +12,8 @@ pub struct ActiveInput {
     cursor: usize,
     /// First visible character when the text is wider than its field.
     scroll: usize,
+    /// Whether characters were typed or deleted since editing started.
+    changed: bool,
 }
 
 impl ActiveInput {
@@ -22,7 +24,21 @@ impl ActiveInput {
             cursor: text.len(),
             text,
             scroll: 0,
+            changed: false,
         }
+    }
+
+    /// Replaces the text with `text`, the cursor at the end, as a change.
+    pub fn replace_with(&mut self, text: &str) {
+        *self = Self {
+            changed: true,
+            ..Self::with_text(text)
+        };
+    }
+
+    /// Whether characters were typed or deleted since editing started.
+    pub fn is_changed(&self) -> bool {
+        self.changed
     }
 
     pub fn text(&self) -> String {
@@ -41,6 +57,7 @@ impl ActiveInput {
     pub fn insert(&mut self, c: char) {
         self.text.insert(self.cursor, c);
         self.cursor += 1;
+        self.changed = true;
     }
 
     pub fn backspace(&mut self) {
@@ -121,7 +138,11 @@ impl ActiveInput {
             (KeyCode::End, Modifiers::None) => Some(Self::end),
             _ => None,
         };
-        edit.map(|edit| edit(self)).is_some()
+        let length = self.text.len();
+        let applied = edit.map(|edit| edit(self)).is_some();
+        // Editing keys only delete, so a change shortens the text.
+        self.changed |= self.text.len() != length;
+        applied
     }
 
     /// The part of the text that fits in a field `width` characters wide,
