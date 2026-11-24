@@ -14,7 +14,17 @@ In Ghostty:
   keybind = ctrl+enter=unbind
   ```
 
-- Ctrl+PgUp/PgDn and Alt+1..8 switch tabs, but come through in a window with a single tab.
+- Ctrl+PgUp/PgDn switch tabs, but come through in a window with a single tab.
+- Alt+1..8 switch tabs. tijdje uses Alt+1..3 for part of day. Add this to Ghostty's configuration to let them through (each key is bound both as a character and as a physical key):
+
+  ```
+  keybind = alt+1=unbind
+  keybind = alt+digit_1=unbind
+  keybind = alt+2=unbind
+  keybind = alt+digit_2=unbind
+  keybind = alt+3=unbind
+  keybind = alt+digit_3=unbind
+  ```
 
 ## License
 
