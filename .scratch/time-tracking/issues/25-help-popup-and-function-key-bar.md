@@ -10,6 +10,7 @@
 - [ ] Groups: General, Day navigation, Field navigation, Field editing, Period definition, Period management, listing every shortcut of the spec's Keyboard section
 - [ ] Colors: cyan background, light text, yellow title, single-line frame, black shadow
 - [ ] The Help screen is gone; F2 Track stays
+- [ ] Ctrl+S and Ctrl+Q get a line each again (ticket 24 merged them into "Save/quit" to fit 24 rows until the help scrolls)
 - [ ] The function-key bar's ten slots stretch evenly over the full width
 
 Spec: `.scratch/time-tracking/spec.md`

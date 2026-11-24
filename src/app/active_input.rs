@@ -1,5 +1,8 @@
 //! Active input: text typed into a field that hasn't been accepted or rejected yet.
 
+use ratatui::crossterm::event::{KeyCode, KeyEvent};
+
+use super::Modifiers;
 use crate::words;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -95,6 +98,30 @@ impl ActiveInput {
     /// Deletes everything from the cursor on.
     pub fn delete_to_end(&mut self) {
         self.text.truncate(self.cursor);
+    }
+
+    /// Applies a shell-like editing key that moves the cursor or deletes
+    /// text; typed characters are left to the caller, which knows what the
+    /// field takes. Returns whether `key` was such an editing key.
+    pub fn apply_editing_key(&mut self, key: KeyEvent) -> bool {
+        let edit: Option<fn(&mut Self)> = match (key.code, Modifiers::of(key)) {
+            (KeyCode::Char('a'), Modifiers::Ctrl) => Some(Self::home),
+            (KeyCode::Char('e'), Modifiers::Ctrl) => Some(Self::end),
+            (KeyCode::Char('w'), Modifiers::Ctrl) => Some(Self::delete_previous_word),
+            (KeyCode::Char('u'), Modifiers::Ctrl) => Some(Self::delete_to_start),
+            (KeyCode::Char('k'), Modifiers::Ctrl) => Some(Self::delete_to_end),
+            (KeyCode::Backspace, Modifiers::Ctrl) => Some(Self::delete_previous_word),
+            (KeyCode::Backspace, Modifiers::None) => Some(Self::backspace),
+            (KeyCode::Delete, Modifiers::None) => Some(Self::delete),
+            (KeyCode::Left, Modifiers::Ctrl) => Some(Self::word_left),
+            (KeyCode::Right, Modifiers::Ctrl) => Some(Self::word_right),
+            (KeyCode::Left, Modifiers::None) => Some(Self::left),
+            (KeyCode::Right, Modifiers::None) => Some(Self::right),
+            (KeyCode::Home, Modifiers::None) => Some(Self::home),
+            (KeyCode::End, Modifiers::None) => Some(Self::end),
+            _ => None,
+        };
+        edit.map(|edit| edit(self)).is_some()
     }
 
     /// The part of the text that fits in a field `width` characters wide,

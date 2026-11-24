@@ -14,14 +14,60 @@ pub enum PopupAction {
     Cancel,
 }
 
+/// A popup with labeled buttons, each standing for an action of type `A`.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Popup {
+pub struct Popup<A = PopupAction> {
     /// A short title, shown in the frame.
     pub title: &'static str,
     /// The full text, shown inside and wrapped if needed.
     pub message: String,
-    pub buttons: Vec<(&'static str, PopupAction)>,
+    pub buttons: Vec<(&'static str, A)>,
     pub selected: usize,
+}
+
+impl<A: Copy> Popup<A> {
+    /// The index of the selected button.
+    pub fn selected_index(&self) -> usize {
+        self.selected
+    }
+
+    /// How many buttons the popup has.
+    pub fn button_count(&self) -> usize {
+        self.buttons.len()
+    }
+
+    /// Selects the button at `index`, or the last one if there aren't that many.
+    pub fn select(&mut self, index: usize) {
+        self.selected = index.min(self.buttons.len() - 1);
+    }
+
+    /// Selects the button to the left, stopping at the first.
+    pub fn select_previous(&mut self) {
+        self.selected = self.selected.saturating_sub(1);
+    }
+
+    /// Selects the button to the right, stopping at the last.
+    pub fn select_next(&mut self) {
+        self.select(self.selected + 1);
+    }
+
+    /// The selected button's action.
+    pub fn selected_action(&self) -> A {
+        self.buttons[self.selected].1
+    }
+
+    /// The action of the button whose label starts with `letter`, in any case.
+    pub fn action_for_letter(&self, letter: char) -> Option<A> {
+        self.buttons
+            .iter()
+            .find(|(label, _)| {
+                label
+                    .chars()
+                    .next()
+                    .is_some_and(|l| l.eq_ignore_ascii_case(&letter))
+            })
+            .map(|&(_, action)| action)
+    }
 }
 
 impl Popup {
@@ -82,24 +128,18 @@ impl Popup {
     /// Esc cancels. Returns the chosen action, if any.
     pub fn handle_key(&mut self, code: KeyCode) -> Option<PopupAction> {
         match code {
-            KeyCode::Left => self.selected = self.selected.saturating_sub(1),
-            KeyCode::Right => self.selected = (self.selected + 1).min(self.buttons.len() - 1),
-            KeyCode::Enter => return Some(self.buttons[self.selected].1),
-            KeyCode::Esc => return Some(PopupAction::Cancel),
-            KeyCode::Char(c) => {
-                return self
-                    .buttons
-                    .iter()
-                    .find(|(label, _)| {
-                        label
-                            .chars()
-                            .next()
-                            .is_some_and(|l| l.eq_ignore_ascii_case(&c))
-                    })
-                    .map(|&(_, action)| action);
+            KeyCode::Left => {
+                self.select_previous();
+                None
             }
-            _ => {}
+            KeyCode::Right => {
+                self.select_next();
+                None
+            }
+            KeyCode::Enter => Some(self.selected_action()),
+            KeyCode::Esc => Some(PopupAction::Cancel),
+            KeyCode::Char(c) => self.action_for_letter(c),
+            _ => None,
         }
-        None
     }
 }

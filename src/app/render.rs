@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Clear, Padding, Paragraph},
 };
 
-use super::{App, Field, FieldFocus, Focus, Popup, Screen};
+use super::{App, Field, FieldFocus, Focus, Popup, Screen, active_input::ActiveInput};
 use crate::domain::{
     Day, Minutes, Period, PeriodIndicator, PeriodType, TimeOfDay,
     calendar::{self, Separator},
@@ -91,7 +91,15 @@ impl App {
             render_notification(frame, main, text);
         }
         if let Some(popup) = &self.popup {
-            render_popup(frame, popup);
+            render_popup(frame, popup, Some(popup.selected), None);
+        }
+        if let Some(go_to_date) = &mut self.go_to_date {
+            let selected = go_to_date.shown_selected_button();
+            let input = PopupInput {
+                input: &mut go_to_date.input,
+                focused: go_to_date.input_focused,
+            };
+            render_popup(frame, &go_to_date.popup, selected, Some(input));
         }
     }
 
@@ -116,8 +124,13 @@ impl App {
         let height = usize::from(list.height);
         let first = self.scroll_to_selected_day(height);
         let width = usize::from(list.width);
-        let lines: Vec<Line> = list_rows(first)
-            .take(height)
+        let rows: Vec<ListRow> = list_rows(first).take(height).collect();
+        self.last_visible_day = rows.iter().rev().find_map(|&row| match row {
+            ListRow::Day(date) => Some(date),
+            ListRow::Separator(_, _) => None,
+        });
+        let lines: Vec<Line> = rows
+            .into_iter()
             .map(|row| match row {
                 ListRow::Day(date) => self.day_line(date, width),
                 ListRow::Separator(Separator::Year, date) => {
@@ -563,7 +576,21 @@ const SHADOW_OFFSET: (u16, u16) = (2, 1);
 /// A button's padding on both sides plus the gap to the next button.
 const BUTTON_EXTRA_WIDTH: usize = 4;
 
-fn render_popup(frame: &mut Frame, popup: &Popup) {
+/// A popup's input field, shown below its message.
+struct PopupInput<'a> {
+    input: &'a mut ActiveInput,
+    focused: bool,
+}
+
+/// Draws `popup` with button `selected` highlighted (none if `None`), and
+/// `input` as a full-width input field below the message, with the cursor
+/// in it while it has focus.
+fn render_popup<A>(
+    frame: &mut Frame,
+    popup: &Popup<A>,
+    selected: Option<usize>,
+    input: Option<PopupInput>,
+) {
     let buttons_width: usize = popup
         .buttons
         .iter()
@@ -579,8 +606,9 @@ fn render_popup(frame: &mut Frame, popup: &Popup) {
         .max(POPUP_MIN_WIDTH)
         .min(max_width);
     let message = wrap(&popup.message, width.saturating_sub(chrome_width));
-    // Margin, frame, message, blank line, buttons, frame, margin.
-    let height = to_u16(message.len() + 6);
+    let input_rows = usize::from(input.is_some());
+    // Margin, frame, message, input field, blank line, buttons, frame, margin.
+    let height = to_u16(message.len() + input_rows + 6);
     let width = to_u16(width);
     let area = Rect {
         x: frame.area().width.saturating_sub(width) / 2,
@@ -615,7 +643,7 @@ fn render_popup(frame: &mut Frame, popup: &Popup) {
 
     let mut buttons: Vec<Span> = Vec::new();
     for (i, (label, _)) in popup.buttons.iter().enumerate() {
-        let style = if i == popup.selected {
+        let style = if Some(i) == selected {
             SELECTED_BUTTON
         } else {
             BUTTON
@@ -631,7 +659,18 @@ fn render_popup(frame: &mut Frame, popup: &Popup) {
             Span::styled(format!("{} ", chars.as_str()), style),
         ]);
     }
+    let message_rows = message.len();
     let mut lines: Vec<Line> = message.into_iter().map(Line::raw).collect();
+    if let Some(PopupInput { input, focused }) = input {
+        let width = usize::from(inner.width);
+        // One cell less, so the cursor at the end stays inside the field.
+        let (text, column) = input.visible(width.saturating_sub(1));
+        let style = if focused { FOCUSED_FIELD } else { FIELD };
+        lines.push(Line::from(Span::styled(fit(&text, width), style)));
+        if focused {
+            frame.set_cursor_position((inner.x + to_u16(column), inner.y + to_u16(message_rows)));
+        }
+    }
     lines.extend([Line::raw(""), Line::from(buttons).centered()]);
     frame.render_widget(Paragraph::new(lines).style(POPUP), inner);
 }
@@ -758,6 +797,7 @@ fn render_help(frame: &mut Frame, area: Rect) {
     let shortcuts = [
         ("Ctrl+↑/↓", "Previous/next day"),
         ("Ctrl+PgUp/PgDn", "Previous/next week"),
+        ("Ctrl+G", "Go to date"),
         (
             "←/→/↑/↓",
             "Field left/right/above/below; editing a project, → at the end takes the suggestion",
@@ -790,8 +830,9 @@ fn render_help(frame: &mut Frame, area: Rect) {
         ("F2, Esc", "Back to Tracking"),
         ("Ctrl+C/Ctrl+V", "Copy/paste the focused field"),
         ("Ctrl+Z/Ctrl+Y", "Undo/redo"),
-        ("Ctrl+S", "Save"),
-        ("Ctrl+Q", "Quit"),
+        // One line, so the list still fits a 24-row terminal until the help
+        // popup scrolls (ticket 25).
+        ("Ctrl+S/Ctrl+Q", "Save/quit"),
     ];
     let lines: Vec<Line> = shortcuts
         .iter()

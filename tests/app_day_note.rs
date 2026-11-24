@@ -421,3 +421,21 @@ fn switching_days_from_the_day_note_focuses_from_of_the_first_period() {
 fn right_panel(row: &str) -> String {
     row.chars().skip(46).collect()
 }
+
+#[test]
+fn the_day_note_is_edited_with_the_shell_like_editing_keys() {
+    // Given
+    let mut app = monday_with_a_note();
+    focus_day_note(&mut app);
+    press(&mut app, KeyCode::Enter);
+
+    // When
+    ctrl_key(&mut app, KeyCode::Backspace);
+    type_text(&mut app, "off");
+    press(&mut app, KeyCode::Home);
+    type_text(&mut app, "A ");
+    press(&mut app, KeyCode::Enter);
+
+    // Then
+    assert_eq!(day_note(&app, MONDAY), Some("A Team off"));
+}

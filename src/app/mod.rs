@@ -1,6 +1,7 @@
 //! Interactive application state and key handling. Drawing lives in `render`.
 
 mod active_input;
+mod go_to_date;
 mod history;
 mod popup;
 mod render;
@@ -11,6 +12,7 @@ use jiff::civil::Date;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use active_input::ActiveInput;
+use go_to_date::{DATE_FORMATS, GoToDate, GoToDateAction};
 use history::{Change, History};
 use popup::{Popup, PopupAction};
 
@@ -28,6 +30,14 @@ const NO_CLIPBOARD: &str = "The clipboard is not available";
 
 fn invalid_time_message(text: &str) -> String {
     format!("{text} is not a valid time (HHMM, 0000–2359)")
+}
+
+fn invalid_date_message(text: &str) -> String {
+    if text.is_empty() {
+        format!("Type a date ({DATE_FORMATS})")
+    } else {
+        format!("{text} is not a valid date ({DATE_FORMATS})")
+    }
 }
 
 /// Where the timesheet is loaded from and saved to.
@@ -126,6 +136,11 @@ impl Field {
     }
 }
 
+/// Pasted text on one line: line breaks become spaces.
+fn one_line(text: &str) -> String {
+    text.lines().map(str::trim).collect::<Vec<_>>().join(" ")
+}
+
 /// The period type Alt+b/f/s/v/h toggles on the focused period.
 fn period_type_for_alt_key(code: KeyCode) -> Option<PeriodType> {
     Some(match code {
@@ -221,7 +236,7 @@ impl Focus {
         if self.is_time() {
             TimeOfDay::parse_pasted(text).map(TimeOfDay::format_hhmm)
         } else {
-            Some(text.lines().map(str::trim).collect::<Vec<_>>().join(" "))
+            Some(one_line(text))
         }
     }
 
@@ -264,8 +279,12 @@ pub struct App {
     /// The day named in a consistency-check popup, for "Go to day".
     inconsistent_day: Option<InconsistentDay>,
     popup: Option<Popup>,
+    /// The "Go to date" popup, while it is open.
+    go_to_date: Option<GoToDate>,
     /// `None` until the first render.
     first_visible_day: Option<Date>,
+    /// The last day the day list showed at the last render.
+    last_visible_day: Option<Date>,
     first_visible_period_row: usize,
 }
 
@@ -309,7 +328,9 @@ impl App {
             changed_days: HashSet::new(),
             inconsistent_day: None,
             popup: None,
+            go_to_date: None,
             first_visible_day: None,
+            last_visible_day: None,
             first_visible_period_row: 0,
         }
     }
@@ -378,6 +399,10 @@ impl App {
                 self.popup = None;
                 return self.run_popup_action(action);
             }
+            return Outcome::Continue;
+        }
+        if self.go_to_date.is_some() {
+            self.handle_go_to_date_key(key);
             return Outcome::Continue;
         }
         // The day note isn't in a period, so period types don't apply to it.
@@ -454,6 +479,7 @@ impl App {
             KeyCode::PageDown if ctrl_only => {
                 self.leave_day_for(calendar::next_week(self.selected))
             }
+            KeyCode::Char('g') if ctrl_only => self.go_to_date = Some(GoToDate::new()),
             KeyCode::Left if plain => self.move_focus_within_period(Direction::Backward),
             KeyCode::Right if plain => self.move_focus_within_period(Direction::Forward),
             KeyCode::Up if plain => self.move_focus_vertically(Direction::Backward),
@@ -488,25 +514,19 @@ impl App {
         let Some(input) = &mut self.active_input else {
             return;
         };
+        // → takes the project suggestion before it would move the cursor.
+        if plain
+            && key.code == KeyCode::Right
+            && let Some(project) = suggestion
+        {
+            *input = ActiveInput::with_text(&project);
+            return;
+        }
+        if input.apply_editing_key(key) {
+            return;
+        }
         match key.code {
             KeyCode::Char(c) if plain && focus.accepts(c, input.len()) => input.insert(c),
-            KeyCode::Char('a') if ctrl_only => input.home(),
-            KeyCode::Char('e') if ctrl_only => input.end(),
-            KeyCode::Char('w') if ctrl_only => input.delete_previous_word(),
-            KeyCode::Char('u') if ctrl_only => input.delete_to_start(),
-            KeyCode::Char('k') if ctrl_only => input.delete_to_end(),
-            KeyCode::Backspace if ctrl_only => input.delete_previous_word(),
-            KeyCode::Backspace if plain => input.backspace(),
-            KeyCode::Delete if plain => input.delete(),
-            KeyCode::Left if ctrl_only => input.word_left(),
-            KeyCode::Right if ctrl_only => input.word_right(),
-            KeyCode::Left if plain => input.left(),
-            KeyCode::Right if plain => match suggestion {
-                Some(project) => *input = ActiveInput::with_text(&project),
-                None => input.right(),
-            },
-            KeyCode::Home if plain => input.home(),
-            KeyCode::End if plain => input.end(),
             KeyCode::Esc => self.active_input = None,
             KeyCode::Enter if plain => {
                 self.accept();
@@ -608,6 +628,18 @@ impl App {
         if !self.accept() {
             self.active_input = previous;
         }
+    }
+
+    /// The clipboard's text, trimmed. `None`, with a notification, when the
+    /// clipboard isn't available or is empty.
+    fn clipboard_text(&mut self) -> Option<String> {
+        let text = self.clipboard.get_text().map(|text| text.trim().to_owned());
+        match text.as_deref() {
+            None => self.notify(NO_CLIPBOARD),
+            Some("") => self.notify("The clipboard is empty"),
+            Some(_) => {}
+        }
+        text.filter(|text| !text.is_empty())
     }
 
     /// The focused input field's current value, as it is shown.
@@ -791,6 +823,88 @@ impl App {
             }
         }
         self.select_day(date);
+    }
+
+    /// Keys while the "Go to date" popup is open. Ctrl+C/Ctrl+V copy and
+    /// paste the input field's text while it has focus, as in other input
+    /// fields; the popup handles all other keys.
+    fn handle_go_to_date_key(&mut self, key: KeyEvent) {
+        match (key.code, Modifiers::of(key)) {
+            (KeyCode::Char('c'), Modifiers::Ctrl) => self.copy_go_to_date_input(),
+            (KeyCode::Char('v'), Modifiers::Ctrl) => self.paste_into_go_to_date_input(),
+            _ => {
+                let action = self.go_to_date.as_mut().and_then(|g| g.handle_key(key));
+                if let Some(action) = action {
+                    self.run_go_to_date_action(action);
+                }
+            }
+        }
+    }
+
+    /// Ctrl+C in the "Go to date" popup: copies the typed date.
+    fn copy_go_to_date_input(&mut self) {
+        let text = self
+            .go_to_date
+            .as_mut()
+            .and_then(GoToDate::focused_input)
+            .map(|input| input.text());
+        if let Some(text) = text
+            && !self.clipboard.set_text(&text)
+        {
+            self.notify(NO_CLIPBOARD);
+        }
+    }
+
+    /// Ctrl+V in the "Go to date" popup: replaces the typed date with the
+    /// clipboard text, on one line. It doesn't go to the date yet.
+    fn paste_into_go_to_date_input(&mut self) {
+        let input_focused = self
+            .go_to_date
+            .as_mut()
+            .is_some_and(|g| g.focused_input().is_some());
+        if let Some(text) = input_focused.then(|| self.clipboard_text()).flatten()
+            && let Some(input) = self.go_to_date.as_mut().and_then(GoToDate::focused_input)
+        {
+            *input = ActiveInput::with_text(&one_line(&text));
+        }
+    }
+
+    /// Runs the choice made in the "Go to date" popup. A typed date on a
+    /// weekend, like today on a weekend, means the Friday before. An invalid
+    /// date keeps the popup open, with a notification, so it can be fixed.
+    fn run_go_to_date_action(&mut self, action: GoToDateAction) {
+        let date = match action {
+            GoToDateAction::Go(text) => {
+                let date = calendar::parse_date(&text, self.today);
+                if date.is_none() {
+                    self.notify(invalid_date_message(text.trim()));
+                }
+                date
+            }
+            GoToDateAction::Today => Some(self.today),
+            GoToDateAction::Cancel => {
+                self.go_to_date = None;
+                None
+            }
+        };
+        if let Some(date) = date {
+            self.go_to_date = None;
+            self.go_to_day(calendar::weekday_on_or_before(date));
+        }
+    }
+
+    /// Leaves the selected day for `date` like other day navigation. If
+    /// `date` isn't in the day list as last shown, the list is laid out
+    /// afresh around it, as on startup, instead of scrolling there.
+    fn go_to_day(&mut self, date: Date) {
+        let visible = self
+            .first_visible_day
+            .zip(self.last_visible_day)
+            .is_some_and(|(first, last)| (first..=last).contains(&date));
+        self.leave_day_for(date);
+        if !visible && self.selected == date {
+            self.first_visible_day = None;
+        }
     }
 
     /// Sorts the selected day and removes its empty periods. Not an undo step.
