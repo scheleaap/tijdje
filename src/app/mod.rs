@@ -632,16 +632,20 @@ impl App {
             None
         };
         let value = (!text.is_empty()).then_some(text);
-        self.edit_selected_day(|day| {
-            if let Some(period) = day.periods.get_mut(focus.period) {
-                match focus.field {
-                    Field::From => period.from = time,
-                    Field::To => period.to = time,
-                    Field::Project => period.project = value,
-                    Field::Notes => period.notes = value,
-                    _ => {}
+        self.edit_selected_day(|day| match focus.field {
+            Field::From => day.set_from(focus.period, time),
+            Field::To => day.set_to(focus.period, time),
+            Field::Project => {
+                if let Some(period) = day.periods.get_mut(focus.period) {
+                    period.project = value;
                 }
             }
+            Field::Notes => {
+                if let Some(period) = day.periods.get_mut(focus.period) {
+                    period.notes = value;
+                }
+            }
+            _ => {}
         });
         self.active_input = None;
         true

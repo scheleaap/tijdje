@@ -77,6 +77,9 @@ A day's worked time minus its actual expected working time.
 **Total balance**:
 The sum of all day balances from the first recorded day up to and including a given day.
 
+**Chained times**:
+Changing a period's end time also changes the start time of the next from–to period on screen, if that was equal to the old end time.
+
 **Consistency check**:
 The rules a day's periods must follow, e.g. no overlaps and From before To.
 

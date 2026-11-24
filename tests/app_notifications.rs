@@ -121,12 +121,12 @@ fn an_invalid_time_is_a_notification() {
 #[test]
 fn a_failed_consistency_check_is_a_notification() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
-    press(&mut app, KeyCode::Tab);
-    type_text(&mut app, "1245");
+    press(&mut app, KeyCode::Down);
+    type_text(&mut app, "1215");
     press(&mut app, KeyCode::Enter);
     ctrl_key(&mut app, KeyCode::Down);
     let text = shown_notification(&mut app).expect("a notification");
-    assert!(text.contains("0845–1245 overlaps 1230–1300"), "{text}");
+    assert!(text.contains("0845–1230 overlaps 1215–1300"), "{text}");
 }
 
 #[test]

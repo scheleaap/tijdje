@@ -16,7 +16,7 @@ use ratatui::{
     crossterm::event::{KeyCode, KeyEvent, KeyModifiers},
 };
 use tijdje::{
-    app::App,
+    app::{App, Field},
     domain::{Day, Minutes, Period, PeriodType, TimeOfDay},
     store::FileSystem,
 };
@@ -265,5 +265,22 @@ impl tijdje::clipboard::Clipboard for FakeClipboard {
     fn set_text(&mut self, text: &str) -> bool {
         *self.0.borrow_mut() = Some(text.to_owned());
         true
+    }
+}
+
+/// Mon 2 Nov from the sample: 0845–1230 work, 1230–1300 break, 1300–1757 work.
+pub fn app_on_monday() -> App {
+    app_with(SAMPLE, jiff::civil::date(2026, 11, 2))
+}
+
+/// The period at `index` of the selected day.
+pub fn period_at(app: &App, index: usize) -> &Period {
+    &app.timesheet().days[&app.selected_day()].periods[index]
+}
+
+/// Moves focus with Tab until `field` of some period has focus.
+pub fn tab_to(app: &mut App, field: Field) {
+    while app.focus().field != field {
+        press(app, KeyCode::Tab);
     }
 }

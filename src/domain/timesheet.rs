@@ -218,6 +218,30 @@ impl Day {
         self.periods.len() - 1
     }
 
+    /// Sets the From of the period at `index`, if there is one. Changes
+    /// nothing else.
+    pub fn set_from(&mut self, index: usize, from: Option<TimeOfDay>) {
+        if let Some(period) = self.periods.get_mut(index) {
+            period.from = from;
+        }
+    }
+
+    /// Sets the To of the period at `index`, if there is one. If the next
+    /// period's From was equal to the old To, it moves along, so consecutive
+    /// periods stay connected. Clearing a To, or filling in the To of an open
+    /// period, leaves the next From alone.
+    pub fn set_to(&mut self, index: usize, to: Option<TimeOfDay>) {
+        let old_to = self
+            .periods
+            .get_mut(index)
+            .and_then(|period| std::mem::replace(&mut period.to, to));
+        if let (Some(old_to), Some(_), Some(next)) = (old_to, to, self.periods.get_mut(index + 1))
+            && next.from == Some(old_to)
+        {
+            next.from = to;
+        }
+    }
+
     /// Checks `period_type` on the period at `index`, or unchecks it (back to
     /// work) if it was already checked. Checking an absence on the day's only
     /// period, while its From and To are empty, fills a full day from 09:00.

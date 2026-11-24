@@ -8,12 +8,12 @@ use tijdje::{
     domain::TimeOfDay,
 };
 
-/// Monday 2 Nov with its first period changed to 0845–1245, which overlaps
-/// the 1230–1300 break.
+/// Monday 2 Nov with its break changed to 1215–1300, which overlaps the
+/// 0845–1230 period before it. Focus stays on the break's From.
 fn monday_with_an_overlap() -> (App, InMemoryFileSystem) {
     let (mut app, fs) = sample_on(date(2026, 11, 2));
-    press(&mut app, KeyCode::Tab);
-    type_text(&mut app, "1245");
+    press(&mut app, KeyCode::Down);
+    type_text(&mut app, "1215");
     press(&mut app, KeyCode::Enter);
     (app, fs)
 }
@@ -32,7 +32,7 @@ fn leaving_a_changed_inconsistent_day_is_refused_with_a_message() {
     let (mut app, _fs) = monday_with_an_overlap();
     ctrl_key(&mut app, KeyCode::Down);
     assert_eq!(app.selected_day(), date(2026, 11, 2));
-    assert!(screen(&mut app).contains("0845–1245 overlaps 1230–1300"));
+    assert!(screen(&mut app).contains("0845–1230 overlaps 1215–1300"));
 }
 
 #[test]
@@ -41,7 +41,7 @@ fn the_offending_periods_are_highlighted_until_the_next_key() {
     ctrl_key(&mut app, KeyCode::Down);
     let buffer = render(&mut app, 120, 24);
     let rows = rows(&buffer);
-    for text in ["0845 1245", "1230 1300"] {
+    for text in ["0845 1230", "1215 1300"] {
         let y = row_index(&rows, text);
         assert_eq!(
             buffer[(60, u16::try_from(y).unwrap())].bg,
@@ -56,7 +56,7 @@ fn the_offending_periods_are_highlighted_until_the_next_key() {
     let text = screen(&mut app);
     assert!(!text.contains("overlaps"));
     let buffer = render(&mut app, 120, 24);
-    let y = row_index(&rows, "0845 1245");
+    let y = row_index(&rows, "0845 1230");
     assert_ne!(buffer[(60, u16::try_from(y).unwrap())].bg, Color::Red);
 }
 
@@ -138,7 +138,7 @@ fn ctrl_s_with_an_inconsistent_day_asks_what_to_do() {
     ctrl(&mut app, 's');
     let text = screen(&mut app);
     assert!(
-        text.contains("ma 2 nov: 0845–1245 overlaps 1230–1300"),
+        text.contains("ma 2 nov: 0845–1230 overlaps 1215–1300"),
         "{text}"
     );
     assert!(
@@ -153,7 +153,7 @@ fn save_anyway_saves_the_inconsistent_day() {
     let (mut app, fs) = monday_with_an_overlap();
     ctrl(&mut app, 's');
     press(&mut app, KeyCode::Char('s'));
-    assert!(fs.get(TIMESHEET).unwrap().contains("to: \"12:45\""));
+    assert!(fs.get(TIMESHEET).unwrap().contains("from: \"12:15\""));
     assert!(!app.has_unsaved_changes());
 }
 

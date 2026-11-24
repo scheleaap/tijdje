@@ -12,21 +12,6 @@ fn focus(period: usize, field: Field) -> FieldFocus {
     FieldFocus { period, field }
 }
 
-/// Mon 2 Nov from the sample: 0845–1230 work, 1230–1300 break, 1300–1757 work.
-fn app_on_monday() -> App {
-    app_with(SAMPLE, date(2026, 11, 2))
-}
-
-fn period(app: &App, index: usize) -> &tijdje::domain::Period {
-    &app.timesheet().days[&app.selected_day()].periods[index]
-}
-
-fn tab_to(app: &mut App, field: Field) {
-    while app.focus().field != field {
-        press(app, KeyCode::Tab);
-    }
-}
-
 #[test]
 fn typing_replaces_the_value_and_enter_accepts_it() {
     let mut app = app_on_monday();
@@ -34,7 +19,7 @@ fn typing_replaces_the_value_and_enter_accepts_it() {
     assert!(app.is_editing());
     press(&mut app, KeyCode::Enter);
     assert!(!app.is_editing());
-    assert_eq!(period(&app, 0).from, TimeOfDay::new(8, 15));
+    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(8, 15));
     let screen = rows(&render(&mut app, 120, 24));
     // 0815–1230 (4h15m) + 1300–1757 (4h57m)
     assert!(row_containing(&screen, "ma  2 nov").contains("9h12m"));
@@ -58,7 +43,7 @@ fn esc_rejects_the_active_input() {
     type_text(&mut app, "07");
     press(&mut app, KeyCode::Esc);
     assert!(!app.is_editing());
-    assert_eq!(period(&app, 0).from, TimeOfDay::new(8, 45));
+    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(8, 45));
 }
 
 #[test]
@@ -77,7 +62,7 @@ fn cursor_keys_edit_within_the_active_input() {
     press(&mut app, KeyCode::Backspace);
     press(&mut app, KeyCode::Enter);
     // "abc" → "Xabc" → delete "b" → "Xac" → backspace before "c" removes "a" → "Xc"
-    assert_eq!(period(&app, 1).notes.as_deref(), Some("Xc"));
+    assert_eq!(period_at(&app, 1).notes.as_deref(), Some("Xc"));
 }
 
 #[test]
@@ -85,7 +70,7 @@ fn time_fields_take_at_most_four_digits() {
     let mut app = app_on_monday();
     type_text(&mut app, "1a2:345");
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period(&app, 0).from, TimeOfDay::new(12, 34));
+    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(12, 34));
 }
 
 #[test]
@@ -110,7 +95,7 @@ fn invalid_time_keeps_editing_and_shows_a_message() {
         "message disappears at the next key"
     );
     press(&mut app, KeyCode::Esc);
-    assert_eq!(period(&app, 0).from, TimeOfDay::new(8, 45));
+    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(8, 45));
 }
 
 #[test]
@@ -127,13 +112,13 @@ fn an_empty_value_can_be_accepted() {
     type_text(&mut app, "1");
     press(&mut app, KeyCode::Backspace);
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period(&app, 0).from, None);
+    assert_eq!(period_at(&app, 0).from, None);
 
     tab_to(&mut app, Field::Project);
     type_text(&mut app, "x");
     press(&mut app, KeyCode::Backspace);
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period(&app, 0).project, None);
+    assert_eq!(period_at(&app, 0).project, None);
 }
 
 #[test]
@@ -143,12 +128,12 @@ fn tab_accepts_and_moves_on() {
     type_text(&mut app, "acme");
     press(&mut app, KeyCode::Tab);
     assert!(!app.is_editing());
-    assert_eq!(period(&app, 0).project.as_deref(), Some("acme"));
+    assert_eq!(period_at(&app, 0).project.as_deref(), Some("acme"));
     assert_eq!(app.focus(), focus(0, Field::Break));
     tab_to(&mut app, Field::Notes);
     type_text(&mut app, "n");
     press(&mut app, KeyCode::BackTab);
-    assert_eq!(period(&app, 0).notes.as_deref(), Some("n"));
+    assert_eq!(period_at(&app, 0).notes.as_deref(), Some("n"));
     assert_eq!(app.focus(), focus(0, Field::Holiday));
 }
 
@@ -159,7 +144,7 @@ fn ctrl_enter_accepts_and_moves_to_from_of_the_next_period() {
     type_text(&mut app, "acme");
     ctrl_key(&mut app, KeyCode::Enter);
     assert!(!app.is_editing());
-    assert_eq!(period(&app, 0).project.as_deref(), Some("acme"));
+    assert_eq!(period_at(&app, 0).project.as_deref(), Some("acme"));
     assert_eq!(app.focus(), focus(1, Field::From));
 }
 
@@ -225,8 +210,8 @@ fn ctrl_enter_in_the_last_period_adds_a_period_starting_where_it_ends() {
     tab_to(&mut app, Field::Notes);
     ctrl_key(&mut app, KeyCode::Enter);
     assert_eq!(app.timesheet().days[&date(2026, 11, 2)].periods.len(), 4);
-    assert_eq!(period(&app, 3).from, TimeOfDay::new(17, 57));
-    assert_eq!(period(&app, 3).to, None);
+    assert_eq!(period_at(&app, 3).from, TimeOfDay::new(17, 57));
+    assert_eq!(period_at(&app, 3).to, None);
     assert_eq!(app.focus(), focus(3, Field::From));
 }
 
@@ -265,7 +250,7 @@ fn enter_starts_editing_with_the_existing_text() {
     press(&mut app, KeyCode::Backspace);
     type_text(&mut app, "0");
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period(&app, 0).from, TimeOfDay::new(8, 40));
+    assert_eq!(period_at(&app, 0).from, TimeOfDay::new(8, 40));
 }
 
 #[test]
@@ -274,7 +259,7 @@ fn typing_in_notes_replaces_the_value_too() {
     tab_to(&mut app, Field::Notes);
     type_text(&mut app, "Day 1");
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period(&app, 0).notes.as_deref(), Some("Day 1"));
+    assert_eq!(period_at(&app, 0).notes.as_deref(), Some("Day 1"));
 }
 
 #[test]
@@ -283,7 +268,7 @@ fn typing_in_other_fields_replaces_the_value() {
     tab_to(&mut app, Field::Project);
     type_text(&mut app, "acme");
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period(&app, 0).project.as_deref(), Some("acme"));
+    assert_eq!(period_at(&app, 0).project.as_deref(), Some("acme"));
 }
 
 #[test]
@@ -464,14 +449,14 @@ fn popups_have_a_short_title_and_a_message() {
 #[test]
 fn the_consistency_popup_has_a_short_title() {
     let (mut app, _fs) = sample_on(date(2026, 11, 2));
-    press(&mut app, KeyCode::Tab);
-    type_text(&mut app, "1245");
+    press(&mut app, KeyCode::Down);
+    type_text(&mut app, "1215");
     press(&mut app, KeyCode::Enter);
     ctrl(&mut app, 's');
     let screen = rows(&render(&mut app, 120, 24)).join("\n");
     assert!(screen.contains("─ Consistency ─"), "{screen}");
     assert!(
-        screen.contains("ma 2 nov: 0845–1245 overlaps 1230–1300"),
+        screen.contains("ma 2 nov: 0845–1230 overlaps 1215–1300"),
         "{screen}"
     );
 }
@@ -488,7 +473,7 @@ fn left_and_right_move_the_cursor_while_editing() {
     press(&mut app, KeyCode::Right);
     type_text(&mut app, "d");
     press(&mut app, KeyCode::Enter);
-    assert_eq!(period(&app, 1).notes.as_deref(), Some("abcd"));
+    assert_eq!(period_at(&app, 1).notes.as_deref(), Some("abcd"));
     assert_eq!(app.focus(), focus(1, Field::Notes));
 }
 
@@ -496,13 +481,13 @@ fn left_and_right_move_the_cursor_while_editing() {
 fn del_clears_an_input_field() {
     let mut app = app_on_monday();
     press(&mut app, KeyCode::Delete);
-    assert_eq!(period(&app, 0).from, None);
+    assert_eq!(period_at(&app, 0).from, None);
     tab_to(&mut app, Field::Project);
     press(&mut app, KeyCode::Delete);
-    assert_eq!(period(&app, 0).project, None);
+    assert_eq!(period_at(&app, 0).project, None);
     tab_to(&mut app, Field::Notes);
     press(&mut app, KeyCode::Delete);
-    assert_eq!(period(&app, 0).notes, None);
+    assert_eq!(period_at(&app, 0).notes, None);
     assert!(!app.is_editing());
 }
 
@@ -514,13 +499,13 @@ fn del_unchecks_a_checkbox_and_leaves_others_alone() {
     tab_to(&mut app, Field::Free);
     press(&mut app, KeyCode::Delete);
     assert_eq!(
-        period(&app, 1).period_type,
+        period_at(&app, 1).period_type,
         tijdje::domain::PeriodType::Break
     );
     press(&mut app, KeyCode::BackTab);
     press(&mut app, KeyCode::Delete);
     assert_eq!(
-        period(&app, 1).period_type,
+        period_at(&app, 1).period_type,
         tijdje::domain::PeriodType::Work
     );
 }
@@ -542,7 +527,7 @@ fn edit_notes(app: &mut App, text: &str) {
 
 fn accepted_notes(app: &mut App) -> Option<String> {
     press(app, KeyCode::Enter);
-    period(app, 1).notes.clone()
+    period_at(app, 1).notes.clone()
 }
 
 #[test]

@@ -3,14 +3,7 @@ mod common;
 use common::*;
 use jiff::civil::date;
 use ratatui::crossterm::event::KeyCode;
-use tijdje::app::{App, Outcome};
-
-/// Mon 2 Nov on the sample, with focus on the first period's To.
-fn monday_on_the_first_to() -> App {
-    let (mut app, _fs) = sample_on(date(2026, 11, 2));
-    press(&mut app, KeyCode::Tab);
-    app
-}
+use tijdje::app::Outcome;
 
 #[test]
 fn a_needless_split_gets_a_period_warning_and_a_break_shows_its_type() {
@@ -32,22 +25,26 @@ days:
 
 #[test]
 fn a_consistency_failure_shows_right_away_while_filling_in_the_day() {
-    let mut app = monday_on_the_first_to();
-    type_text(&mut app, "1245");
+    let (mut app, _fs) = sample_on(date(2026, 11, 2));
+    press(&mut app, KeyCode::Down);
+    type_text(&mut app, "1215");
     press(&mut app, KeyCode::Enter);
     let screen = rows(&render(&mut app, 120, 24));
-    assert!(right(row_containing(&screen, "0845 1245")).starts_with("│⚠️"));
-    assert!(right(row_containing(&screen, "1230 1300")).starts_with("│⚠️"));
+    assert!(right(row_containing(&screen, "0845 1230")).starts_with("│⚠️"));
+    assert!(right(row_containing(&screen, "1215 1300")).starts_with("│⚠️"));
     assert!(right(row_containing(&screen, "1300 1757")).starts_with("│  "));
 }
 
 #[test]
 fn a_zero_minute_period_is_a_consistency_failure_not_a_warning() {
-    let mut app = monday_on_the_first_to();
-    type_text(&mut app, "0845");
+    // The last period's From, so no To changes and nothing chains.
+    let (mut app, _fs) = sample_on(date(2026, 11, 2));
+    press(&mut app, KeyCode::Down);
+    press(&mut app, KeyCode::Down);
+    type_text(&mut app, "1757");
     press(&mut app, KeyCode::Enter);
     let screen = rows(&render(&mut app, 120, 24));
-    assert!(right(row_containing(&screen, "0845 0845")).starts_with("│⚠️"));
+    assert!(right(row_containing(&screen, "1757 1757")).starts_with("│⚠️"));
     assert!(left(row_containing(&screen, "ma  2 nov")).contains("⚠️"));
 }
 

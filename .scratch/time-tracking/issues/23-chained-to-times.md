@@ -4,9 +4,9 @@
 
 **Blocked by:** 16
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Only To → next from–to period's From; changing a From changes nothing else (domain built test-first)
-- [ ] The chained change is part of the same undo step
+- [x] Only To → next from–to period's From; changing a From changes nothing else (domain built test-first)
+- [x] The chained change is part of the same undo step
 
 Spec: `.scratch/time-tracking/spec.md`

@@ -17,5 +17,6 @@
 - [ ] `part_of_day` with a non-null `from`/`to` is a parse error
 - [ ] Ctrl+Enter after a part-of-day last period adds a period with an empty From
 - [ ] The empty-period definition excludes periods with a part of day (they are never removed when sorting)
+- [ ] Chained times (ticket 23, `Day::set_to`) skip part-of-day and empty periods when looking for the next from–to period
 
 Spec: `.scratch/time-tracking/spec.md`
